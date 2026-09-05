@@ -1,0 +1,281 @@
+{
+  "timestamp": "2026-09-05T10:59:54.615Z",
+  "total": 39,
+  "passed": 39,
+  "failed": 0,
+  "scorecard": [
+    {
+      "module": "System & RBAC",
+      "category": "Live DB & RPC",
+      "testName": "Live Admin Authentication & Session Issuance",
+      "passed": true,
+      "durationMs": 498
+    },
+    {
+      "module": "System & RBAC",
+      "category": "Live DB & RPC",
+      "testName": "Discover anchor metadata & provision isolated test student",
+      "passed": true,
+      "durationMs": 504
+    },
+    {
+      "module": "Fees & Financials",
+      "category": "Live DB & RPC",
+      "testName": "Live Fee Ledger Retrieval & Category Discovery",
+      "passed": true,
+      "durationMs": 248
+    },
+    {
+      "module": "Fees & Financials",
+      "category": "Live DB & RPC",
+      "testName": "RPC collect_fee Live Execution & Ledger Balance Update",
+      "passed": true,
+      "durationMs": 303
+    },
+    {
+      "module": "Fees & Financials",
+      "category": "Live DB & RPC",
+      "testName": "RPC void_fee_payment Live Reversal & Ledger Reconciliation",
+      "passed": true,
+      "durationMs": 358
+    },
+    {
+      "module": "Fees & Financials",
+      "category": "Frontend UI & Templates",
+      "testName": "Inspect Fee modals, receipt template & report components",
+      "passed": true,
+      "durationMs": 2
+    },
+    {
+      "module": "Fees & Financials",
+      "category": "Zero Mock Data",
+      "testName": "Verify zero mock data in FeesPortal and subcomponents",
+      "passed": true,
+      "durationMs": 2
+    },
+    {
+      "module": "CBSE Examination",
+      "category": "Live DB & RPC",
+      "testName": "Exams Master CRUD & Subject Schedule Attachment",
+      "passed": true,
+      "durationMs": 242
+    },
+    {
+      "module": "CBSE Examination",
+      "category": "Live DB & RPC",
+      "testName": "RPC save_marks Live Recording & Validation",
+      "passed": true,
+      "durationMs": 261
+    },
+    {
+      "module": "CBSE Examination",
+      "category": "Frontend UI & Templates",
+      "testName": "Inspect ExaminationModule views, admit cards & report cards",
+      "passed": true,
+      "durationMs": 1
+    },
+    {
+      "module": "CBSE Examination",
+      "category": "Zero Mock Data",
+      "testName": "Verify zero mock data in ExaminationModule",
+      "passed": true,
+      "durationMs": 1
+    },
+    {
+      "module": "Attendance & Registers",
+      "category": "Live DB & RPC",
+      "testName": "RPC save_attendance Batch Recording & Status Verification",
+      "passed": true,
+      "durationMs": 244
+    },
+    {
+      "module": "Attendance & Registers",
+      "category": "Live DB & RPC",
+      "testName": "CBSE Attendance Summary & Leave Requests verification",
+      "passed": true,
+      "durationMs": 239
+    },
+    {
+      "module": "Attendance & Registers",
+      "category": "Frontend UI & Templates",
+      "testName": "Inspect AttendanceEntry register UI & quick toggle actions",
+      "passed": true,
+      "durationMs": 2
+    },
+    {
+      "module": "Attendance & Registers",
+      "category": "Zero Mock Data",
+      "testName": "Verify zero mock data in AttendanceEntry",
+      "passed": true,
+      "durationMs": 1
+    },
+    {
+      "module": "Transport",
+      "category": "Live DB & RPC",
+      "testName": "Routes, Vehicles, Drivers & Student Allotment Live CRUD",
+      "passed": true,
+      "durationMs": 498
+    },
+    {
+      "module": "Transport",
+      "category": "Frontend UI & Templates",
+      "testName": "Inspect TransportManagement tabs, modals & driver cards",
+      "passed": true,
+      "durationMs": 1
+    },
+    {
+      "module": "Transport",
+      "category": "Zero Mock Data",
+      "testName": "Verify zero mock data in TransportManagement",
+      "passed": true,
+      "durationMs": 1
+    },
+    {
+      "module": "Library",
+      "category": "Live DB & RPC",
+      "testName": "Catalog Books & Book Issues/Returns Live Lifecycle",
+      "passed": true,
+      "durationMs": 347
+    },
+    {
+      "module": "Library",
+      "category": "Frontend UI & Templates",
+      "testName": "Inspect LibraryManagement book catalog, tabs & issue forms",
+      "passed": true,
+      "durationMs": 0
+    },
+    {
+      "module": "Library",
+      "category": "Zero Mock Data",
+      "testName": "Verify zero mock data in LibraryManagement",
+      "passed": true,
+      "durationMs": 1
+    },
+    {
+      "module": "Hostel",
+      "category": "Live DB & RPC",
+      "testName": "Hostel Blocks & Rooms Live CRUD",
+      "passed": true,
+      "durationMs": 240
+    },
+    {
+      "module": "Hostel",
+      "category": "Frontend UI & Templates",
+      "testName": "Inspect HostelManagement room occupancy grid & visitor registry",
+      "passed": true,
+      "durationMs": 1
+    },
+    {
+      "module": "Hostel",
+      "category": "Zero Mock Data",
+      "testName": "Verify zero mock data in HostelManagement",
+      "passed": true,
+      "durationMs": 1
+    },
+    {
+      "module": "Inventory",
+      "category": "Live DB & RPC",
+      "testName": "Inventory Items & Physical Assets Live CRUD",
+      "passed": true,
+      "durationMs": 250
+    },
+    {
+      "module": "Inventory",
+      "category": "Frontend UI & Templates",
+      "testName": "Inspect InventoryManagement stock levels & purchase order lifecycle",
+      "passed": true,
+      "durationMs": 0
+    },
+    {
+      "module": "Inventory",
+      "category": "Zero Mock Data",
+      "testName": "Verify zero mock data in InventoryManagement",
+      "passed": true,
+      "durationMs": 1
+    },
+    {
+      "module": "Medical & Discipline",
+      "category": "Live DB & RPC",
+      "testName": "Student Medical Records & Disciplinary Infractions Live CRUD",
+      "passed": true,
+      "durationMs": 250
+    },
+    {
+      "module": "Medical & Discipline",
+      "category": "Frontend UI & Templates",
+      "testName": "Inspect MedicalManagement & DisciplineManagement modals & badges",
+      "passed": true,
+      "durationMs": 1
+    },
+    {
+      "module": "Medical & Discipline",
+      "category": "Zero Mock Data",
+      "testName": "Verify zero mock data in Medical & Discipline modules",
+      "passed": true,
+      "durationMs": 2
+    },
+    {
+      "module": "Front Office & Certificates",
+      "category": "Live DB & RPC",
+      "testName": "Front Office Logs & Certificate Issuance with Verification Code",
+      "passed": true,
+      "durationMs": 240
+    },
+    {
+      "module": "Front Office & Certificates",
+      "category": "Frontend UI & Templates",
+      "testName": "Inspect CertificateGenerator PDF render, QRCode & templates",
+      "passed": true,
+      "durationMs": 1
+    },
+    {
+      "module": "Front Office & Certificates",
+      "category": "Zero Mock Data",
+      "testName": "Verify zero mock data in Front Office & CertificateGenerator",
+      "passed": true,
+      "durationMs": 1
+    },
+    {
+      "module": "System & RBAC",
+      "category": "Live DB & RPC",
+      "testName": "RPC system_overview & admin_user_directory Live Execution",
+      "passed": true,
+      "durationMs": 240
+    },
+    {
+      "module": "System & RBAC",
+      "category": "Live DB & RPC",
+      "testName": "RPC set_user_status Live Execution & Audit Trail",
+      "passed": true,
+      "durationMs": 366
+    },
+    {
+      "module": "System & RBAC",
+      "category": "Live DB & RPC",
+      "testName": "RPC audit_log_search & audit_log_facets Live Verification",
+      "passed": true,
+      "durationMs": 246
+    },
+    {
+      "module": "System & RBAC",
+      "category": "Frontend UI & Templates",
+      "testName": "Inspect SystemManagement subviews, user directory & audit log viewer",
+      "passed": true,
+      "durationMs": 1
+    },
+    {
+      "module": "System & RBAC",
+      "category": "Zero Mock Data",
+      "testName": "Verify zero mock data in SystemManagement & subviews",
+      "passed": true,
+      "durationMs": 0
+    },
+    {
+      "module": "Teardown",
+      "category": "Quality Gate & Teardown",
+      "testName": "Cascade-aware deletion of all generated audit records",
+      "passed": true,
+      "durationMs": 2684
+    }
+  ]
+}
