@@ -94,16 +94,37 @@ export default function UserDirectoryView() {
 
   const adminApi = async (path: string, init: RequestInit = {}) => {
     const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) {
+      throw new Error('Your session has expired. Please sign in again.');
+    }
     const res = await fetch('/api/admin' + path, {
       ...init,
       headers: {
         'Content-Type': 'application/json',
-        Authorization: 'Bearer ' + (data.session?.access_token || ''),
+        Authorization: 'Bearer ' + token,
         ...(init.headers || {}),
       },
     });
-    const body = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(body.error || 'Request failed');
+    const contentType = res.headers.get('content-type') || '';
+    let body: any = {};
+    if (contentType.includes('application/json')) {
+      body = await res.json().catch(() => ({}));
+    } else {
+      const text = await res.text().catch(() => '');
+      if (!res.ok) {
+        if (res.status === 404) {
+          throw new Error('Backend API (/api/admin' + path + ') returned 404. Ensure Vercel Serverless Functions and SUPABASE_SERVICE_ROLE_KEY are deployed.');
+        }
+        if (res.status === 503) {
+          throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured in server environment variables.');
+        }
+        throw new Error(text || `Request failed with status ${res.status}`);
+      }
+    }
+    if (!res.ok) {
+      throw new Error(body.error || body.message || `Request failed with status ${res.status}`);
+    }
     return body;
   };
 
