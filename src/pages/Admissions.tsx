@@ -219,6 +219,18 @@ export default function Admissions() {
     } else if (lower.includes('doc') || lower.includes('document') || lower.includes('certificate')) {
       botReply = `📄 **Required Documents for Verification:**\n1. Student Birth Certificate (Municipal/Gram Panchayat)\n2. Previous Year Report Card (Class 1 and above)\n3. Transfer Certificate (TC) from recognized school\n4. 4 Passport-size photographs\n5. Aadhaar Card copy (Student & Parents)`;
       quickReplies = ['Continue Application', 'Submit My Form'];
+    } else if (lower.includes('submit application') || lower.includes('submit my form') || lower === 'submit' || lower.includes('submit now')) {
+      if (!formData.name) {
+        botReply = `To submit your application, please provide the **Applicant's Full Name** first:`;
+        quickReplies = ['Student: Aarav Kumar', 'Student: Priya Sharma'];
+      } else if (!formData.fatherName) {
+        botReply = `Almost ready! Please share the **Father's / Guardian's Name** to complete the registration:`;
+        quickReplies = ['Father: Mr. Rajesh Kumar', 'Father: Mr. Manoj Sharma'];
+      } else {
+        handleFinalSubmit();
+        botReply = `🎉 Processing your application for **${formData.name}** (Class ${formData.class})...\n\nGenerating your instant Registration Slip now!`;
+        quickReplies = ['Ask About Fees', 'Required Documents', 'School Timings'];
+      }
     } else {
       // General input handling: capture address or other info
       if (!formData.address && formData.fatherName) {

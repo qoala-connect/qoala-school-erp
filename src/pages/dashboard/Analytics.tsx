@@ -93,15 +93,15 @@ const PremiumStatCard = ({ label, value, trend, trendValue, icon: Icon, gradient
   >
     <div className="flex justify-between items-start mb-2 sm:mb-2.5">
       <div className={cn("p-1.5 sm:p-2 rounded-lg text-white shadow-sm transition-transform duration-200 shrink-0", gradient, onClick && "group-hover:scale-105")}>
-        <Icon className="w-3.5 h-3.5 sm:w-[18px] sm:h-[18px]" />
+        <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
       </div>
       {!isLoading && (
         <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
           <div className={cn(
-            "flex items-center gap-0.5 px-1 sm:px-1.5 py-0.5 rounded-full text-[8px] sm:text-[9px] font-black tracking-wide",
+            "flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-semibold",
             trend === 'up' ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
           )}>
-            {trend === 'up' ? <ArrowUpRight size={8} /> : <ArrowDownRight size={8} />}
+            {trend === 'up' ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
             {trendValue}
           </div>
           {onClick && (
@@ -114,12 +114,12 @@ const PremiumStatCard = ({ label, value, trend, trendValue, icon: Icon, gradient
     </div>
     
     <div className="min-w-0">
-      <div className="text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5 truncate">{label}</div>
+      <div className="text-xs font-medium text-slate-500 mb-1 truncate">{label}</div>
       <div className="flex items-baseline justify-between gap-1 min-w-0">
         {isLoading ? (
-          <div className="h-5 sm:h-6 w-12 sm:w-16 bg-slate-100 animate-pulse rounded-lg" />
+          <div className="h-6 sm:h-7 w-16 sm:w-20 bg-slate-100 animate-pulse rounded-lg" />
         ) : (
-          <div className="text-sm sm:text-2xl font-display font-black text-slate-900 tracking-tight leading-none truncate">{value}</div>
+          <div className="text-lg sm:text-2xl font-bold text-slate-900 leading-tight truncate">{value}</div>
         )}
         <div className="hidden sm:block shrink-0">
           <MiniSparkline color={sparkColor} data={sparkData} />
@@ -335,15 +335,15 @@ export default function Analytics() {
           tabIndex={0}
           role="button"
           aria-label={`New Admissions: ${metrics?.kpi?.pendingAdmissions || '0'} Pending`}
-          className="bg-white p-2.5 sm:p-3.5 rounded-xl border border-slate-100/80 shadow-2xs flex items-center justify-between gap-1.5 sm:gap-3 cursor-pointer hover:border-violet-500/50 hover:shadow-md transition-all duration-200 select-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:outline-none group min-w-0"
+          className="bg-white p-3 sm:p-4 rounded-xl border border-slate-100/80 shadow-2xs flex items-center justify-between gap-2 sm:gap-3 cursor-pointer hover:border-violet-500/50 hover:shadow-md transition-all duration-200 select-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:outline-none group min-w-0"
         >
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <div className="p-1.5 sm:p-2 rounded-lg bg-violet-50 text-violet-600 shrink-0 group-hover:scale-105 transition-transform duration-200">
-              <GraduationCap className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="p-2 rounded-lg bg-violet-50 text-violet-600 shrink-0 group-hover:scale-105 transition-transform duration-200">
+              <GraduationCap className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div className="min-w-0">
-              <div className="text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase tracking-wider truncate">New Admissions</div>
-              <div className="text-xs sm:text-base font-black text-slate-900 mt-0.5 truncate">{metrics?.kpi?.pendingAdmissions || '0'} Pending</div>
+              <div className="text-xs font-medium text-slate-500 truncate">New Admissions</div>
+              <div className="text-sm sm:text-base font-bold text-slate-900 mt-0.5 truncate">{metrics?.kpi?.pendingAdmissions || '0'} Pending</div>
             </div>
           </div>
           <ChevronRight size={14} className="text-violet-500 opacity-0 group-hover:opacity-100 translate-x-[-4px] group-hover:translate-x-0 transition-all duration-200 shrink-0 hidden sm:block" />
@@ -357,15 +357,15 @@ export default function Analytics() {
           tabIndex={0}
           role="button"
           aria-label={`Estimated Revenue: ₹${(metrics?.fees?.totalFee || 0).toLocaleString()}`}
-          className="bg-white p-2.5 sm:p-3.5 rounded-xl border border-slate-100/80 shadow-2xs flex items-center justify-between gap-1.5 sm:gap-3 cursor-pointer hover:border-violet-500/50 hover:shadow-md transition-all duration-200 select-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:outline-none group min-w-0"
+          className="bg-white p-3 sm:p-4 rounded-xl border border-slate-100/80 shadow-2xs flex items-center justify-between gap-2 sm:gap-3 cursor-pointer hover:border-violet-500/50 hover:shadow-md transition-all duration-200 select-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:outline-none group min-w-0"
         >
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <div className="p-1.5 sm:p-2 rounded-lg bg-indigo-50 text-indigo-600 shrink-0 group-hover:scale-105 transition-transform duration-200">
-              <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="p-2 rounded-lg bg-indigo-50 text-indigo-600 shrink-0 group-hover:scale-105 transition-transform duration-200">
+              <Wallet className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div className="min-w-0">
-              <div className="text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase tracking-wider truncate">Est. Revenue</div>
-              <div className="text-xs sm:text-base font-black text-slate-900 mt-0.5 truncate">₹{(metrics?.fees?.totalFee || 0).toLocaleString()}</div>
+              <div className="text-xs font-medium text-slate-500 truncate">Est. Revenue</div>
+              <div className="text-sm sm:text-base font-bold text-slate-900 mt-0.5 truncate">₹{(metrics?.fees?.totalFee || 0).toLocaleString()}</div>
             </div>
           </div>
           <ChevronRight size={14} className="text-violet-500 opacity-0 group-hover:opacity-100 translate-x-[-4px] group-hover:translate-x-0 transition-all duration-200 shrink-0 hidden sm:block" />
@@ -379,15 +379,15 @@ export default function Analytics() {
           tabIndex={0}
           role="button"
           aria-label={`Pending Dues: ₹${(metrics?.fees?.pendingAmount || 0).toLocaleString()}`}
-          className="bg-white p-2.5 sm:p-3.5 rounded-xl border border-slate-100/80 shadow-2xs flex items-center justify-between gap-1.5 sm:gap-3 cursor-pointer hover:border-violet-500/50 hover:shadow-md transition-all duration-200 select-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:outline-none group min-w-0"
+          className="bg-white p-3 sm:p-4 rounded-xl border border-slate-100/80 shadow-2xs flex items-center justify-between gap-2 sm:gap-3 cursor-pointer hover:border-violet-500/50 hover:shadow-md transition-all duration-200 select-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:outline-none group min-w-0"
         >
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <div className="p-1.5 sm:p-2 rounded-lg bg-rose-50 text-rose-600 shrink-0 group-hover:scale-105 transition-transform duration-200">
-              <AlertCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="p-2 rounded-lg bg-rose-50 text-rose-600 shrink-0 group-hover:scale-105 transition-transform duration-200">
+              <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div className="min-w-0">
-              <div className="text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase tracking-wider truncate">Pending Dues</div>
-              <div className="text-xs sm:text-base font-black text-slate-900 mt-0.5 truncate">₹{(metrics?.fees?.pendingAmount || 0).toLocaleString()}</div>
+              <div className="text-xs font-medium text-slate-500 truncate">Pending Dues</div>
+              <div className="text-sm sm:text-base font-bold text-slate-900 mt-0.5 truncate">₹{(metrics?.fees?.pendingAmount || 0).toLocaleString()}</div>
             </div>
           </div>
           <ChevronRight size={14} className="text-violet-500 opacity-0 group-hover:opacity-100 translate-x-[-4px] group-hover:translate-x-0 transition-all duration-200 shrink-0 hidden sm:block" />
@@ -401,15 +401,15 @@ export default function Analytics() {
           tabIndex={0}
           role="button"
           aria-label={`Active Classes: ${metrics?.kpi?.totalClasses || 0} Classes`}
-          className="bg-white p-2.5 sm:p-3.5 rounded-xl border border-slate-100/80 shadow-2xs flex items-center justify-between gap-1.5 sm:gap-3 cursor-pointer hover:border-violet-500/50 hover:shadow-md transition-all duration-200 select-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:outline-none group min-w-0"
+          className="bg-white p-3 sm:p-4 rounded-xl border border-slate-100/80 shadow-2xs flex items-center justify-between gap-2 sm:gap-3 cursor-pointer hover:border-violet-500/50 hover:shadow-md transition-all duration-200 select-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:outline-none group min-w-0"
         >
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <div className="p-1.5 sm:p-2 rounded-lg bg-emerald-50 text-emerald-600 shrink-0 group-hover:scale-105 transition-transform duration-200">
-              <School className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600 shrink-0 group-hover:scale-105 transition-transform duration-200">
+              <School className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div className="min-w-0">
-              <div className="text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase tracking-wider truncate">Active Classes</div>
-              <div className="text-xs sm:text-base font-black text-slate-900 mt-0.5 truncate">{metrics?.kpi?.totalClasses || 0} Classes</div>
+              <div className="text-xs font-medium text-slate-500 truncate">Active Classes</div>
+              <div className="text-sm sm:text-base font-bold text-slate-900 mt-0.5 truncate">{metrics?.kpi?.totalClasses || 0} Classes</div>
             </div>
           </div>
           <ChevronRight size={14} className="text-violet-500 opacity-0 group-hover:opacity-100 translate-x-[-4px] group-hover:translate-x-0 transition-all duration-200 shrink-0 hidden sm:block" />
@@ -419,8 +419,8 @@ export default function Analytics() {
       {/* 2.5 Enterprise Resource Overview */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Enterprise Resources & Utilities</h3>
-          <span className="text-[9px] text-[#1a73e8] font-black uppercase tracking-wider bg-blue-50 px-2 py-0.5 rounded-md">Live Schema Verified</span>
+          <h3 className="text-xs font-semibold text-slate-600 uppercase tracking-wider">Enterprise Resources & Utilities</h3>
+          <span className="text-xs text-blue-700 font-medium bg-blue-50 px-2.5 py-0.5 rounded-md border border-blue-100">Live Schema Verified</span>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {[
@@ -517,16 +517,16 @@ export default function Analytics() {
             >
               <div className="flex justify-between items-start mb-2">
                 <div className={cn("p-1.5 rounded-lg shrink-0", item.color)}>
-                  <item.icon className="w-3.5 h-3.5" />
+                  <item.icon className="w-4 h-4" />
                 </div>
                 <div className="text-[#1a73e8] opacity-0 group-hover:opacity-100 translate-x-[-4px] group-hover:translate-x-0 transition-all duration-200 shrink-0">
-                  <ChevronRight size={12} className="stroke-[2.5]" />
+                  <ChevronRight size={14} className="stroke-[2.5]" />
                 </div>
               </div>
               <div>
-                <div className="text-[10px] font-bold text-slate-800 leading-tight group-hover:text-[#1a73e8] transition-colors">{item.label}</div>
-                <div className="text-xs font-black text-slate-900 mt-0.5">{item.value}</div>
-                <div className="text-[8px] font-semibold text-slate-400 mt-0.5 uppercase tracking-wider">{item.sub}</div>
+                <div className="text-xs font-semibold text-slate-800 leading-tight group-hover:text-[#1a73e8] transition-colors">{item.label}</div>
+                <div className="text-sm font-bold text-slate-900 mt-0.5">{item.value}</div>
+                <div className="text-[11px] font-normal text-slate-500 mt-0.5">{item.sub}</div>
               </div>
             </motion.div>
           ))}
@@ -539,17 +539,17 @@ export default function Analytics() {
         <div className="lg:col-span-2 bg-white p-3.5 sm:p-4 rounded-xl border border-slate-100/80 shadow-2xs flex flex-col justify-between">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3.5">
             <div>
-              <h3 className="text-base font-display font-black text-slate-900 leading-none">Financial Velocity &amp; Invoicing</h3>
-              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-1">Real-time revenue realization</p>
+              <h3 className="text-base font-bold text-slate-900 leading-none">Financial Velocity &amp; Invoicing</h3>
+              <p className="text-xs text-slate-500 font-normal mt-1">Real-time revenue realization</p>
             </div>
             <div className="flex gap-3">
               <div className="flex items-center gap-1.5">
                 <div className="w-2 h-2 rounded-full bg-[#1a73e8]" />
-                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Collected</span>
+                <span className="text-xs font-medium text-slate-600">Collected</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <div className="w-2 h-2 rounded-full bg-slate-200" />
-                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Target</span>
+                <span className="text-xs font-medium text-slate-600">Target</span>
               </div>
             </div>
           </div>
@@ -616,8 +616,8 @@ export default function Analytics() {
         {/* Attendance Summary Donut */}
         <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-100/80 shadow-2xs flex flex-col justify-between">
           <div className="text-center mb-2">
-            <h3 className="text-base font-display font-black text-slate-900 leading-none">Attendance Summary</h3>
-            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-1">Today's Presence Rate</p>
+            <h3 className="text-base font-bold text-slate-900 leading-none">Attendance Summary</h3>
+            <p className="text-xs text-slate-500 font-normal mt-1">Today's Presence Rate</p>
           </div>
           <div 
             className="flex-1 min-h-[130px] flex items-center justify-center relative cursor-pointer group/pie" 
@@ -642,8 +642,8 @@ export default function Analytics() {
               </PieChart>
             </ResponsiveContainer>
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mt-1">
-              <span className="text-2xl font-black text-slate-900 leading-none group-hover/pie:scale-110 transition-transform duration-200">{metrics?.avgAttendance || 92}%</span>
-              <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Present</span>
+              <span className="text-2xl font-bold text-slate-900 leading-none group-hover/pie:scale-105 transition-transform duration-200">{metrics?.avgAttendance || 92}%</span>
+              <span className="text-xs text-slate-500 font-normal mt-0.5">Present</span>
             </div>
           </div>
           <div 
@@ -653,8 +653,8 @@ export default function Analytics() {
           >
             {ATTENDANCE_PIE.map(item => (
               <div key={item.name} className="text-center">
-                <div className="text-base font-black text-slate-800 leading-none">{item.value}%</div>
-                <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-0.5">{item.name}</div>
+                <div className="text-base font-bold text-slate-800 leading-none">{item.value}%</div>
+                <div className="text-xs text-slate-500 font-normal mt-0.5">{item.name}</div>
               </div>
             ))}
           </div>
@@ -665,8 +665,8 @@ export default function Analytics() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5 sm:gap-4">
         <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-100/80 shadow-2xs flex flex-col justify-between">
           <div>
-            <h3 className="text-base font-display font-black text-slate-900 leading-none">Admissions Trend</h3>
-            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-1">New Enrolments Timeline</p>
+            <h3 className="text-base font-bold text-slate-900 leading-none">Admissions Trend</h3>
+            <p className="text-xs text-slate-500 font-normal mt-1">New Enrolments Timeline</p>
           </div>
           <div className="h-[180px] w-full mt-3.5 cursor-pointer" title="Click to view admissions dashboard" onClick={() => navigate('/dashboard/admissions')}>
             <ResponsiveContainer width="100%" height="100%">
@@ -683,8 +683,8 @@ export default function Analytics() {
 
         <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-100/80 shadow-2xs flex flex-col justify-between">
           <div>
-            <h3 className="text-base font-display font-black text-slate-900 leading-none">Class-wise Student Distribution</h3>
-            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-1">Gender breakup per section</p>
+            <h3 className="text-base font-bold text-slate-900 leading-none">Class-wise Student Distribution</h3>
+            <p className="text-xs text-slate-500 font-normal mt-1">Gender breakup per section</p>
           </div>
           <div className="h-[180px] w-full mt-3.5 cursor-pointer" title="Click on a grade level to filter the students directory">
             <ResponsiveContainer width="100%" height="100%">
@@ -728,8 +728,8 @@ export default function Analytics() {
             className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-100/80 shadow-2xs cursor-pointer group hover:border-slate-300 transition-all"
           >
             <div className="flex justify-between items-center mb-2">
-              <span className="text-[10px] font-bold text-slate-500 truncate">{item.title}</span>
-              <span className="text-xs font-black text-slate-900">{item.progress}%</span>
+              <span className="text-xs font-medium text-slate-500 truncate">{item.title}</span>
+              <span className="text-xs font-bold text-slate-900">{item.progress}%</span>
             </div>
             <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
               <motion.div 
@@ -747,8 +747,8 @@ export default function Analytics() {
       <div className="bg-white rounded-xl border border-slate-100/80 shadow-2xs overflow-hidden">
         <div className="p-3.5 sm:p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
           <div>
-            <h3 className="text-base font-display font-black text-slate-900 leading-none">Operational Activity Stream</h3>
-            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-1">Live audit log across academic modules</p>
+            <h3 className="text-base font-bold text-slate-900 leading-none">Operational Activity Stream</h3>
+            <p className="text-xs text-slate-500 font-normal mt-1">Live audit log across academic modules</p>
           </div>
 
           {/* Sub-tabs Filter */}

@@ -65,22 +65,22 @@ export function AdminStatCard({
       )}
     >
       <div className="flex items-center justify-between gap-2 mb-2">
-        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest truncate">
+        <span className="text-xs font-medium text-slate-500 truncate">
           {label}
         </span>
         <div className={cn("p-1.5 rounded-lg border shrink-0", styles.iconBg)}>
-          <Icon size={14} />
+          <Icon size={16} />
         </div>
       </div>
 
       <div>
         <div className="flex items-baseline gap-2">
-          <h3 className="text-xl sm:text-2xl font-extrabold text-slate-900 leading-none">
+          <h3 className="text-xl sm:text-2xl font-bold text-slate-900 leading-tight">
             {value}
           </h3>
           {trend && (
             <span className={cn(
-              "text-[10px] font-bold px-1.5 py-0.5 rounded-full",
+              "text-xs font-medium px-2 py-0.5 rounded-full",
               trend.isPositive ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
             )}>
               {trend.isPositive ? '+' : ''}{trend.value}
@@ -88,7 +88,7 @@ export function AdminStatCard({
           )}
         </div>
         {subtext && (
-          <p className="text-[10px] text-slate-400 font-semibold mt-1 truncate">
+          <p className="text-xs text-slate-500 font-normal mt-1 truncate">
             {subtext}
           </p>
         )}

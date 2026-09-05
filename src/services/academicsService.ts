@@ -735,7 +735,9 @@ export async function fetchTimetable(input: {
     .order('period_number');
 
   if (input.class_id) query = query.eq('class_id', input.class_id);
-  if (input.section_id) query = query.eq('section_id', input.section_id);
+  if (input.section_id) {
+    query = query.or(`section_id.eq.${input.section_id},section_id.is.null`);
+  }
 
   return unwrap(await query);
 }
@@ -766,6 +768,7 @@ export async function saveTimetableSlot(input: {
     .from('timetable')
     .select('id, class_id, section_id, teacher_id, start_time, end_time')
     .eq('academic_year_id', input.academic_year_id)
+    .eq('class_id', input.class_id)
     .eq('day', input.day)
     .eq('period_number', input.period_number);
   if (input.id) clash = clash.neq('id', input.id);
@@ -774,7 +777,7 @@ export async function saveTimetableSlot(input: {
   if (!clashError && sameSlot) {
     for (const row of sameSlot) {
       const sameSection =
-        (row as any).class_id === input.class_id && ((row as any).section_id ?? null) === (input.section_id || null);
+        ((row as any).section_id ?? null) === (input.section_id || null);
       if (sameSection) {
         // If adding without an ID, adopt the existing slot ID to update seamlessly!
         if (!targetId) {
@@ -800,10 +803,10 @@ export async function saveTimetableSlot(input: {
   // 1. Direct Supabase write attempt
   try {
     const res = targetId
-      ? await supabase.from('timetable').update(payload).eq('id', targetId)
-      : await supabase.from('timetable').insert([payload]);
+      ? await supabase.from('timetable').update(payload).eq('id', targetId).select()
+      : await supabase.from('timetable').insert([payload]).select();
 
-    if (!res.error) return;
+    if (!res.error && res.data && res.data.length > 0) return;
   } catch (err) {
     // Fall through to resilient backend endpoint
   }

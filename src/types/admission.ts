@@ -137,6 +137,7 @@ export interface AdmissionRecord {
 }
 
 export interface CreateAdmissionInput {
+  application_number?: string;
   name: string;
   father_name: string;
   mother_name?: string;

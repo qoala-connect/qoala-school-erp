@@ -68,6 +68,7 @@ export default function FeesPortal() {
   // Filters & Sorting State
   const [search, setSearch] = useState('');
   const [classFilter, setClassFilter] = useState('all');
+  const [sectionFilter, setSectionFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [quickFilter, setQuickFilter] = useState<'all' | 'defaulters' | 'critical' | 'partial' | 'paid'>('all');
   const [sortField, setSortField] = useState<'name' | 'class' | 'demand' | 'paid' | 'remaining' | 'status'>('remaining');
@@ -215,6 +216,7 @@ export default function FeesPortal() {
       );
 
       const matchesClass = classFilter === 'all' || f.students?.class === classFilter || `Class ${f.students?.class}` === classFilter;
+      const matchesSection = sectionFilter === 'all' || f.students?.section === sectionFilter;
       const matchesStatus = statusFilter === 'all' || f.status === statusFilter;
 
       let matchesQuick = true;
@@ -223,7 +225,7 @@ export default function FeesPortal() {
       else if (quickFilter === 'partial') matchesQuick = f.amount_paid > 0 && f.remaining_amount > 0;
       else if (quickFilter === 'paid') matchesQuick = f.status === 'paid';
 
-      return matchesSearch && matchesClass && matchesStatus && matchesQuick;
+      return matchesSearch && matchesClass && matchesSection && matchesStatus && matchesQuick;
     });
 
     // Sort comparator
@@ -232,8 +234,8 @@ export default function FeesPortal() {
       if (sortField === 'name') {
         comparison = (a.students?.name || '').localeCompare(b.students?.name || '');
       } else if (sortField === 'class') {
-        const aCls = parseInt(a.students?.class || '0') || 0;
-        const bCls = parseInt(b.students?.class || '0') || 0;
+        const aCls = a.students?.class?.toLowerCase().includes('lkg') ? 0 : parseInt(a.students?.class || '0') || 0;
+        const bCls = b.students?.class?.toLowerCase().includes('lkg') ? 0 : parseInt(b.students?.class || '0') || 0;
         comparison = aCls - bCls;
       } else if (sortField === 'demand') {
         comparison = (a.total_amount || 0) - (b.total_amount || 0);
@@ -248,7 +250,7 @@ export default function FeesPortal() {
     });
 
     return result;
-  }, [fees, search, classFilter, statusFilter, quickFilter, sortField, sortOrder]);
+  }, [fees, search, classFilter, sectionFilter, statusFilter, quickFilter, sortField, sortOrder]);
 
   // Pagination for Student Fee Directory
   const totalPages = Math.ceil(filteredFees.length / pageSize) || 1;
@@ -260,7 +262,20 @@ export default function FeesPortal() {
   // Dynamic unique classes from records
   const uniqueClasses = useMemo(() => {
     const set = new Set(fees.map(f => f.students?.class).filter(Boolean));
-    return Array.from(set).sort((a: any, b: any) => (parseInt(a) || 0) - (parseInt(b) || 0));
+    return Array.from(set).sort((a: any, b: any) => {
+      const aVal = a?.toLowerCase().includes('lkg') ? 0 : parseInt(a) || 99;
+      const bVal = b?.toLowerCase().includes('lkg') ? 0 : parseInt(b) || 99;
+      return aVal - bVal;
+    });
+  }, [fees]);
+
+  // Dynamic unique sections from records
+  const uniqueSections = useMemo(() => {
+    const set = new Set<string>();
+    fees.forEach(f => {
+      if (f.students?.section) set.add(f.students.section);
+    });
+    return Array.from(set).sort();
   }, [fees]);
 
   // Recharts Monthly & Category Aggregations
@@ -552,8 +567,8 @@ export default function FeesPortal() {
                   <Plus className="w-4 h-4 text-white" />
                 </div>
                 <div className="text-left">
-                  <span className="text-xs font-black block leading-tight">Cashier Intake</span>
-                  <span className="text-[10px] text-emerald-100 font-medium">Record Fee Payment</span>
+                  <span className="text-xs sm:text-sm font-semibold block leading-tight">Cashier Intake</span>
+                  <span className="text-[11px] text-emerald-100 font-normal">Record Fee Payment</span>
                 </div>
               </div>
               <ArrowUpRight className="w-4 h-4 text-white/70 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
@@ -568,8 +583,8 @@ export default function FeesPortal() {
                   <AlertCircle className="w-4 h-4 text-white" />
                 </div>
                 <div className="text-left">
-                  <span className="text-xs font-black block leading-tight">Defaulters Roster</span>
-                  <span className="text-[10px] text-rose-100 font-medium">{metrics.pendingInvoices} pending accounts</span>
+                  <span className="text-xs sm:text-sm font-semibold block leading-tight">Defaulters Roster</span>
+                  <span className="text-[11px] text-rose-100 font-normal">{metrics.pendingInvoices} pending accounts</span>
                 </div>
               </div>
               <ChevronRight className="w-4 h-4 text-white/70 group-hover:translate-x-0.5 transition-transform" />
@@ -584,8 +599,8 @@ export default function FeesPortal() {
                   <Receipt className="w-4 h-4 text-white" />
                 </div>
                 <div className="text-left">
-                  <span className="text-xs font-black block leading-tight">Audit Receipts</span>
-                  <span className="text-[10px] text-violet-100 font-medium">{transactions.length} cleared entries</span>
+                  <span className="text-xs sm:text-sm font-semibold block leading-tight">Audit Receipts</span>
+                  <span className="text-[11px] text-violet-100 font-normal">{transactions.length} cleared entries</span>
                 </div>
               </div>
               <ChevronRight className="w-4 h-4 text-white/70 group-hover:translate-x-0.5 transition-transform" />
@@ -600,8 +615,8 @@ export default function FeesPortal() {
                   <Layers className="w-4 h-4 text-white" />
                 </div>
                 <div className="text-left">
-                  <span className="text-xs font-black block leading-tight">Grade Matrix</span>
-                  <span className="text-[10px] text-slate-300 font-medium">Fee Structures</span>
+                  <span className="text-xs sm:text-sm font-semibold block leading-tight">Grade Matrix</span>
+                  <span className="text-[11px] text-slate-300 font-normal">Fee Structures</span>
                 </div>
               </div>
               <ChevronRight className="w-4 h-4 text-white/70 group-hover:translate-x-0.5 transition-transform" />
@@ -619,11 +634,11 @@ export default function FeesPortal() {
                     <span className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg">
                       <TrendingUp className="w-4 h-4" />
                     </span>
-                    <h3 className="text-sm font-display font-black text-slate-800 uppercase tracking-wider">
+                    <h3 className="text-sm font-semibold text-slate-800">
                       Monthly Revenue Collection Velocity
                     </h3>
                   </div>
-                  <p className="text-xs text-slate-400 font-medium mt-0.5">Realized collections vs outstanding dues across CBSE academic months</p>
+                  <p className="text-xs text-slate-500 font-normal mt-0.5">Realized collections vs outstanding dues across CBSE academic months</p>
                 </div>
 
                 <div className="flex items-center gap-4 text-xs font-bold">
@@ -899,6 +914,17 @@ export default function FeesPortal() {
                 <option value="all">All Classes</option>
                 {uniqueClasses.map(c => (
                   <option key={c} value={c}>{c.startsWith('Class') ? c : `Class ${c}`}</option>
+                ))}
+              </select>
+
+              <select
+                value={sectionFilter}
+                onChange={(e) => { setSectionFilter(e.target.value); setCurrentPage(1); }}
+                className="bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs text-slate-700 font-bold outline-none cursor-pointer"
+              >
+                <option value="all">All Sections</option>
+                {uniqueSections.map(sec => (
+                  <option key={sec} value={sec}>Section {sec}</option>
                 ))}
               </select>
 

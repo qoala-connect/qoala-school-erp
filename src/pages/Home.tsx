@@ -218,7 +218,7 @@ export default function Home() {
         </Link>
       </aside>
 
-      {/* 4. HERO BANNER SLIDER & QUOTE OVERLAY WITH ENTERPRISE ANIMATIONS */}
+      {/* 4. MODERN CINEMATIC HERO BANNER & BENTO SHOWCASE */}
       <section className="relative bg-slate-950 overflow-hidden min-h-[580px] lg:min-h-[660px] flex items-center pt-28 md:pt-36">
         {/* Slides with Ken Burns animation */}
         {slides.map((slide, idx) => (
@@ -236,7 +236,7 @@ export default function Home() {
               }`}
             />
             {/* Multi-layered cinematic gradient overlay for ultra-crisp readability */}
-            <div className="absolute inset-0 bg-gradient-to-r from-slate-950/95 via-blue-950/80 to-slate-950/40" />
+            <div className="absolute inset-0 bg-gradient-to-r from-slate-950/95 via-blue-950/85 to-slate-950/50" />
             <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-black/40" />
           </div>
         ))}
@@ -247,117 +247,129 @@ export default function Home() {
 
         {/* Content Container */}
         <div className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-20 w-full">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
             
             {/* Left Column: Headlines & Call to Actions */}
-            <div className="lg:col-span-7 text-white">
-              <div className="flex flex-wrap items-center gap-2.5 mb-5">
-                <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-black uppercase tracking-wider sjs-glow-badge backdrop-blur-md">
-                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
-                  ADMISSIONS OPEN 2026-27
+            <div className="lg:col-span-7 text-white space-y-6">
+              {/* Top Status Pill */}
+              <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/15 backdrop-blur-xl shadow-lg">
+                <span className="flex h-2 w-2 relative">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-400"></span>
                 </span>
-
-                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-600/30 text-blue-200 border border-blue-400/30 text-xs font-semibold backdrop-blur-md">
-                  <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
+                <span className="text-xs font-bold tracking-wide text-amber-300">
+                  Admissions Open 2026-27
+                </span>
+                <span className="text-white/30">•</span>
+                <span className="text-xs font-medium text-slate-200">
                   CBSE Aff. No. 2131498
                 </span>
               </div>
 
-              <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black font-serif tracking-tight leading-[1.1] mb-4 drop-shadow-md">
-                ST. JOSEPH’S <br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500">
-                  SCHOOL
-                </span>
-              </h1>
-
-              <p className="text-sm sm:text-base lg:text-lg text-slate-200 font-medium mb-6 max-w-xl leading-relaxed text-balance">
-                Empowering visionary young minds at Barhalganj with value-centered education, modern digital pedagogy, holistic discipline, and spiritual excellence.
-              </p>
-
-              {/* Dynamic Quote Box with Golden Accent & Watermark */}
-              <div className="relative bg-slate-900/90 backdrop-blur-md border-l-4 border-amber-400 p-4 sm:p-5 rounded-r-2xl mb-8 shadow-2xl overflow-hidden group hover:border-amber-300 transition-all">
-                <Quote className="absolute right-3 bottom-2 w-16 h-16 text-white/5 pointer-events-none -scale-x-100" />
-                <div className="flex items-center gap-2 mb-1.5">
-                  <div className="w-2 h-2 rounded-full bg-amber-400" />
-                  <h3 className="text-xs font-bold text-amber-400 uppercase tracking-widest">
-                    {slides[activeSlide].quoteAuthor}
-                  </h3>
+              {/* Main Headline */}
+              <div className="space-y-1.5">
+                <div className="text-xs sm:text-sm font-black uppercase tracking-[0.25em] text-amber-400 font-sans">
+                  St. Joseph's School • Barhalganj
                 </div>
-                <p className="text-xs sm:text-sm italic text-slate-100 font-serif leading-relaxed">
-                  "{slides[activeSlide].quoteText}"
-                </p>
+                <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black font-serif tracking-tight leading-[1.1] text-white">
+                  Nurturing Visionary Minds with{' '}
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-yellow-200 to-amber-500">
+                    Excellence &amp; Values
+                  </span>
+                </h1>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex flex-wrap items-center gap-3.5">
-                <a
-                  href="#about"
-                  className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 px-6 py-3.5 rounded-xl font-black text-sm tracking-wide transition-all transform hover:-translate-y-0.5 shadow-lg shadow-amber-500/25 cursor-pointer"
-                >
-                  EXPLORE SJS <ChevronRight className="w-4 h-4 stroke-[3]" />
-                </a>
+              {/* Sub-headline */}
+              <p className="text-sm sm:text-base lg:text-lg text-slate-200/90 font-normal leading-relaxed max-w-xl text-balance">
+                Empowering students with holistic CBSE curriculum, digital smart classrooms, modern STEM robotics laboratories, and time-tested moral discipline since 1996.
+              </p>
 
+              {/* Action Buttons */}
+              <div className="flex flex-wrap items-center gap-3.5 pt-1">
                 <Link
                   to="/admissions"
-                  className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white px-6 py-3.5 rounded-xl font-bold text-sm tracking-wide transition-all transform hover:-translate-y-0.5 shadow-lg shadow-blue-600/30"
+                  className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 hover:from-amber-300 hover:to-amber-500 text-slate-950 px-6 py-3.5 rounded-xl font-black text-sm tracking-wide transition-all transform hover:-translate-y-0.5 shadow-lg shadow-amber-500/25 cursor-pointer group"
                 >
-                  Apply Online <ArrowRight className="w-4 h-4" />
+                  Apply for Admission
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </Link>
 
                 <a
-                  href="#gallery"
-                  className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white px-4 py-3.5 rounded-xl font-semibold text-xs sm:text-sm tracking-wide transition-all backdrop-blur-md border border-white/10 cursor-pointer"
+                  href="#about"
+                  className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-5 py-3.5 rounded-xl font-bold text-xs sm:text-sm tracking-wide transition-all backdrop-blur-md border border-white/15 hover:border-white/30 cursor-pointer"
                 >
-                  <Play className="w-3.5 h-3.5 fill-current text-amber-400" /> Virtual Tour
+                  <Play className="w-3.5 h-3.5 fill-amber-400 text-amber-400" /> Explore Campus
                 </a>
+
+                <Link
+                  to="/login"
+                  className="inline-flex items-center gap-1.5 text-slate-300 hover:text-white font-semibold text-xs sm:text-sm px-3.5 py-3.5 rounded-xl hover:bg-white/5 transition-colors"
+                >
+                  <ShieldCheck className="w-4 h-4 text-blue-400" /> ERP Login
+                </Link>
               </div>
             </div>
 
-            {/* Right Column: Floating Highlights Cards (Desktop / Tablet) */}
+            {/* Right Column: Modern Frosted Glass Bento Showcase */}
             <div className="hidden lg:flex lg:col-span-5 flex-col gap-4">
-              <div className="sjs-float-chip bg-slate-900/80 backdrop-blur-xl border border-white/15 p-5 rounded-2xl shadow-2xl text-white">
-                <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-3">
-                  <div className="flex items-center gap-2">
-                    <Award className="w-5 h-5 text-amber-400" />
-                    <span className="text-xs font-black uppercase tracking-wider text-amber-300">
-                      Why St. Joseph’s?
-                    </span>
+              <div className="relative rounded-3xl bg-slate-900/75 border border-white/15 backdrop-blur-2xl p-6 shadow-2xl overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-amber-400/10 rounded-full blur-2xl pointer-events-none" />
+
+                <div className="flex items-center justify-between pb-4 border-b border-white/10">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-amber-400/20 border border-amber-400/30 flex items-center justify-center">
+                      <Award className="w-4 h-4 text-amber-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-black uppercase tracking-wider text-white">
+                        Institutional Highlights
+                      </h3>
+                      <span className="text-[10px] text-slate-400">CBSE Senior Secondary Excellence</span>
+                    </div>
                   </div>
-                  <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">
-                    Est. 1996
+                  <span className="text-[11px] font-black px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30 font-mono">
+                    EST. 1996
                   </span>
                 </div>
 
-                <div className="space-y-3 text-xs text-slate-200">
-                  <div className="flex items-start gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                    <span><strong>100% CBSE Board Pass Rate</strong> with distinguished state and district toppers.</span>
+                {/* 2x2 Stats Grid */}
+                <div className="grid grid-cols-2 gap-3 my-4">
+                  <div className="p-3 rounded-2xl bg-white/5 border border-white/10 hover:border-amber-400/30 transition-colors">
+                    <div className="text-2xl font-black text-amber-400 font-serif">100%</div>
+                    <div className="text-[11px] font-bold text-slate-200 mt-0.5">Board Pass Rate</div>
+                    <div className="text-[10px] text-slate-400">CBSE District Toppers</div>
                   </div>
-                  <div className="flex items-start gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                    <span><strong>Smart Digital Classrooms</strong> and advanced AI & STEM composite robotics labs.</span>
-                  </div>
-                  <div className="flex items-start gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                    <span><strong>Eco-Friendly Green Campus</strong> with dedicated athletic sports complexes.</span>
-                  </div>
-                </div>
-              </div>
 
-              {/* Floating Quick Stat Badge */}
-              <div className="sjs-float-chip-delayed flex items-center justify-between bg-gradient-to-r from-blue-900/90 to-indigo-950/90 backdrop-blur-md border border-blue-400/30 p-4 rounded-2xl shadow-xl text-white">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-amber-400/20 border border-amber-400/40 flex items-center justify-center">
-                    <GraduationCap className="w-5 h-5 text-amber-400" />
+                  <div className="p-3 rounded-2xl bg-white/5 border border-white/10 hover:border-blue-400/30 transition-colors">
+                    <div className="text-2xl font-black text-blue-400 font-serif">30+ Yrs</div>
+                    <div className="text-[11px] font-bold text-slate-200 mt-0.5">Academic Legacy</div>
+                    <div className="text-[10px] text-slate-400">Trusted Education</div>
                   </div>
-                  <div>
-                    <div className="text-base font-black text-white">3,000+ Students</div>
-                    <div className="text-[11px] text-slate-300">Nurtured with Christian Values</div>
+
+                  <div className="p-3 rounded-2xl bg-white/5 border border-white/10 hover:border-emerald-400/30 transition-colors">
+                    <div className="text-2xl font-black text-emerald-400 font-serif">3,000+</div>
+                    <div className="text-[11px] font-bold text-slate-200 mt-0.5">Active Scholars</div>
+                    <div className="text-[10px] text-slate-400">Values &amp; Character</div>
+                  </div>
+
+                  <div className="p-3 rounded-2xl bg-white/5 border border-white/10 hover:border-purple-400/30 transition-colors">
+                    <div className="text-2xl font-black text-purple-400 font-serif">K–12</div>
+                    <div className="text-[11px] font-bold text-slate-200 mt-0.5">Comprehensive</div>
+                    <div className="text-[10px] text-slate-400">Nursery to Class XII</div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-xs font-bold text-amber-400">Class Nursery</div>
-                  <div className="text-[11px] text-slate-300">to Class XII (CBSE)</div>
+
+                {/* Live Philosophy / Quote Bar */}
+                <div className="pt-3 border-t border-white/10 flex items-start gap-2.5">
+                  <Quote className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    <p className="text-xs text-slate-200 italic font-serif leading-snug line-clamp-2">
+                      "{slides[activeSlide].quoteText}"
+                    </p>
+                    <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider block mt-1">
+                      — {slides[activeSlide].quoteAuthor}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -367,7 +379,6 @@ export default function Home() {
 
         {/* Slide Navigation Controls & Timer Progress Bar */}
         <div className="absolute bottom-6 right-4 sm:right-8 z-30 flex items-center gap-3 bg-slate-950/80 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/10 shadow-2xl">
-          {/* Prev Arrow */}
           <button
             type="button"
             onClick={() => setActiveSlide((prev) => (prev === 0 ? slides.length - 1 : prev - 1))}
@@ -377,7 +388,6 @@ export default function Home() {
             <ChevronLeft className="w-4 h-4" />
           </button>
 
-          {/* Slide Indicator Dots */}
           <div className="flex items-center gap-1.5">
             {slides.map((_, idx) => (
               <button
@@ -391,12 +401,10 @@ export default function Home() {
             ))}
           </div>
 
-          {/* Slide Counter */}
           <span className="text-[11px] font-mono font-bold text-slate-300 ml-1">
             0{activeSlide + 1} / 0{slides.length}
           </span>
 
-          {/* Next Arrow */}
           <button
             type="button"
             onClick={() => setActiveSlide((prev) => (prev + 1) % slides.length)}
@@ -413,71 +421,67 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 5. EXACT LIVE SJS PILL BUTTONS RIBBON (.aboutmidsec) */}
-      <section className="w-full bg-[#f8fafc] py-6 px-3 sm:px-6 relative z-30 border-b border-slate-200">
-        <div className="max-w-[1400px] mx-auto">
-          <div className="flex flex-wrap items-center justify-center lg:justify-between gap-3 sm:gap-4">
-            
-            <a 
-              href="https://entab-s3-bucket1.s3.ap-south-1.amazonaws.com/SJSKBUP/public/pdf/PublicDisclosure.pdf" 
-              target="_blank" 
+      {/* 5. MODERN QUICK ACTION DOCK */}
+      <section className="w-full bg-white relative z-30 border-b border-slate-200 shadow-xs">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+            {/* 1. CBSE Mandatory Disclosure */}
+            <a
+              href="https://entab-s3-bucket1.s3.ap-south-1.amazonaws.com/SJSKBUP/public/pdf/PublicDisclosure.pdf"
+              target="_blank"
               rel="noreferrer"
-              className="sjs-btn-pill shadow-md hover:scale-105 transition-transform"
+              className="p-3.5 rounded-2xl bg-slate-50 hover:bg-blue-50/80 border border-slate-200/80 hover:border-blue-300 transition-all flex items-center gap-3 group shadow-2xs hover:shadow-xs"
             >
-              CBSE DISCLOSURE
+              <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                <FileText className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <span className="block text-xs font-bold text-slate-900 group-hover:text-blue-700 truncate">CBSE Disclosure</span>
+                <span className="block text-[10px] text-slate-500 truncate">Mandatory Public Docs</span>
+              </div>
             </a>
 
-            <Link 
+            {/* 2. Online Fee Payment */}
+            <Link
               to="/login"
-              className="sjs-btn-pill shadow-md hover:scale-105 transition-transform"
+              className="p-3.5 rounded-2xl bg-slate-50 hover:bg-emerald-50/80 border border-slate-200/80 hover:border-emerald-300 transition-all flex items-center gap-3 group shadow-2xs hover:shadow-xs"
             >
-              ONLINE PAYMENT
+              <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                <Download className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <span className="block text-xs font-bold text-slate-900 group-hover:text-emerald-700 truncate">Fee Payment</span>
+                <span className="block text-[10px] text-slate-500 truncate">Online ERP &amp; Receipts</span>
+              </div>
             </Link>
 
-            <Link 
+            {/* 3. Admissions */}
+            <Link
               to="/admissions"
-              className="sjs-btn-pill shadow-md hover:scale-105 transition-transform"
+              className="p-3.5 rounded-2xl bg-slate-50 hover:bg-amber-50/80 border border-slate-200/80 hover:border-amber-300 transition-all flex items-center gap-3 group shadow-2xs hover:shadow-xs"
             >
-              ALUMNAE REGISTRATION
+              <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                <GraduationCap className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <span className="block text-xs font-bold text-slate-900 group-hover:text-amber-800 truncate">Admissions 2026</span>
+                <span className="block text-[10px] text-slate-500 truncate">Apply Online Now</span>
+              </div>
             </Link>
 
-            {/* Center Authentic Live Phone Box (.phone) */}
-            <a 
+            {/* 4. Helpdesk */}
+            <a
               href="tel:+918853242676"
-              className="sjs-phone-box hover:scale-108 transition-all group"
-              title="Call School Helpdesk"
+              className="p-3.5 rounded-2xl bg-slate-50 hover:bg-indigo-50/80 border border-slate-200/80 hover:border-indigo-300 transition-all flex items-center gap-3 group shadow-2xs hover:shadow-xs"
             >
-              <img 
-                src="https://entab-s3-bucket1.s3.ap-south-1.amazonaws.com/SJSKBUP/public/Images/phone.gif" 
-                alt="Call Us" 
-                className="w-9 h-9 object-contain"
-              />
-              <span className="text-[10px] font-black uppercase text-[#061f3d] tracking-wider mt-0.5 group-hover:text-blue-600">
-                CALL US!
-              </span>
+              <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                <Phone className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <span className="block text-xs font-bold text-slate-900 group-hover:text-indigo-700 truncate">School Helpdesk</span>
+                <span className="block text-[10px] text-slate-500 truncate">+91 88532 42676</span>
+              </div>
             </a>
-
-            <Link 
-              to="/dashboard/transport"
-              className="sjs-btn-pill shadow-md hover:scale-105 transition-transform"
-            >
-              BUS ROUTE
-            </Link>
-
-            <a 
-              href="#gallery"
-              className="sjs-btn-pill shadow-md hover:scale-105 transition-transform"
-            >
-              GALLERY
-            </a>
-
-            <Link 
-              to="/login"
-              className="sjs-btn-pill shadow-md hover:scale-105 transition-transform bg-gradient-to-r from-blue-700 to-blue-600"
-            >
-              ERP LOGIN
-            </Link>
-
           </div>
         </div>
       </section>

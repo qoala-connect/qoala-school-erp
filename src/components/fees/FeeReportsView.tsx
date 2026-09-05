@@ -19,23 +19,34 @@ export default function FeeReportsView({
   onOpenCollectModal
 }: FeeReportsViewProps) {
   const [selectedClass, setSelectedClass] = useState('All');
+  const [selectedSection, setSelectedSection] = useState('All');
   const [severityFilter, setSeverityFilter] = useState<'all' | 'critical' | 'moderate' | 'partial'>('all');
-  const [activeReportTab, setActiveReportTab] = useState<'defaulters' | 'class_summary'>('defaulters');
+  const [activeReportTab, setActiveReportTab] = useState<'defaulters' | 'class_summary' | 'section_summary'>('defaulters');
   const [search, setSearch] = useState('');
+
+  // Extract unique sections dynamically
+  const uniqueSections = useMemo(() => {
+    const set = new Set<string>();
+    fees.forEach(f => {
+      if (f.students?.section) set.add(f.students.section);
+    });
+    return Array.from(set).sort();
+  }, [fees]);
 
   // Filtered dataset for reports
   const filteredFees = useMemo(() => {
     return fees.filter(f => {
       const matchesClass = selectedClass === 'All' || f.students?.class === selectedClass || `Class ${f.students?.class}` === selectedClass;
+      const matchesSection = selectedSection === 'All' || f.students?.section === selectedSection;
       const matchesSearch = !search.trim() || (
         (f.students?.name && f.students.name.toLowerCase().includes(search.toLowerCase())) ||
         (f.students?.admission_number && f.students.admission_number.toLowerCase().includes(search.toLowerCase())) ||
         (f.students?.father_name && f.students.father_name.toLowerCase().includes(search.toLowerCase()))
       );
 
-      return matchesClass && matchesSearch;
+      return matchesClass && matchesSection && matchesSearch;
     });
-  }, [fees, selectedClass, search]);
+  }, [fees, selectedClass, selectedSection, search]);
 
   // Defaulters List (Students with remaining > 0)
   const defaulters = useMemo(() => {
@@ -49,27 +60,82 @@ export default function FeeReportsView({
       });
   }, [filteredFees, severityFilter]);
 
-  // Class-wise aggregation
+  // Class-wise aggregation (sorted naturally: LKG -> 1 -> ... -> 12)
   const classSummary = useMemo(() => {
-    const map: Record<string, { className: string; demand: number; collected: number; dues: number; count: number }> = {};
+    const map: Record<string, { className: string; demand: number; collected: number; dues: number; count: number; defaulters: number }> = {};
 
     classes.forEach(c => {
-      map[c.class_name] = { className: `Class ${c.class_name}`, demand: 0, collected: 0, dues: 0, count: 0 };
+      map[c.class_name] = { className: c.class_name.startsWith('Class') ? c.class_name : `Class ${c.class_name}`, demand: 0, collected: 0, dues: 0, count: 0, defaulters: 0 };
     });
 
     fees.forEach(f => {
       const cls = f.students?.class || 'Unknown';
       if (!map[cls]) {
-        map[cls] = { className: `Class ${cls}`, demand: 0, collected: 0, dues: 0, count: 0 };
+        map[cls] = { className: cls.startsWith('Class') ? cls : `Class ${cls}`, demand: 0, collected: 0, dues: 0, count: 0, defaulters: 0 };
       }
-      map[cls].demand += f.total_amount;
-      map[cls].collected += f.amount_paid;
-      map[cls].dues += f.remaining_amount;
-      map[cls].count += 1;
+      const isMatch = (selectedClass === 'All' || f.students?.class === selectedClass) &&
+                      (selectedSection === 'All' || f.students?.section === selectedSection);
+      if (isMatch) {
+        map[cls].demand += f.total_amount;
+        map[cls].collected += f.amount_paid;
+        map[cls].dues += f.remaining_amount;
+        map[cls].count += 1;
+        if (f.remaining_amount > 0) {
+          map[cls].defaulters += 1;
+        }
+      }
     });
 
-    return Object.values(map);
-  }, [fees, classes]);
+    return Object.values(map)
+      .filter(cs => cs.count > 0 || selectedClass === 'All')
+      .sort((a, b) => {
+        const aVal = a.className.toLowerCase().includes('lkg') ? 0 : parseInt(a.className.replace(/\D/g, '')) || 99;
+        const bVal = b.className.toLowerCase().includes('lkg') ? 0 : parseInt(b.className.replace(/\D/g, '')) || 99;
+        return aVal - bVal;
+      });
+  }, [fees, classes, selectedClass, selectedSection]);
+
+  // Section-wise aggregation (e.g. Class 1-A, Class 1-B, Class 1-C, etc.)
+  const sectionSummary = useMemo(() => {
+    const map: Record<string, { key: string; className: string; section: string; demand: number; collected: number; dues: number; count: number; defaulters: number }> = {};
+
+    fees.forEach(f => {
+      const cls = f.students?.class || 'Unknown';
+      const sec = f.students?.section || 'A';
+      const isMatch = (selectedClass === 'All' || cls === selectedClass) &&
+                      (selectedSection === 'All' || sec === selectedSection);
+      
+      if (isMatch) {
+        const key = `${cls}_${sec}`;
+        if (!map[key]) {
+          map[key] = {
+            key,
+            className: cls.startsWith('Class') ? cls : `Class ${cls}`,
+            section: sec,
+            demand: 0,
+            collected: 0,
+            dues: 0,
+            count: 0,
+            defaulters: 0
+          };
+        }
+        map[key].demand += f.total_amount;
+        map[key].collected += f.amount_paid;
+        map[key].dues += f.remaining_amount;
+        map[key].count += 1;
+        if (f.remaining_amount > 0) {
+          map[key].defaulters += 1;
+        }
+      }
+    });
+
+    return Object.values(map).sort((a, b) => {
+      const aVal = a.className.toLowerCase().includes('lkg') ? 0 : parseInt(a.className.replace(/\D/g, '')) || 99;
+      const bVal = b.className.toLowerCase().includes('lkg') ? 0 : parseInt(b.className.replace(/\D/g, '')) || 99;
+      if (aVal !== bVal) return aVal - bVal;
+      return a.section.localeCompare(b.section);
+    });
+  }, [fees, selectedClass, selectedSection]);
 
   // Overall report metrics
   const reportMetrics = useMemo(() => {
@@ -108,13 +174,15 @@ export default function FeeReportsView({
       link.click();
       document.body.removeChild(link);
       toast.success(`Exported ${defaulters.length} fee defaulter records.`);
-    } else {
-      const headers = ['Class', 'Total Demand (INR)', 'Total Collected (INR)', 'Outstanding Dues (INR)', 'Collection Rate (%)'];
+    } else if (activeReportTab === 'class_summary') {
+      const headers = ['Class', 'Students Enrolled', 'Total Demand (INR)', 'Total Collected (INR)', 'Outstanding Dues (INR)', 'Defaulter Accounts', 'Collection Rate (%)'];
       const rows = classSummary.map(cs => [
         cs.className,
+        cs.count,
         cs.demand,
         cs.collected,
         cs.dues,
+        cs.defaulters,
         cs.demand > 0 ? `${Math.round((cs.collected / cs.demand) * 100)}%` : '0%'
       ]);
 
@@ -127,6 +195,28 @@ export default function FeeReportsView({
       link.click();
       document.body.removeChild(link);
       toast.success('Exported class-wise fee collection summary.');
+    } else {
+      const headers = ['Class', 'Section', 'Students Enrolled', 'Total Demand (INR)', 'Total Collected (INR)', 'Outstanding Dues (INR)', 'Defaulter Accounts', 'Collection Rate (%)'];
+      const rows = sectionSummary.map(ss => [
+        ss.className,
+        ss.section,
+        ss.count,
+        ss.demand,
+        ss.collected,
+        ss.dues,
+        ss.defaulters,
+        ss.demand > 0 ? `${Math.round((ss.collected / ss.demand) * 100)}%` : '0%'
+      ]);
+
+      const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(r => r.map(v => `"${v}"`).join(','))].join('\n');
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement('a');
+      link.setAttribute('href', encodedUri);
+      link.setAttribute('download', `Section_Fee_Breakdown_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success('Exported section-wise fee breakdown report.');
     }
   };
 
@@ -151,40 +241,40 @@ export default function FeeReportsView({
       
       {/* 1. Report KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-        <div className="bg-white border border-slate-200/60 rounded-2xl p-4 shadow-xs">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Total Demand in Scope</span>
-          <div className="text-xl font-display font-black text-slate-800 mt-1">₹{reportMetrics.totalDemand.toLocaleString()}</div>
-          <span className="text-[10px] text-slate-400 font-medium">{filteredFees.length} fee ledgers</span>
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-2xs flex flex-col justify-between">
+          <span className="text-xs font-medium text-slate-500 block truncate">Total Demand in Scope</span>
+          <div className="text-xl sm:text-2xl font-bold text-slate-900 mt-1.5 leading-tight">₹{reportMetrics.totalDemand.toLocaleString()}</div>
+          <span className="text-xs text-slate-400 font-normal mt-1 block">{filteredFees.length} fee ledgers</span>
         </div>
 
-        <div className="bg-white border border-slate-200/60 rounded-2xl p-4 shadow-xs">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-500 block">Total Realized Collection</span>
-          <div className="text-xl font-display font-black text-emerald-700 mt-1">₹{reportMetrics.totalCollected.toLocaleString()}</div>
-          <span className="text-[10px] text-emerald-600 font-bold">{reportMetrics.collectionRate}% realization rate</span>
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-2xs flex flex-col justify-between">
+          <span className="text-xs font-medium text-emerald-600 block truncate">Total Realized Collection</span>
+          <div className="text-xl sm:text-2xl font-bold text-emerald-700 mt-1.5 leading-tight">₹{reportMetrics.totalCollected.toLocaleString()}</div>
+          <span className="text-xs text-emerald-600 font-medium mt-1 block">{reportMetrics.collectionRate}% realization rate</span>
         </div>
 
-        <div className="bg-white border border-slate-200/60 rounded-2xl p-4 shadow-xs">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-rose-500 block">Outstanding Balance Dues</span>
-          <div className="text-xl font-display font-black text-rose-700 mt-1">₹{reportMetrics.totalDues.toLocaleString()}</div>
-          <span className="text-[10px] text-rose-600 font-bold">{reportMetrics.defaultersCount} pending accounts</span>
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-2xs flex flex-col justify-between">
+          <span className="text-xs font-medium text-rose-600 block truncate">Outstanding Balance Dues</span>
+          <div className="text-xl sm:text-2xl font-bold text-rose-700 mt-1.5 leading-tight">₹{reportMetrics.totalDues.toLocaleString()}</div>
+          <span className="text-xs text-rose-600 font-medium mt-1 block">{reportMetrics.defaultersCount} pending accounts</span>
         </div>
 
-        <div className="bg-white border border-slate-200/60 rounded-2xl p-4 shadow-xs">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-violet-500 block">Defaulter Rate</span>
-          <div className="text-xl font-display font-black text-violet-700 mt-1">
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-2xs flex flex-col justify-between">
+          <span className="text-xs font-medium text-violet-600 block truncate">Defaulter Rate</span>
+          <div className="text-xl sm:text-2xl font-bold text-violet-700 mt-1.5 leading-tight">
             {filteredFees.length > 0 ? `${Math.round((reportMetrics.defaultersCount / filteredFees.length) * 100)}%` : '0%'}
           </div>
-          <span className="text-[10px] text-violet-600 font-medium">Of enrolled students in scope</span>
+          <span className="text-xs text-slate-400 font-normal mt-1 block">Enrolled in scope</span>
         </div>
       </div>
 
       {/* 2. Controls & Tab Switcher */}
       <div className="bg-white border border-slate-200/60 rounded-2xl p-4 shadow-xs flex flex-col md:flex-row gap-3 items-center justify-between">
         
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
           <button
             onClick={() => setActiveReportTab('defaulters')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               activeReportTab === 'defaulters'
                 ? 'bg-rose-50 text-rose-700 border border-rose-200 shadow-2xs'
                 : 'text-slate-600 hover:bg-slate-100'
@@ -194,20 +284,30 @@ export default function FeeReportsView({
           </button>
           <button
             onClick={() => setActiveReportTab('class_summary')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               activeReportTab === 'class_summary'
                 ? 'bg-violet-50 text-violet-700 border border-violet-200 shadow-2xs'
                 : 'text-slate-600 hover:bg-slate-100'
             }`}
           >
-            Class-Wise Collection Summary
+            Class-Wise Summary ({classSummary.length})
+          </button>
+          <button
+            onClick={() => setActiveReportTab('section_summary')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeReportTab === 'section_summary'
+                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs'
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            Section-Wise Breakdown ({sectionSummary.length})
           </button>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
           {activeReportTab === 'defaulters' && (
             <>
-              <div className="relative flex-1 sm:w-56">
+              <div className="relative flex-1 sm:w-48">
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
                 <input
                   type="text"
@@ -239,6 +339,17 @@ export default function FeeReportsView({
             <option value="All">All Classes</option>
             {classes.map(c => (
               <option key={c.id} value={c.class_name}>Class {c.class_name}</option>
+            ))}
+          </select>
+
+          <select
+            value={selectedSection}
+            onChange={(e) => setSelectedSection(e.target.value)}
+            className="bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs font-bold text-slate-700 outline-none cursor-pointer"
+          >
+            <option value="All">All Sections</option>
+            {uniqueSections.map(sec => (
+              <option key={sec} value={sec}>Section {sec}</option>
             ))}
           </select>
 
@@ -330,15 +441,17 @@ export default function FeeReportsView({
               </table>
             </div>
           )
-        ) : (
+        ) : activeReportTab === 'class_summary' ? (
           <div className="overflow-x-auto">
             <table className="w-full text-xs text-left">
               <thead>
                 <tr className="border-b border-slate-200 text-[10px] uppercase tracking-wider text-slate-400 font-black">
                   <th className="py-2.5 px-3">Class / Grade</th>
+                  <th className="py-2.5 px-3 text-center">Enrolled</th>
                   <th className="py-2.5 px-3 text-right">Total Demand (₹)</th>
                   <th className="py-2.5 px-3 text-right text-emerald-600">Total Collected (₹)</th>
                   <th className="py-2.5 px-3 text-right text-rose-600">Outstanding Balance (₹)</th>
+                  <th className="py-2.5 px-3 text-center text-amber-600">Defaulters</th>
                   <th className="py-2.5 px-3 text-right">Realization Rate</th>
                 </tr>
               </thead>
@@ -348,14 +461,78 @@ export default function FeeReportsView({
                   return (
                     <tr key={cs.className} className="hover:bg-slate-50 transition-colors">
                       <td className="py-3 px-3 font-bold text-slate-900">{cs.className}</td>
+                      <td className="py-3 px-3 text-center text-slate-500 font-mono font-bold">{cs.count}</td>
                       <td className="py-3 px-3 text-right font-mono font-bold text-slate-800">₹{cs.demand.toLocaleString()}</td>
                       <td className="py-3 px-3 text-right font-mono font-bold text-emerald-700">₹{cs.collected.toLocaleString()}</td>
                       <td className="py-3 px-3 text-right font-mono font-bold text-rose-700">₹{cs.dues.toLocaleString()}</td>
+                      <td className="py-3 px-3 text-center font-mono font-bold text-amber-700">
+                        {cs.defaulters > 0 ? (
+                          <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-[11px] font-extrabold border border-amber-200">
+                            {cs.defaulters}
+                          </span>
+                        ) : (
+                          <span className="text-emerald-600 font-bold text-[11px]">0</span>
+                        )}
+                      </td>
                       <td className="py-3 px-3 text-right">
                         <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                          rate >= 80 ? 'bg-emerald-50 text-emerald-700' :
-                          rate >= 50 ? 'bg-amber-50 text-amber-700' :
-                          'bg-rose-50 text-rose-700'
+                          rate >= 80 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                          rate >= 50 ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                          'bg-rose-50 text-rose-700 border border-rose-200'
+                        }`}>
+                          {rate}%
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          /* Section-Wise Breakdown Table */
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left">
+              <thead>
+                <tr className="border-b border-slate-200 text-[10px] uppercase tracking-wider text-slate-400 font-black">
+                  <th className="py-2.5 px-3">Class & Section</th>
+                  <th className="py-2.5 px-3 text-center">Enrolled</th>
+                  <th className="py-2.5 px-3 text-right">Total Demand (₹)</th>
+                  <th className="py-2.5 px-3 text-right text-emerald-600">Total Collected (₹)</th>
+                  <th className="py-2.5 px-3 text-right text-rose-600">Outstanding Balance (₹)</th>
+                  <th className="py-2.5 px-3 text-center text-amber-600">Defaulters</th>
+                  <th className="py-2.5 px-3 text-right">Realization Rate</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-medium">
+                {sectionSummary.map(ss => {
+                  const rate = ss.demand > 0 ? Math.round((ss.collected / ss.demand) * 100) : 0;
+                  return (
+                    <tr key={ss.key} className="hover:bg-slate-50 transition-colors">
+                      <td className="py-3 px-3">
+                        <span className="font-bold text-slate-900">{ss.className}</span>
+                        <span className="ml-1.5 px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px] font-black border border-slate-200">
+                          Sec {ss.section}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-center text-slate-500 font-mono font-bold">{ss.count}</td>
+                      <td className="py-3 px-3 text-right font-mono font-bold text-slate-800">₹{ss.demand.toLocaleString()}</td>
+                      <td className="py-3 px-3 text-right font-mono font-bold text-emerald-700">₹{ss.collected.toLocaleString()}</td>
+                      <td className="py-3 px-3 text-right font-mono font-bold text-rose-700">₹{ss.dues.toLocaleString()}</td>
+                      <td className="py-3 px-3 text-center font-mono font-bold">
+                        {ss.defaulters > 0 ? (
+                          <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-[11px] font-extrabold border border-amber-200">
+                            {ss.defaulters}
+                          </span>
+                        ) : (
+                          <span className="text-emerald-600 font-bold text-[11px]">0</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-3 text-right">
+                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                          rate >= 80 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                          rate >= 50 ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                          'bg-rose-50 text-rose-700 border border-rose-200'
                         }`}>
                           {rate}%
                         </span>

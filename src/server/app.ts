@@ -472,14 +472,21 @@ export function createExpressApp() {
 
       // Check for existing slot to auto-upsert if no ID was provided
       if (!targetId) {
-        const { data: existing } = await adminClient!
+        let existingQuery = adminClient!
           .from('timetable')
           .select('id')
           .eq('academic_year_id', academic_year_id)
           .eq('class_id', class_id)
           .eq('day', day)
-          .eq('period_number', Number(period_number))
-          .maybeSingle();
+          .eq('period_number', Number(period_number));
+
+        if (section_id) {
+          existingQuery = existingQuery.eq('section_id', section_id);
+        } else {
+          existingQuery = existingQuery.is('section_id', null);
+        }
+
+        const { data: existing } = await existingQuery.maybeSingle();
 
         if (existing?.id) {
           targetId = existing.id;
@@ -499,12 +506,25 @@ export function createExpressApp() {
         end_time: cleanEndTime,
       };
 
-      const { data, error } = targetId
-        ? await adminClient!.from('timetable').update(payload).eq('id', targetId).select().single()
-        : await adminClient!.from('timetable').insert([payload]).select().single();
+      let result: any = null;
+      if (targetId) {
+        const { data, error } = await adminClient!.from('timetable').update(payload).eq('id', targetId).select();
+        if (error) return res.status(400).json({ error: error.message });
+        if (data && data.length > 0) {
+          result = data[0];
+        } else {
+          // If specified ID not found in database, insert as new slot
+          const { data: insData, error: insErr } = await adminClient!.from('timetable').insert([payload]).select().single();
+          if (insErr) return res.status(400).json({ error: insErr.message });
+          result = insData;
+        }
+      } else {
+        const { data, error } = await adminClient!.from('timetable').insert([payload]).select().single();
+        if (error) return res.status(400).json({ error: error.message });
+        result = data;
+      }
 
-      if (error) return res.status(400).json({ error: error.message });
-      return res.json({ ok: true, data });
+      return res.json({ ok: true, data: result });
     } catch (err: any) {
       return res.status(500).json({ error: err.message || 'Timetable save failed' });
     }
@@ -736,9 +756,196 @@ export function createExpressApp() {
         })
         .eq('id', feeId);
 
-      return res.json({ ok: true, student_fee_id: feeId, total_paid: totalPaid, status: newStatus });
+      return res.json({ ok: true, message: 'Payment voided successfully', totalPaid, status: newStatus });
     } catch (err: any) {
-      return res.status(500).json({ error: err.message || 'Payment void failed' });
+      return res.status(500).json({ error: err.message || 'Void payment failed' });
+    }
+  });
+
+  /* ------------------------------------------------------------------ *
+   * Admissions Endpoints (Public Application & Staff Management)
+   * ------------------------------------------------------------------ */
+  app.post('/api/admissions/apply', async (req, res) => {
+    try {
+      const body = req.body || {};
+      const {
+        name, father_name, mother_name, date_of_birth, gender,
+        class: applyingClass, class_id, section, section_id,
+        academic_year, academic_year_id, phone, email, address,
+        photo_url, aadhaar_last4, category, cwsn_status, only_child_girl,
+        previous_school, previous_class, previous_marks, transfer_certificate_no,
+        blood_group, emergency_contact, religion, nationality,
+        father_occupation, mother_occupation, documents, notes
+      } = body;
+
+      if (!name || !name.trim()) {
+        return res.status(400).json({ error: 'Student full name is required' });
+      }
+      if (!father_name || !father_name.trim()) {
+        return res.status(400).json({ error: "Father/Guardian full name is required" });
+      }
+
+      const yearCode = academic_year || '2026-27';
+      const randSeq = Math.floor(1000 + Math.random() * 9000);
+      const appNum = body.application_number || `SJS/ADM/${yearCode}/${randSeq}`;
+
+      const defaultDocs = documents && documents.length > 0 ? documents : [
+        { id: 'doc-1', name: 'Birth Certificate', type: 'Certificate', status: 'Pending' },
+        { id: 'doc-2', name: 'Transfer Certificate (TC)', type: 'Academic', status: 'Pending' },
+        { id: 'doc-3', name: 'Previous School Marksheet', type: 'Academic', status: 'Pending' },
+        { id: 'doc-4', name: 'Aadhaar Card / ID Proof', type: 'Identification', status: aadhaar_last4 ? 'Verified' : 'Pending' },
+        { id: 'doc-5', name: 'Passport Size Photograph', type: 'Photo', status: photo_url ? 'Verified' : 'Pending', url: photo_url },
+      ];
+
+      const payload = {
+        application_number: appNum,
+        name: name.trim(),
+        father_name: father_name.trim(),
+        mother_name: mother_name ? mother_name.trim() : null,
+        date_of_birth: date_of_birth || new Date().toISOString().split('T')[0],
+        gender: (gender || 'male').toLowerCase(),
+        class: (applyingClass || '1').toString().trim(),
+        class_id: class_id || null,
+        section: (section || 'A').toString().trim(),
+        section_id: section_id || null,
+        academic_year: yearCode,
+        academic_year_id: academic_year_id || null,
+        phone: phone ? phone.trim() : null,
+        email: email ? email.trim() : null,
+        address: address ? address.trim() : null,
+        photo_url: photo_url || null,
+        aadhaar_last4: aadhaar_last4 || null,
+        category: category || 'General',
+        cwsn_status: Boolean(cwsn_status),
+        only_child_girl: Boolean(only_child_girl),
+        previous_school: previous_school ? previous_school.trim() : null,
+        previous_class: previous_class ? previous_class.trim() : null,
+        previous_marks: previous_marks ? previous_marks.trim() : null,
+        transfer_certificate_no: transfer_certificate_no ? transfer_certificate_no.trim() : null,
+        blood_group: blood_group || null,
+        emergency_contact: emergency_contact || null,
+        religion: religion || null,
+        nationality: nationality || 'Indian',
+        father_occupation: father_occupation || null,
+        mother_occupation: mother_occupation || null,
+        documents: defaultDocs,
+        notes: notes || null,
+        status: 'Pending',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      const db = adminClient || supabase;
+      if (!db) {
+        return res.status(500).json({ error: 'Database service unavailable' });
+      }
+
+      const { data, error } = await db
+        .from('admissions')
+        .insert([payload])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('[API Admissions Apply] Insert error:', error);
+        return res.status(400).json({ error: error.message || 'Failed to submit admission application' });
+      }
+
+      return res.status(201).json({
+        ok: true,
+        message: 'Admission application registered successfully.',
+        data
+      });
+    } catch (err: any) {
+      console.error('[API Admissions Apply] Exception:', err);
+      return res.status(500).json({ error: err.message || 'Admission application submission failed' });
+    }
+  });
+
+  app.post('/api/admissions/:id/update', async (req, res) => {
+    const user = await requireStaff(req, res);
+    if (!user) return;
+    const { id } = req.params;
+    const updates = req.body || {};
+
+    try {
+      const db = adminClient || supabase;
+      const { data, error } = await db!
+        .from('admissions')
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) return res.status(400).json({ error: error.message });
+      return res.json({ ok: true, data });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message || 'Update admission failed' });
+    }
+  });
+
+  app.post('/api/admissions/:id/approve', async (req, res) => {
+    const user = await requireStaff(req, res);
+    if (!user) return;
+    const { id } = req.params;
+    const { section_name, roll_number } = req.body || {};
+
+    try {
+      const db = adminClient || supabase;
+      const { data: rpcRes, error: rpcErr } = await db!.rpc('approve_admission', {
+        _admission_id: id,
+        _section_name: section_name || 'A',
+        _roll_number: roll_number || null
+      });
+
+      if (rpcErr) {
+        // Direct fallback
+        const { data: adm } = await db!.from('admissions').select('*').eq('id', id).single();
+        if (!adm) return res.status(404).json({ error: 'Admission not found' });
+
+        const admYear = (adm.academic_year || '2026-27').split('-')[0];
+        const admSeq = String(Math.floor(1000 + Math.random() * 9000));
+        const admNumber = `SJS/${admYear}/${admSeq}`;
+
+        const { data: newStud, error: studErr } = await db!
+          .from('students')
+          .insert([{
+            admission_number: admNumber,
+            roll_number: roll_number || '01',
+            name: adm.name,
+            father_name: adm.father_name,
+            mother_name: adm.mother_name,
+            date_of_birth: adm.date_of_birth,
+            gender: adm.gender,
+            class: adm.class,
+            section: section_name || adm.section || 'A',
+            academic_year: adm.academic_year || '2026-27',
+            phone: adm.phone,
+            email: adm.email,
+            address: adm.address,
+            status: 'active'
+          }])
+          .select()
+          .single();
+
+        if (studErr) return res.status(400).json({ error: studErr.message });
+
+        await db!.from('admissions').update({
+          status: 'Approved',
+          student_id: newStud.id,
+          reviewed_by: user.id,
+          reviewed_at: new Date().toISOString()
+        }).eq('id', id);
+
+        return res.json({ ok: true, student: newStud });
+      }
+
+      return res.json({ ok: true, result: rpcRes });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message || 'Approve admission failed' });
     }
   });
 
