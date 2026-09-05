@@ -1,0 +1,6 @@
+{
+  "name": "Sushila Devi Public School",
+  "description": "Enterprise school ERP management platform featuring multi-stage admissions approvals, parent enquiries CRM pipeline, interactive reports & analytics, and live AI assistant for Sushila Devi Public School.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

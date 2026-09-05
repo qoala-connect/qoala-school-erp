@@ -1,0 +1,1886 @@
+{
+  "total": 164,
+  "passed": 112,
+  "failed": 52,
+  "skipped": 0,
+  "durationMs": 1265,
+  "tierBreakdown": {
+    "1": {
+      "total": 65,
+      "passed": 36,
+      "failed": 29
+    },
+    "2": {
+      "total": 65,
+      "passed": 48,
+      "failed": 17
+    },
+    "3": {
+      "total": 19,
+      "passed": 13,
+      "failed": 6
+    },
+    "4": {
+      "total": 15,
+      "passed": 15,
+      "failed": 0
+    }
+  },
+  "featureBreakdown": {
+    "F1": {
+      "total": 14,
+      "passed": 14,
+      "failed": 0
+    },
+    "F2": {
+      "total": 11,
+      "passed": 11,
+      "failed": 0
+    },
+    "F3": {
+      "total": 14,
+      "passed": 14,
+      "failed": 0
+    },
+    "F4": {
+      "total": 10,
+      "passed": 10,
+      "failed": 0
+    },
+    "F5": {
+      "total": 12,
+      "passed": 4,
+      "failed": 8
+    },
+    "F6": {
+      "total": 12,
+      "passed": 4,
+      "failed": 8
+    },
+    "F7": {
+      "total": 14,
+      "passed": 4,
+      "failed": 10
+    },
+    "F8": {
+      "total": 10,
+      "passed": 1,
+      "failed": 9
+    },
+    "F9": {
+      "total": 12,
+      "passed": 7,
+      "failed": 5
+    },
+    "F10": {
+      "total": 21,
+      "passed": 17,
+      "failed": 4
+    },
+    "F11": {
+      "total": 13,
+      "passed": 11,
+      "failed": 2
+    },
+    "F12": {
+      "total": 11,
+      "passed": 5,
+      "failed": 6
+    },
+    "F13": {
+      "total": 10,
+      "passed": 10,
+      "failed": 0
+    }
+  },
+  "results": [
+    {
+      "id": "T1-F1-01",
+      "name": "Route Security: /dashboard/transport enforces transport.manage permission",
+      "featureId": "F1",
+      "tier": 1,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 2
+    },
+    {
+      "id": "T1-F1-02",
+      "name": "Route Security: /dashboard/library enforces library.manage permission",
+      "featureId": "F1",
+      "tier": 1,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 2
+    },
+    {
+      "id": "T1-F1-03",
+      "name": "Route Security: /dashboard/inventory enforces inventory.manage permission",
+      "featureId": "F1",
+      "tier": 1,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T1-F1-04",
+      "name": "Route Security: Operations modules (hostel, front-office) enforce manage permissions",
+      "featureId": "F1",
+      "tier": 1,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T1-F1-05",
+      "name": "Route Security: Communication & Certificates routes enforce specific permission guards",
+      "featureId": "F1",
+      "tier": 1,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T1-F2-01",
+      "name": "Route Dedup: /dashboard/exam redirects to canonical /dashboard/examination",
+      "featureId": "F2",
+      "tier": 1,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T1-F2-02",
+      "name": "Route Dedup: /dashboard/marks redirects to canonical /dashboard/examination",
+      "featureId": "F2",
+      "tier": 1,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T1-F2-03",
+      "name": "Route Dedup: GoogleClassroomManager and GoogleFormsManager imports are removed from App.tsx",
+      "featureId": "F2",
+      "tier": 1,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T1-F2-04",
+      "name": "Route Dedup: DatabaseManager and RoleAndUserManager imports are removed from App.tsx",
+      "featureId": "F2",
+      "tier": 1,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T1-F2-05",
+      "name": "Route Dedup: Core business modules map to single canonical route parents",
+      "featureId": "F2",
+      "tier": 1,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T1-F3-01",
+      "name": "Context Preservation: Student 360 passes student context when navigating to Fees",
+      "featureId": "F3",
+      "tier": 1,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 5
+    },
+    {
+      "id": "T1-F3-02",
+      "name": "Context Preservation: Student 360 passes student details to CertificateGenerator",
+      "featureId": "F3",
+      "tier": 1,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 5
+    },
+    {
+      "id": "T1-F3-03",
+      "name": "Context Routing: Analytics \"Total Teachers\" navigates to /dashboard/teachers",
+      "featureId": "F3",
+      "tier": 1,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 5
+    },
+    {
+      "id": "T1-F3-04",
+      "name": "Context Receiver: AdmissionsManagement reads statusFilter from router state",
+      "featureId": "F3",
+      "tier": 1,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 5
+    },
+    {
+      "id": "T1-F3-05",
+      "name": "Context Receiver: CertificateGenerator populates student details from router state",
+      "featureId": "F3",
+      "tier": 1,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 6
+    },
+    {
+      "id": "T1-F4-01",
+      "name": "Sidebar Alignment: Front Office module is mounted in the navigation sidebar",
+      "featureId": "F4",
+      "tier": 1,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T1-F4-02",
+      "name": "Sidebar Alignment: Hostel module is mounted in the navigation sidebar",
+      "featureId": "F4",
+      "tier": 1,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T1-F4-03",
+      "name": "Sidebar Alignment: Medical and Discipline modules are mounted in sidebar",
+      "featureId": "F4",
+      "tier": 1,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T1-F4-04",
+      "name": "Sidebar Alignment: Reports module is mounted in sidebar navigation",
+      "featureId": "F4",
+      "tier": 1,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T1-F4-05",
+      "name": "Global Search: Differentiates between Teachers and Non-Teaching Staff routes",
+      "featureId": "F4",
+      "tier": 1,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 2
+    },
+    {
+      "id": "T1-F5-01",
+      "name": "RLS Hardening: disciplinary_records disallows unconditional true write access",
+      "featureId": "F5",
+      "tier": 1,
+      "milestone": "M2",
+      "status": "FAILED",
+      "durationMs": 22,
+      "error": {
+        "message": "Must have migration affecting disciplinary_records",
+        "stack": "AssertionError: Must have migration affecting disciplinary_records\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f05_rls_leaks.test.ts:22:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "disciplinary_records",
+        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
+      }
+    },
+    {
+      "id": "T1-F5-02",
+      "name": "RLS Hardening: front_office_logs disallows unconditional true write access",
+      "featureId": "F5",
+      "tier": 1,
+      "milestone": "M2",
+      "status": "PASSED",
+      "durationMs": 20
+    },
+    {
+      "id": "T1-F5-03",
+      "name": "RLS Hardening: online_classes disallows unauthenticated/unprivileged mutations",
+      "featureId": "F5",
+      "tier": 1,
+      "milestone": "M2",
+      "status": "PASSED",
+      "durationMs": 19
+    },
+    {
+      "id": "T1-F5-04",
+      "name": "RLS Separation: online_classes separates read access from write/delete privileges",
+      "featureId": "F5",
+      "tier": 1,
+      "milestone": "M2",
+      "status": "FAILED",
+      "durationMs": 20,
+      "error": {
+        "message": "Must define separate SELECT policy for online_classes",
+        "stack": "AssertionError: Must define separate SELECT policy for online_classes\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f05_rls_leaks.test.ts:80:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "online_classes_read_enrolled",
+        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
+      }
+    },
+    {
+      "id": "T1-F5-05",
+      "name": "RLS Isolation: disciplinary_records allows students/parents to read only their own records",
+      "featureId": "F5",
+      "tier": 1,
+      "milestone": "M2",
+      "status": "FAILED",
+      "durationMs": 21,
+      "error": {
+        "message": "Must define owner SELECT policy on disciplinary_records",
+        "stack": "AssertionError: Must define owner SELECT policy on disciplinary_records\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f05_rls_leaks.test.ts:95:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "disciplinary_records_owner_select",
+        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
+      }
+    },
+    {
+      "id": "T1-F6-01",
+      "name": "Escalation Guard: guard_profile_role_change protects status mutation against non-admins",
+      "featureId": "F6",
+      "tier": 1,
+      "milestone": "M2",
+      "status": "FAILED",
+      "durationMs": 17,
+      "error": {
+        "message": "guard_profile_role_change must inspect NEW.status IS DISTINCT FROM OLD.status",
+        "stack": "AssertionError: guard_profile_role_change must inspect NEW.status IS DISTINCT FROM OLD.status\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f06_escalation_guard.test.ts:22:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "NEW.status IS DISTINCT FROM OLD.status",
+        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
+      }
+    },
+    {
+      "id": "T1-F6-02",
+      "name": "Escalation Guard: Unauthorized status update raises SQLERR 42501",
+      "featureId": "F6",
+      "tier": 1,
+      "milestone": "M2",
+      "status": "PASSED",
+      "durationMs": 20
+    },
+    {
+      "id": "T1-F6-03",
+      "name": "Escalation Guard: guard_teacher_profile_update function is defined",
+      "featureId": "F6",
+      "tier": 1,
+      "milestone": "M2",
+      "status": "FAILED",
+      "durationMs": 20,
+      "error": {
+        "message": "Must define function guard_teacher_profile_update()",
+        "stack": "AssertionError: Must define function guard_teacher_profile_update()\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f06_escalation_guard.test.ts:56:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "guard_teacher_profile_update",
+        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
+      }
+    },
+    {
+      "id": "T1-F6-04",
+      "name": "Escalation Guard: Teachers cannot self-modify designation, status, or is_active",
+      "featureId": "F6",
+      "tier": 1,
+      "milestone": "M2",
+      "status": "FAILED",
+      "durationMs": 25,
+      "error": {
+        "message": "Must check designation alteration",
+        "stack": "AssertionError: Must check designation alteration\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f06_escalation_guard.test.ts:71:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "NEW.designation IS DISTINCT FROM OLD.designation",
+        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
+      }
+    },
+    {
+      "id": "T1-F6-05",
+      "name": "Escalation Guard: Trigger trigger_guard_teacher_update is bound BEFORE UPDATE on teachers",
+      "featureId": "F6",
+      "tier": 1,
+      "milestone": "M2",
+      "status": "FAILED",
+      "durationMs": 22,
+      "error": {
+        "message": "Must create trigger trigger_guard_teacher_update on public.teachers",
+        "stack": "AssertionError: Must create trigger trigger_guard_teacher_update on public.teachers\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f06_escalation_guard.test.ts:87:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "CREATE TRIGGER trigger_guard_teacher_update",
+        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
+      }
+    },
+    {
+      "id": "T1-F7-01",
+      "name": "Role Access: fee_payments grants management access to staff and accountants",
+      "featureId": "F7",
+      "tier": 1,
+      "milestone": "M2",
+      "status": "FAILED",
+      "durationMs": 22,
+      "error": {
+        "message": "Must create fee_payments_staff_all policy",
+        "stack": "AssertionError: Must create fee_payments_staff_all policy\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f07_role_lockouts.test.ts:22:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "CREATE POLICY \"fee_payments_staff_all\" ON public.fee_payments",
+        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
+      }
+    },
+    {
+      "id": "T1-F7-02",
+      "name": "Silent Failure: fee_payments includes owner SELECT policy for student/parent ledgers",
+      "featureId": "F7",
+      "tier": 1,
+      "milestone": "M2",
+      "status": "FAILED",
+      "durationMs": 20,
+      "error": {
+        "message": "Must define fee_payments_owner_select policy",
+        "stack": "AssertionError: Must define fee_payments_owner_select policy\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f07_role_lockouts.test.ts:41:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "CREATE POLICY \"fee_payments_owner_select\" ON public.fee_payments",
+        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
+      }
+    },
+    {
+      "id": "T1-F7-03",
+      "name": "Role Access: leave_requests allows teaching staff to read approved student leaves",
+      "featureId": "F7",
+      "tier": 1,
+      "milestone": "M2",
+      "status": "FAILED",
+      "durationMs": 20,
+      "error": {
+        "message": "Must define leave_requests_staff_select policy",
+        "stack": "AssertionError: Must define leave_requests_staff_select policy\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f07_role_lockouts.test.ts:60:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "CREATE POLICY \"leave_requests_staff_select\" ON public.leave_requests",
+        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
+      }
+    },
+    {
+      "id": "T1-F7-04",
+      "name": "Role Access: Gallery and Notices policies use is_admin() covering super_admin and principal",
+      "featureId": "F7",
+      "tier": 1,
+      "milestone": "M2",
+      "status": "PASSED",
+      "durationMs": 20
+    },
+    {
+      "id": "T1-F7-05",
+      "name": "Policy Coverage: receipt_counters table has explicit active RLS policy",
+      "featureId": "F7",
+      "tier": 1,
+      "milestone": "M2",
+      "status": "FAILED",
+      "durationMs": 20,
+      "error": {
+        "message": "Must define policy on receipt_counters",
+        "stack": "AssertionError: Must define policy on receipt_counters\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f07_role_lockouts.test.ts:94:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "CREATE POLICY \"receipt_counters_admin_all\" ON public.receipt_counters",
+        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
+      }
+    },
+    {
+      "id": "T1-F8-01",
+      "name": "FK Indexing: idx_disciplinary_records_student_id is indexed to accelerate Student 360 queries",
+      "featureId": "F8",
+      "tier": 1,
+      "milestone": "M2",
+      "status": "FAILED",
+      "durationMs": 19,
+      "error": {
+        "message": "Must create index on disciplinary_records(student_id)",
+        "stack": "AssertionError: Must create index on disciplinary_records(student_id)\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f08_db_indexing.test.ts:22:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "CREATE INDEX IF NOT EXISTS idx_disciplinary_records_student_id ON public.disciplinary_records(student_id)",
+        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
+      }
+    },
+    {
+      "id": "T1-F8-02",
+      "name": "FK Indexing: Foreign keys on admissions and attendance are indexed",
+      "featureId": "F8",
+      "tier": 1,
+      "milestone": "M2",
+      "status": "FAILED",
+      "durationMs": 25,
+      "error": {
+        "message": "Must index admissions.academic_year_id",
+        "stack": "AssertionError: Must index admissions.academic_year_id\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f08_db_indexing.test.ts:41:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "idx_admissions_academic_year_id",
+        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
+      }
+    },
+    {
+      "id": "T1-F8-03",
+      "name": "Index Optimization: 10 redundant duplicate indexes are dropped",
+      "featureId": "F8",
+      "tier": 1,
+      "milestone": "M2",
+      "status": "FAILED",
+      "durationMs": 45,
+      "error": {
+        "message": "Must drop duplicate idx_admissions_status",
+        "stack": "AssertionError: Must drop duplicate idx_admissions_status\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f08_db_indexing.test.ts:58:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "DROP INDEX IF EXISTS public.idx_admissions_status",
+        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
+      }
+    },
+    {
+      "id": "T1-F8-04",
+      "name": "View Integrity: fee_collection_summary queries canonical student_fees and fee_payments",
+      "featureId": "F8",
+      "tier": 1,
+      "milestone": "M2",
+      "status": "FAILED",
+      "durationMs": 58,
+      "error": {
+        "message": "Must update fee_collection_summary",
+        "stack": "AssertionError: Must update fee_collection_summary\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f08_db_indexing.test.ts:75:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "CREATE OR REPLACE VIEW public.fee_collection_summary",
+        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
+      }
+    },
+    {
+      "id": "T1-F8-05",
+      "name": "View Integrity: pending_fees_summary_view queries canonical student_fees table",
+      "featureId": "F8",
+      "tier": 1,
+      "milestone": "M2",
+      "status": "FAILED",
+      "durationMs": 30,
+      "error": {
+        "message": "Must update pending_fees_summary_view",
+        "stack": "AssertionError: Must update pending_fees_summary_view\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f08_db_indexing.test.ts:91:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "CREATE OR REPLACE VIEW public.pending_fees_summary_view",
+        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
+      }
+    },
+    {
+      "id": "T1-F9-01",
+      "name": "AI Grounding: server.ts queries canonical student_fees instead of legacy fees",
+      "featureId": "F9",
+      "tier": 1,
+      "milestone": "M2",
+      "status": "FAILED",
+      "durationMs": 4,
+      "error": {
+        "message": "server.ts must query student_fees for AI grounding",
+        "stack": "AssertionError: server.ts must query student_fees for AI grounding\n    at Object.strictEqual (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:40:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f09_ai_grounding.test.ts:23:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "student_fees",
+        "actual": "fees"
+      }
+    },
+    {
+      "id": "T1-F9-02",
+      "name": "AI Grounding: server.ts extracts status, net_amount, and student_id from student_fees",
+      "featureId": "F9",
+      "tier": 1,
+      "milestone": "M2",
+      "status": "FAILED",
+      "durationMs": 1,
+      "error": {
+        "message": "server.ts must query student_fees",
+        "stack": "AssertionError: server.ts must query student_fees\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f09_ai_grounding.test.ts:38:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "student_fees",
+        "actual": "import express from \"express\";\nimport path from \"path\";\nimport { createServer as createViteServer } from \"vite\";\nimport { GoogleGenAI } from \"@google/genai\";\nimport { createClient } from \"@supabase/su... [truncated 13384 chars]"
+      }
+    },
+    {
+      "id": "T1-F9-03",
+      "name": "Service Concurrency: teacherService eliminates client-side memory count race condition",
+      "featureId": "F9",
+      "tier": 1,
+      "milestone": "M2",
+      "status": "FAILED",
+      "durationMs": 3,
+      "error": {
+        "message": "teacherService must not use countData.length race condition",
+        "stack": "AssertionError: teacherService must not use countData.length race condition\n    at Object.notStrictEqual (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:47:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f09_ai_grounding.test.ts:55:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "memory-count-race",
+        "actual": "memory-count-race"
+      }
+    },
+    {
+      "id": "T1-F9-04",
+      "name": "AI Grounding: /api/chat system prompt includes verified ERP context metrics",
+      "featureId": "F9",
+      "tier": 1,
+      "milestone": "M2",
+      "status": "PASSED",
+      "durationMs": 0
+    },
+    {
+      "id": "T1-F9-05",
+      "name": "AI Grounding: Backend handles grounding query failures gracefully with fallback defaults",
+      "featureId": "F9",
+      "tier": 1,
+      "milestone": "M2",
+      "status": "FAILED",
+      "durationMs": 0,
+      "error": {
+        "message": "server.ts must wrap grounding queries in try/catch",
+        "stack": "AssertionError: server.ts must wrap grounding queries in try/catch\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f09_ai_grounding.test.ts:87:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "catch (e)",
+        "actual": "import express from \"express\";\nimport path from \"path\";\nimport { createServer as createViteServer } from \"vite\";\nimport { GoogleGenAI } from \"@google/genai\";\nimport { createClient } from \"@supabase/su... [truncated 13384 chars]"
+      }
+    },
+    {
+      "id": "T1-F10-01",
+      "name": "Action Interactivity: Reports.tsx buttons execute real download/export handlers",
+      "featureId": "F10",
+      "tier": 1,
+      "milestone": "M3",
+      "status": "FAILED",
+      "durationMs": 4,
+      "error": {
+        "message": "Reports.tsx must have active onClick handlers on export buttons",
+        "stack": "AssertionError: Reports.tsx must have active onClick handlers on export buttons\n    at Object.isTrue (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:27:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f10_action_buttons.test.ts:22:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": true,
+        "actual": false
+      }
+    },
+    {
+      "id": "T1-F10-02",
+      "name": "Action Authenticity: TransportManagement includes student_id in student_transport payload",
+      "featureId": "F10",
+      "tier": 1,
+      "milestone": "M3",
+      "status": "FAILED",
+      "durationMs": 4,
+      "error": {
+        "message": "TransportManagement must populate student_id on insert",
+        "stack": "AssertionError: TransportManagement must populate student_id on insert\n    at Object.isTrue (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:27:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f10_action_buttons.test.ts:37:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": true,
+        "actual": false
+      }
+    },
+    {
+      "id": "T1-F10-03",
+      "name": "Action Authenticity: MedicalManagement includes student_id in student_medical payload",
+      "featureId": "F10",
+      "tier": 1,
+      "milestone": "M3",
+      "status": "FAILED",
+      "durationMs": 4,
+      "error": {
+        "message": "MedicalManagement must populate student_id on insert",
+        "stack": "AssertionError: MedicalManagement must populate student_id on insert\n    at Object.isTrue (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:27:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f10_action_buttons.test.ts:52:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": true,
+        "actual": false
+      }
+    },
+    {
+      "id": "T1-F10-04",
+      "name": "Action Authenticity: SchoolCalendar queries valid start_date column on holidays table",
+      "featureId": "F10",
+      "tier": 1,
+      "milestone": "M3",
+      "status": "FAILED",
+      "durationMs": 4,
+      "error": {
+        "message": "SchoolCalendar must query start_date on holidays",
+        "stack": "AssertionError: SchoolCalendar must query start_date on holidays\n    at Object.isTrue (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:27:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f10_action_buttons.test.ts:67:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": true,
+        "actual": false
+      }
+    },
+    {
+      "id": "T1-F10-05",
+      "name": "Action Authenticity: Settings.tsx fake toast-only save is eliminated or retired",
+      "featureId": "F10",
+      "tier": 1,
+      "milestone": "M3",
+      "status": "PASSED",
+      "durationMs": 5
+    },
+    {
+      "id": "T1-F11-01",
+      "name": "UI/UX Consistency: Central Breadcrumbs component is implemented in Dashboard layout",
+      "featureId": "F11",
+      "tier": 1,
+      "milestone": "M3",
+      "status": "FAILED",
+      "durationMs": 1,
+      "error": {
+        "message": "DashboardLayout must implement or render Breadcrumb navigation",
+        "stack": "AssertionError: DashboardLayout must implement or render Breadcrumb navigation\n    at Object.isTrue (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:27:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f11_ui_consistency.test.ts:23:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": true,
+        "actual": false
+      }
+    },
+    {
+      "id": "T1-F11-02",
+      "name": "UI/UX Consistency: DashboardLayout handles mobile screens with slide-out overlay drawer",
+      "featureId": "F11",
+      "tier": 1,
+      "milestone": "M3",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T1-F11-03",
+      "name": "UI/UX Consistency: Complex tables use overflow-x-auto to prevent mobile cutoff",
+      "featureId": "F11",
+      "tier": 1,
+      "milestone": "M3",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T1-F11-04",
+      "name": "State Feedback: Key modules render actionable empty states when datasets are empty",
+      "featureId": "F11",
+      "tier": 1,
+      "milestone": "M3",
+      "status": "FAILED",
+      "durationMs": 1,
+      "error": {
+        "message": "AdmissionsManagement must display empty state message",
+        "stack": "AssertionError: AdmissionsManagement must display empty state message\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f11_ui_consistency.test.ts:69:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "No applications found",
+        "actual": "import React, { useState, useEffect, useMemo, useRef } from 'react';\r\nimport { createPortal } from 'react-dom';\r\nimport {\r\n  Search,\r\n  Download,\r\n  XCircle,\r\n  Phone,\r\n  RefreshCcw,\r\n  GraduationCap,... [truncated 50996 chars]"
+      }
+    },
+    {
+      "id": "T1-F11-05",
+      "name": "State Feedback: ProtectedRoute and data tables display accessible loading indicators",
+      "featureId": "F11",
+      "tier": 1,
+      "milestone": "M3",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T1-F12-01",
+      "name": "Query Performance: admissionService.fetchAdmissions supports bounded pagination parameters",
+      "featureId": "F12",
+      "tier": 1,
+      "milestone": "M3",
+      "status": "FAILED",
+      "durationMs": 3,
+      "error": {
+        "message": "admissionService must support bounded query pagination",
+        "stack": "AssertionError: admissionService must support bounded query pagination\n    at Object.isTrue (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:27:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f12_query_perf.test.ts:22:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": true,
+        "actual": false
+      }
+    },
+    {
+      "id": "T1-F12-02",
+      "name": "Query Performance: feeService.fetchFees supports bounded pagination parameters",
+      "featureId": "F12",
+      "tier": 1,
+      "milestone": "M3",
+      "status": "FAILED",
+      "durationMs": 3,
+      "error": {
+        "message": "feeService must support bounded query pagination",
+        "stack": "AssertionError: feeService must support bounded query pagination\n    at Object.isTrue (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:27:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f12_query_perf.test.ts:37:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": true,
+        "actual": false
+      }
+    },
+    {
+      "id": "T1-F12-03",
+      "name": "Query Performance: feeService.fetchTransactions limits payment ledger queries",
+      "featureId": "F12",
+      "tier": 1,
+      "milestone": "M3",
+      "status": "FAILED",
+      "durationMs": 1,
+      "error": {
+        "message": "feeService must apply limit or range to transaction queries",
+        "stack": "AssertionError: feeService must apply limit or range to transaction queries\n    at Object.isTrue (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:27:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f12_query_perf.test.ts:53:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": true,
+        "actual": false
+      }
+    },
+    {
+      "id": "T1-F12-04",
+      "name": "Query Performance: teacherService filters assignments by active academic year",
+      "featureId": "F12",
+      "tier": 1,
+      "milestone": "M3",
+      "status": "PASSED",
+      "durationMs": 2
+    },
+    {
+      "id": "T1-F12-05",
+      "name": "Query Performance: server.ts bounds initial context query size for Gemini AI",
+      "featureId": "F12",
+      "tier": 1,
+      "milestone": "M3",
+      "status": "PASSED",
+      "durationMs": 0
+    },
+    {
+      "id": "T1-F13-01",
+      "name": "Quality Gate: package.json specifies build, dev, and lint verification scripts",
+      "featureId": "F13",
+      "tier": 1,
+      "milestone": "M4",
+      "status": "PASSED",
+      "durationMs": 0
+    },
+    {
+      "id": "T1-F13-02",
+      "name": "Quality Gate: tsconfig.json properly configures @/* path alias to src/*",
+      "featureId": "F13",
+      "tier": 1,
+      "milestone": "M4",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T1-F13-03",
+      "name": "Quality Gate: Additive migration scripts use IF NOT EXISTS and DROP IF EXISTS safeguards",
+      "featureId": "F13",
+      "tier": 1,
+      "milestone": "M4",
+      "status": "PASSED",
+      "durationMs": 18
+    },
+    {
+      "id": "T1-F13-04",
+      "name": "Quality Gate: Zero duplicate module implementations in production routes",
+      "featureId": "F13",
+      "tier": 1,
+      "milestone": "M4",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T1-F13-05",
+      "name": "Quality Gate: Original request requirements R1 through R5 are addressed in project artifacts",
+      "featureId": "F13",
+      "tier": 1,
+      "milestone": "M4",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T2-F1-01",
+      "name": "Route Security Boundary: ProtectedRoute fails closed when errorKind is \"no-profile\"",
+      "featureId": "F1",
+      "tier": 2,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T2-F1-02",
+      "name": "Route Security Boundary: ProtectedRoute redirects unauthenticated sessions to /login",
+      "featureId": "F1",
+      "tier": 2,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T2-F1-03",
+      "name": "Route Security Boundary: Unmatched URLs fall through to NotFound component via path=\"*\"",
+      "featureId": "F1",
+      "tier": 2,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T2-F1-04",
+      "name": "Route Security Boundary: Examination sub-routes enforce specific publish vs view privileges",
+      "featureId": "F1",
+      "tier": 2,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T2-F1-05",
+      "name": "Route Security Boundary: Academics dynamic path /dashboard/academics/:view is protected",
+      "featureId": "F1",
+      "tier": 2,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 2
+    },
+    {
+      "id": "T2-F2-01",
+      "name": "Route Dedup Boundary: Legacy redirects specify replace flag to prevent back-button loops",
+      "featureId": "F2",
+      "tier": 2,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T2-F2-02",
+      "name": "Route Dedup Boundary: Deep academic paths resolve to canonical /dashboard/academics/:view",
+      "featureId": "F2",
+      "tier": 2,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T2-F2-03",
+      "name": "Route Dedup Boundary: Legacy system paths redirect to /dashboard/system/:view",
+      "featureId": "F2",
+      "tier": 2,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T2-F2-04",
+      "name": "Route Dedup Boundary: Verbose *-management paths redirect to clean nouns",
+      "featureId": "F2",
+      "tier": 2,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T2-F2-05",
+      "name": "Route Dedup Boundary: Dead mockup files (DatabaseManager, RoleAndUserManager) are retired",
+      "featureId": "F2",
+      "tier": 2,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T2-F3-01",
+      "name": "Context Boundary: Student 360 specifies activeTab: \"student_fees\" when redirecting to fees",
+      "featureId": "F3",
+      "tier": 2,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 2
+    },
+    {
+      "id": "T2-F3-02",
+      "name": "Context Boundary: Certificate generation payload passes complete student tuple",
+      "featureId": "F3",
+      "tier": 2,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T2-F3-03",
+      "name": "Context Boundary: AdmissionsManagement defaults to \"all\" when location.state is undefined",
+      "featureId": "F3",
+      "tier": 2,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T2-F3-04",
+      "name": "Context Boundary: Global Search Exam click navigates with tab=exams and selectedExamId",
+      "featureId": "F3",
+      "tier": 2,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 2
+    },
+    {
+      "id": "T2-F3-05",
+      "name": "Context Boundary: Employees.tsx consumes selectedEmployeeId to focus/filter record",
+      "featureId": "F3",
+      "tier": 2,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T2-F4-01",
+      "name": "Sidebar Boundary: Sidebar categories filter items by user permission set",
+      "featureId": "F4",
+      "tier": 2,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T2-F4-02",
+      "name": "Sidebar Boundary: Collapsed sidebar hides text labels while preserving icon tooltips",
+      "featureId": "F4",
+      "tier": 2,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T2-F4-03",
+      "name": "Search Boundary: Search input maintains overlay briefly on blur to permit click selection",
+      "featureId": "F4",
+      "tier": 2,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T2-F4-04",
+      "name": "Search Boundary: Global Search renders \"No matching records found\" when query matches nothing",
+      "featureId": "F4",
+      "tier": 2,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T2-F4-05",
+      "name": "Sidebar Boundary: Academics module groups 7 sub-views under a unified category",
+      "featureId": "F4",
+      "tier": 2,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T2-F5-01",
+      "name": "RLS Boundary: No mutating RLS policy uses literal TRUE in WITH CHECK clause",
+      "featureId": "F5",
+      "tier": 2,
+      "milestone": "M2",
+      "status": "PASSED",
+      "durationMs": 19
+    },
+    {
+      "id": "T2-F5-02",
+      "name": "RLS Boundary: disciplinary_records owner policy verifies family_id matching",
+      "featureId": "F5",
+      "tier": 2,
+      "milestone": "M2",
+      "status": "FAILED",
+      "durationMs": 19,
+      "error": {
+        "message": "Owner policy must join on family_id to isolate records across families",
+        "stack": "AssertionError: Owner policy must join on family_id to isolate records across families\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier2\\f05_boundary.test.ts:44:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "s.family_id IN (SELECT p.family_id FROM public.parents p WHERE p.user_id = auth.uid())",
+        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
+      }
+    },
+    {
+      "id": "T2-F5-03",
+      "name": "RLS Boundary: disciplinary_records allows student user_id match for self-reading",
+      "featureId": "F5",
+      "tier": 2,
+      "milestone": "M2",
+      "status": "FAILED",
+      "durationMs": 19,
+      "error": {
+        "message": "Owner policy must include student user_id matching condition",
+        "stack": "AssertionError: Owner policy must include student user_id matching condition\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier2\\f05_boundary.test.ts:63:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "s.user_id = auth.uid()",
+        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
+      }
+    },
+    {
+      "id": "T2-F5-04",
+      "name": "RLS Boundary: Mutating policies evaluate public.is_staff() helper",
+      "featureId": "F5",
+      "tier": 2,
+      "milestone": "M2",
+      "status": "FAILED",
+      "durationMs": 20,
+      "error": {
+        "message": "Policy check must use public.is_staff()",
+        "stack": "AssertionError: Policy check must use public.is_staff()\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier2\\f05_boundary.test.ts:83:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "WITH CHECK (public.is_staff())",
+        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
+      }
+    },
+    {
+      "id": "T2-F5-05",
+      "name": "RLS Boundary: Hardening migration drops legacy policies before creating secure replacements",
+      "featureId": "F5",
+      "tier": 2,
+      "milestone": "M2",
+      "status": "FAILED",
+      "durationMs": 19,
+      "error": {
+        "message": "Expected string to contain \"DROP POLICY IF EXISTS \"disciplinary_staff_all\" ON public.disciplinary_records\"",
+        "stack": "AssertionError: Expected string to contain \"DROP POLICY IF EXISTS \"disciplinary_staff_all\" ON public.disciplinary_records\"\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier2\\f05_boundary.test.ts:98:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "DROP POLICY IF EXISTS \"disciplinary_staff_all\" ON public.disciplinary_records",
+        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
+      }
+    },
+    {
+      "id": "T2-F6-01",
+      "name": "Escalation Boundary: guard_profile_role_change permits service_role / CLI when auth.uid() is NULL",
+      "featureId": "F6",
+      "tier": 2,
+      "milestone": "M2",
+      "status": "PASSED",
+      "durationMs": 19
+    },
+    {
+      "id": "T2-F6-02",
+      "name": "Escalation Boundary: Suspended user cannot bypass set_user_status via direct profiles update",
+      "featureId": "F6",
+      "tier": 2,
+      "milestone": "M2",
+      "status": "FAILED",
+      "durationMs": 19,
+      "error": {
+        "message": "Trigger must guard status column modifications",
+        "stack": "AssertionError: Trigger must guard status column modifications\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier2\\f06_boundary.test.ts:41:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "NEW.status IS DISTINCT FROM OLD.status",
+        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
+      }
+    },
+    {
+      "id": "T2-F6-03",
+      "name": "Escalation Boundary: Teachers cannot forge or alter official employee_id",
+      "featureId": "F6",
+      "tier": 2,
+      "milestone": "M2",
+      "status": "FAILED",
+      "durationMs": 26,
+      "error": {
+        "message": "Trigger must protect employee_id against alteration",
+        "stack": "AssertionError: Trigger must protect employee_id against alteration\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier2\\f06_boundary.test.ts:60:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "NEW.employee_id IS DISTINCT FROM OLD.employee_id",
+        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
+      }
+    },
+    {
+      "id": "T2-F6-04",
+      "name": "Escalation Boundary: Guard trigger functions run with SECURITY DEFINER privileges",
+      "featureId": "F6",
+      "tier": 2,
+      "milestone": "M2",
+      "status": "FAILED",
+      "durationMs": 22,
+      "error": {
+        "message": "Functions must secure search_path",
+        "stack": "AssertionError: Functions must secure search_path\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier2\\f06_boundary.test.ts:80:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "SET search_path = public, pg_temp",
+        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
+      }
+    },
+    {
+      "id": "T2-F6-05",
+      "name": "Escalation Boundary: Non-admin changing role to super_admin is rejected with error message",
+      "featureId": "F6",
+      "tier": 2,
+      "milestone": "M2",
+      "status": "PASSED",
+      "durationMs": 19
+    },
+    {
+      "id": "T2-F7-01",
+      "name": "Role Hierarchy Boundary: is_admin() includes super_admin, admin, and principal",
+      "featureId": "F7",
+      "tier": 2,
+      "milestone": "M2",
+      "status": "PASSED",
+      "durationMs": 19
+    },
+    {
+      "id": "T2-F7-02",
+      "name": "Leave Requests Boundary: leave_requests policy covers students, teachers, and non-teaching staff",
+      "featureId": "F7",
+      "tier": 2,
+      "milestone": "M2",
+      "status": "FAILED",
+      "durationMs": 18,
+      "error": {
+        "message": "Expected string to contain \"SELECT id FROM public.students WHERE user_id = auth.uid()\"",
+        "stack": "AssertionError: Expected string to contain \"SELECT id FROM public.students WHERE user_id = auth.uid()\"\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier2\\f07_boundary.test.ts:39:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "SELECT id FROM public.students WHERE user_id = auth.uid()",
+        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
+      }
+    },
+    {
+      "id": "T2-F7-03",
+      "name": "Fee Payments Boundary: Owner policy matches student_fee_id to authenticated student or parent",
+      "featureId": "F7",
+      "tier": 2,
+      "milestone": "M2",
+      "status": "FAILED",
+      "durationMs": 18,
+      "error": {
+        "message": "Must join student_fees to fee_payments",
+        "stack": "AssertionError: Must join student_fees to fee_payments\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier2\\f07_boundary.test.ts:56:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "sf.id = fee_payments.student_fee_id",
+        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
+      }
+    },
+    {
+      "id": "T2-F7-04",
+      "name": "Receipt Counters Boundary: receipt_counters is manageable by all administrators",
+      "featureId": "F7",
+      "tier": 2,
+      "milestone": "M2",
+      "status": "FAILED",
+      "durationMs": 18,
+      "error": {
+        "message": "Must create receipt_counters_admin_all policy",
+        "stack": "AssertionError: Must create receipt_counters_admin_all policy\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier2\\f07_boundary.test.ts:72:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "CREATE POLICY \"receipt_counters_admin_all\" ON public.receipt_counters",
+        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
+      }
+    },
+    {
+      "id": "T2-F7-05",
+      "name": "User Roles Boundary: user_roles policy does not use fragile (get_user_role() = 'admin'::text)",
+      "featureId": "F7",
+      "tier": 2,
+      "milestone": "M2",
+      "status": "PASSED",
+      "durationMs": 19
+    },
+    {
+      "id": "T2-F8-01",
+      "name": "FK Indexing Boundary: Timetable and Teacher Assignment foreign keys have B-tree indexes",
+      "featureId": "F8",
+      "tier": 2,
+      "milestone": "M2",
+      "status": "FAILED",
+      "durationMs": 19,
+      "error": {
+        "message": "Expected string to contain \"idx_timetable_class_id\"",
+        "stack": "AssertionError: Expected string to contain \"idx_timetable_class_id\"\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier2\\f08_boundary.test.ts:22:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "idx_timetable_class_id",
+        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
+      }
+    },
+    {
+      "id": "T2-F8-02",
+      "name": "FK Indexing Boundary: Student transport route_id and vehicle_id are indexed",
+      "featureId": "F8",
+      "tier": 2,
+      "milestone": "M2",
+      "status": "FAILED",
+      "durationMs": 32,
+      "error": {
+        "message": "Expected string to contain \"idx_student_transport_route_id\"",
+        "stack": "AssertionError: Expected string to contain \"idx_student_transport_route_id\"\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier2\\f08_boundary.test.ts:41:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "idx_student_transport_route_id",
+        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
+      }
+    },
+    {
+      "id": "T2-F8-03",
+      "name": "View Boundary: fee_collection_summary filters out voided payments (voided_at IS NULL)",
+      "featureId": "F8",
+      "tier": 2,
+      "milestone": "M2",
+      "status": "FAILED",
+      "durationMs": 19,
+      "error": {
+        "message": "fee_collection_summary must filter fp.voided_at IS NULL",
+        "stack": "AssertionError: fee_collection_summary must filter fp.voided_at IS NULL\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier2\\f08_boundary.test.ts:57:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "fp.voided_at IS NULL",
+        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
+      }
+    },
+    {
+      "id": "T2-F8-04",
+      "name": "View Boundary: pending_fees_summary_view calculates days_overdue accurately",
+      "featureId": "F8",
+      "tier": 2,
+      "milestone": "M2",
+      "status": "FAILED",
+      "durationMs": 19,
+      "error": {
+        "message": "Must compute days_overdue using (CURRENT_DATE - sf.due_date)",
+        "stack": "AssertionError: Must compute days_overdue using (CURRENT_DATE - sf.due_date)\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier2\\f08_boundary.test.ts:76:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "(CURRENT_DATE - sf.due_date) AS days_overdue",
+        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
+      }
+    },
+    {
+      "id": "T2-F8-05",
+      "name": "View Security Boundary: Views enforce security_invoker = on to inherit caller RLS",
+      "featureId": "F8",
+      "tier": 2,
+      "milestone": "M2",
+      "status": "PASSED",
+      "durationMs": 20
+    },
+    {
+      "id": "T2-F9-01",
+      "name": "AI Grounding Boundary: server.ts defaults missing status to \"Pending\" during reduce",
+      "featureId": "F9",
+      "tier": 2,
+      "milestone": "M2",
+      "status": "PASSED",
+      "durationMs": 0
+    },
+    {
+      "id": "T2-F9-02",
+      "name": "AI Service Boundary: server.ts handles missing GEMINI_API_KEY gracefully",
+      "featureId": "F9",
+      "tier": 2,
+      "milestone": "M2",
+      "status": "PASSED",
+      "durationMs": 0
+    },
+    {
+      "id": "T2-F9-03",
+      "name": "Service Boundary: Teacher employee ID adheres to uppercase alphanumeric prefix",
+      "featureId": "F9",
+      "tier": 2,
+      "milestone": "M2",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T2-F9-04",
+      "name": "Service Boundary: Archiving or resigning a teacher automatically deactivates active assignments",
+      "featureId": "F9",
+      "tier": 2,
+      "milestone": "M2",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T2-F9-05",
+      "name": "Server Boundary: server.ts provides an accessible /api/health probe endpoint",
+      "featureId": "F9",
+      "tier": 2,
+      "milestone": "M2",
+      "status": "FAILED",
+      "durationMs": 0,
+      "error": {
+        "message": "server.ts must define /api/health endpoint",
+        "stack": "AssertionError: server.ts must define /api/health endpoint\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier2\\f09_boundary.test.ts:89:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "app.get('/api/health'",
+        "actual": "import express from \"express\";\nimport path from \"path\";\nimport { createServer as createViteServer } from \"vite\";\nimport { GoogleGenAI } from \"@google/genai\";\nimport { createClient } from \"@supabase/su... [truncated 13384 chars]"
+      }
+    },
+    {
+      "id": "T2-F10-01",
+      "name": "Action Boundary: Report download triggers pass report category and format arguments",
+      "featureId": "F10",
+      "tier": 2,
+      "milestone": "M3",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T2-F10-02",
+      "name": "Action Boundary: Transport allotment checks route_id and vehicle_id presence",
+      "featureId": "F10",
+      "tier": 2,
+      "milestone": "M3",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T2-F10-03",
+      "name": "Action Boundary: Medical record form binds student_id to prevent orphaned health logs",
+      "featureId": "F10",
+      "tier": 2,
+      "milestone": "M3",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T2-F10-04",
+      "name": "Action Boundary: SchoolCalendar queries start_date and end_date correctly",
+      "featureId": "F10",
+      "tier": 2,
+      "milestone": "M3",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T2-F10-05",
+      "name": "Action Boundary: LibraryManagement does not delete from book_issues when deleting other tabs",
+      "featureId": "F10",
+      "tier": 2,
+      "milestone": "M3",
+      "status": "PASSED",
+      "durationMs": 2
+    },
+    {
+      "id": "T2-F11-01",
+      "name": "UI/UX Boundary: Breadcrumbs dynamically parses pathname segments from useLocation",
+      "featureId": "F11",
+      "tier": 2,
+      "milestone": "M3",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T2-F11-02",
+      "name": "UI/UX Boundary: Mobile hamburger button is hidden on large desktop screens (lg:hidden)",
+      "featureId": "F11",
+      "tier": 2,
+      "milestone": "M3",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T2-F11-03",
+      "name": "UI/UX Boundary: Desktop search bar hides gracefully on mobile (hidden sm:flex)",
+      "featureId": "F11",
+      "tier": 2,
+      "milestone": "M3",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T2-F11-04",
+      "name": "UI/UX Boundary: User feedback leverages sonner toast notifications for mutations",
+      "featureId": "F11",
+      "tier": 2,
+      "milestone": "M3",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T2-F11-05",
+      "name": "UI/UX Boundary: DashboardLayout renders AcademicYearSelector in header for cross-module session scope",
+      "featureId": "F11",
+      "tier": 2,
+      "milestone": "M3",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T2-F12-01",
+      "name": "Query Performance Boundary: admissionService handles combined status, year, class, and section filters",
+      "featureId": "F12",
+      "tier": 2,
+      "milestone": "M3",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T2-F12-02",
+      "name": "Query Performance Boundary: feeService orders records by created_at descending",
+      "featureId": "F12",
+      "tier": 2,
+      "milestone": "M3",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T2-F12-03",
+      "name": "Query Performance Boundary: teacherService optimizes department filter at database level",
+      "featureId": "F12",
+      "tier": 2,
+      "milestone": "M3",
+      "status": "FAILED",
+      "durationMs": 1,
+      "error": {
+        "message": "Must push department filter to Supabase query",
+        "stack": "AssertionError: Must push department filter to Supabase query\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier2\\f12_boundary.test.ts:55:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "query.eq('department_id', filters.department)",
+        "actual": "import { supabase } from '@/lib/supabase';\n\nexport type TeacherLifecycleStatus =\n  | 'Draft'\n  | 'Active'\n  | 'On Leave'\n  | 'Inactive'\n  | 'Transferred'\n  | 'Resigned'\n  | 'Retired'\n  | 'Archived';\n\n... [truncated 21172 chars]"
+      }
+    },
+    {
+      "id": "T2-F12-04",
+      "name": "Query Performance Boundary: System audit logs query is capped to prevent massive memory dumps",
+      "featureId": "F12",
+      "tier": 2,
+      "milestone": "M3",
+      "status": "FAILED",
+      "durationMs": 1,
+      "error": {
+        "message": "Must query audit_logs table",
+        "stack": "AssertionError: Must query audit_logs table\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier2\\f12_boundary.test.ts:71:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "audit_logs",
+        "actual": "import React, { useEffect, useState, useCallback } from 'react';\nimport { \n  searchAuditLogs, \n  fetchAuditLogFacets, \n  AuditLogRow, \n  AuditLogFacets \n} from '@/services/systemService';\nimport { use... [truncated 17333 chars]"
+      }
+    },
+    {
+      "id": "T2-F12-05",
+      "name": "Query Performance Boundary: Student 360 executes parallel sub-queries within Promise.all",
+      "featureId": "F12",
+      "tier": 2,
+      "milestone": "M3",
+      "status": "PASSED",
+      "durationMs": 2
+    },
+    {
+      "id": "T2-F13-01",
+      "name": "Verification Boundary: package.json specifies \"type\": \"module\" for native ESM execution",
+      "featureId": "F13",
+      "tier": 2,
+      "milestone": "M4",
+      "status": "PASSED",
+      "durationMs": 0
+    },
+    {
+      "id": "T2-F13-02",
+      "name": "Verification Boundary: vite.config.ts configures React and Tailwind plugins",
+      "featureId": "F13",
+      "tier": 2,
+      "milestone": "M4",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T2-F13-03",
+      "name": "Verification Boundary: .env provides syntactically valid JWT anon key and URL",
+      "featureId": "F13",
+      "tier": 2,
+      "milestone": "M4",
+      "status": "PASSED",
+      "durationMs": 3
+    },
+    {
+      "id": "T2-F13-04",
+      "name": "Verification Boundary: Acceptance criteria mandates 12-part Final Audit Report (Sections A-L)",
+      "featureId": "F13",
+      "tier": 2,
+      "milestone": "M4",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T2-F13-05",
+      "name": "Verification Boundary: Production status distinguishes P0, P1, P2, and P3 blockers",
+      "featureId": "F13",
+      "tier": 2,
+      "milestone": "M4",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T3-F1-F4-01",
+      "name": "Pairwise (F1+F4): Admissions route permission (student.create) matches sidebar item permission",
+      "featureId": "F1",
+      "tier": 3,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 2
+    },
+    {
+      "id": "T3-F1-F4-02",
+      "name": "Pairwise (F1+F4): Financials route permission (fees.view) matches sidebar category permission",
+      "featureId": "F1",
+      "tier": 3,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T3-F1-F4-03",
+      "name": "Pairwise (F1+F4): System route permission (settings.manage) matches sidebar category",
+      "featureId": "F1",
+      "tier": 3,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 2
+    },
+    {
+      "id": "T3-F1-F4-04",
+      "name": "Pairwise (F1+F4): Attendance route permission (attendance.manage) matches sidebar item",
+      "featureId": "F1",
+      "tier": 3,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 2
+    },
+    {
+      "id": "T3-F3-F10-01",
+      "name": "Pairwise (F3+F10): Student 360 navigation to Fees triggers FeeCollectionModal with passed student",
+      "featureId": "F3",
+      "tier": 3,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T3-F3-F10-02",
+      "name": "Pairwise (F3+F10): Student 360 navigation to Certificates auto-populates certificate payload",
+      "featureId": "F3",
+      "tier": 3,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T3-F3-F10-03",
+      "name": "Pairwise (F3+F10): Global Search to Exam activates exam and enables CBSE marks/results processing",
+      "featureId": "F3",
+      "tier": 3,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 0
+    },
+    {
+      "id": "T3-F5-F6-01",
+      "name": "Pairwise (F5+F6): User cannot bypass RLS restrictions by tampering with profiles role/status",
+      "featureId": "F5",
+      "tier": 3,
+      "milestone": "M2",
+      "status": "FAILED",
+      "durationMs": 19,
+      "error": {
+        "message": "Must guard status modification",
+        "stack": "AssertionError: Must guard status modification\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier3\\f05_f06_rls_triggers.test.ts:24:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "NEW.status IS DISTINCT FROM OLD.status",
+        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
+      }
+    },
+    {
+      "id": "T3-F5-F6-02",
+      "name": "Pairwise (F5+F6): Inactive teacher cannot reactivate employment to regain is_staff() RLS privileges",
+      "featureId": "F6",
+      "tier": 3,
+      "milestone": "M2",
+      "status": "FAILED",
+      "durationMs": 20,
+      "error": {
+        "message": "Must deploy guard_teacher_profile_update",
+        "stack": "AssertionError: Must deploy guard_teacher_profile_update\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier3\\f05_f06_rls_triggers.test.ts:39:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "guard_teacher_profile_update",
+        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
+      }
+    },
+    {
+      "id": "T3-F5-F6-03",
+      "name": "Pairwise (F5+F6): Disciplinary records policies rely on is_staff() which requires active account status",
+      "featureId": "F5",
+      "tier": 3,
+      "milestone": "M2",
+      "status": "PASSED",
+      "durationMs": 21
+    },
+    {
+      "id": "T3-F7-F8-01",
+      "name": "Pairwise (F7+F8): Accountants unlocked on fee_payments query updated fee_collection_summary view",
+      "featureId": "F7",
+      "tier": 3,
+      "milestone": "M2",
+      "status": "FAILED",
+      "durationMs": 33,
+      "error": {
+        "message": "fee_payments must allow staff/accountants",
+        "stack": "AssertionError: fee_payments must allow staff/accountants\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier3\\f07_f08_rbac_views.test.ts:22:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "fee_payments_staff_all",
+        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
+      }
+    },
+    {
+      "id": "T3-F7-F8-02",
+      "name": "Pairwise (F7+F8): Teachers reading leave_requests benefit from indexed attendance tables",
+      "featureId": "F7",
+      "tier": 3,
+      "milestone": "M2",
+      "status": "FAILED",
+      "durationMs": 21,
+      "error": {
+        "message": "Must have leave_requests_staff_select policy",
+        "stack": "AssertionError: Must have leave_requests_staff_select policy\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier3\\f07_f08_rbac_views.test.ts:39:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "leave_requests_staff_select",
+        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
+      }
+    },
+    {
+      "id": "T3-F7-F8-03",
+      "name": "Pairwise (F7+F8): Student owner select policy on fee_payments populates ledger without silent empty array",
+      "featureId": "F7",
+      "tier": 3,
+      "milestone": "M2",
+      "status": "FAILED",
+      "durationMs": 21,
+      "error": {
+        "message": "Must have fee_payments_owner_select policy",
+        "stack": "AssertionError: Must have fee_payments_owner_select policy\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier3\\f07_f08_rbac_views.test.ts:55:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "fee_payments_owner_select",
+        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
+      }
+    },
+    {
+      "id": "T3-F9-F12-01",
+      "name": "Pairwise (F9+F12): AI server grounding queries project specific column tuples to limit network payload",
+      "featureId": "F9",
+      "tier": 3,
+      "milestone": "M2",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T3-F9-F12-02",
+      "name": "Pairwise (F9+F12): AI server calculates fee collection ratios without division by zero",
+      "featureId": "F9",
+      "tier": 3,
+      "milestone": "M2",
+      "status": "PASSED",
+      "durationMs": 0
+    },
+    {
+      "id": "T3-F9-F12-03",
+      "name": "Pairwise (F9+F12): Fee service queries query the same student_fees canonical table as AI grounding",
+      "featureId": "F12",
+      "tier": 3,
+      "milestone": "M3",
+      "status": "FAILED",
+      "durationMs": 1,
+      "error": {
+        "message": "server.ts must query student_fees",
+        "stack": "AssertionError: server.ts must query student_fees\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier3\\f09_f12_ai_pagination.test.ts:55:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
+        "expected": "student_fees",
+        "actual": "import express from \"express\";\nimport path from \"path\";\nimport { createServer as createViteServer } from \"vite\";\nimport { GoogleGenAI } from \"@google/genai\";\nimport { createClient } from \"@supabase/su... [truncated 13384 chars]"
+      }
+    },
+    {
+      "id": "T3-F3-F11-01",
+      "name": "Pairwise (F3+F11): Academics sub-routes reflect specific view name in breadcrumb navigation",
+      "featureId": "F11",
+      "tier": 3,
+      "milestone": "M3",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T3-F3-F11-02",
+      "name": "Pairwise (F3+F11): Fees module maintains Financials parent trail when navigated from Student 360",
+      "featureId": "F11",
+      "tier": 3,
+      "milestone": "M3",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T3-F3-F11-03",
+      "name": "Pairwise (F3+F11): Examination module displays CBSE Examination category in navigation trail",
+      "featureId": "F11",
+      "tier": 3,
+      "milestone": "M3",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T4-SC1-01",
+      "name": "Scenario 1 (Step 1): Admissions module supports direct intake and pending approvals queue",
+      "featureId": "F10",
+      "tier": 4,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T4-SC1-02",
+      "name": "Scenario 1 (Step 2): Student 360 loads complete profile and provides fee collection trigger",
+      "featureId": "F3",
+      "tier": 4,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T4-SC1-03",
+      "name": "Scenario 1 (Step 3): FeesPortal executes collect_fee RPC and triggers printable receipt and ID card",
+      "featureId": "F10",
+      "tier": 4,
+      "milestone": "M3",
+      "status": "PASSED",
+      "durationMs": 3
+    },
+    {
+      "id": "T4-SC2-01",
+      "name": "Scenario 2 (Step 1): AcademicsManagement manages academic years, classes, and subjects under one module",
+      "featureId": "F2",
+      "tier": 4,
+      "milestone": "M1",
+      "status": "PASSED",
+      "durationMs": 2
+    },
+    {
+      "id": "T4-SC2-02",
+      "name": "Scenario 2 (Step 2): Teachers module maps educators to classes and subjects via teacher_assignments",
+      "featureId": "F10",
+      "tier": 4,
+      "milestone": "M3",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T4-SC2-03",
+      "name": "Scenario 2 (Step 3): ExaminationModule manages exams, marks entry, and consolidated report cards",
+      "featureId": "F10",
+      "tier": 4,
+      "milestone": "M3",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T4-SC3-01",
+      "name": "Scenario 3 (Step 1): System module provisions users via set_user_role and set_user_status RPCs",
+      "featureId": "F10",
+      "tier": 4,
+      "milestone": "M3",
+      "status": "PASSED",
+      "durationMs": 2
+    },
+    {
+      "id": "T4-SC3-02",
+      "name": "Scenario 3 (Step 2): RolesPermissionsView dynamically binds granular permissions to role_permissions",
+      "featureId": "F10",
+      "tier": 4,
+      "milestone": "M3",
+      "status": "PASSED",
+      "durationMs": 2
+    },
+    {
+      "id": "T4-SC3-03",
+      "name": "Scenario 3 (Step 3): System records audit logs and triggers prevent unauthorized role alteration",
+      "featureId": "F6",
+      "tier": 4,
+      "milestone": "M2",
+      "status": "PASSED",
+      "durationMs": 20
+    },
+    {
+      "id": "T4-SC4-01",
+      "name": "Scenario 4 (Step 1): leave_requests supports student, teacher, and staff leave submissions",
+      "featureId": "F7",
+      "tier": 4,
+      "milestone": "M2",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T4-SC4-02",
+      "name": "Scenario 4 (Step 2): AttendanceEntry provides bulk marking tools (Present All, Absent All)",
+      "featureId": "F10",
+      "tier": 4,
+      "milestone": "M3",
+      "status": "PASSED",
+      "durationMs": 2
+    },
+    {
+      "id": "T4-SC4-03",
+      "name": "Scenario 4 (Step 3): Saving register commits all student attendance statuses via save_attendance RPC",
+      "featureId": "F10",
+      "tier": 4,
+      "milestone": "M3",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T4-SC5-01",
+      "name": "Scenario 5 (Step 1): TransportManagement maintains routes, fleet vehicles, and drivers",
+      "featureId": "F10",
+      "tier": 4,
+      "milestone": "M3",
+      "status": "PASSED",
+      "durationMs": 2
+    },
+    {
+      "id": "T4-SC5-02",
+      "name": "Scenario 5 (Step 2): Student transit allocation links route, vehicle, and student identifier",
+      "featureId": "F10",
+      "tier": 4,
+      "milestone": "M3",
+      "status": "PASSED",
+      "durationMs": 1
+    },
+    {
+      "id": "T4-SC5-03",
+      "name": "Scenario 5 (Step 3): InventoryManagement manages institutional assets and stock levels",
+      "featureId": "F10",
+      "tier": 4,
+      "milestone": "M3",
+      "status": "PASSED",
+      "durationMs": 2
+    }
+  ]
+}

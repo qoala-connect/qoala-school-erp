@@ -1,0 +1,107 @@
+{
+  "tables": {
+    "students": {
+      "columns": {
+        "id": "uuid PRIMARY KEY DEFAULT gen_random_uuid()",
+        "admission_number": "text UNIQUE NOT NULL",
+        "roll_number": "text NOT NULL",
+        "name": "text NOT NULL",
+        "father_name": "text NOT NULL",
+        "mother_name": "text",
+        "date_of_birth": "date NOT NULL",
+        "gender": "text CHECK (gender IN ('male', 'female', 'other'))",
+        "class": "text NOT NULL",
+        "section": "text NOT NULL",
+        "phone": "varchar",
+        "email": "text",
+        "address": "text",
+        "academic_year": "text NOT NULL",
+        "created_at": "timestamp with time zone DEFAULT now()"
+      }
+    },
+    "attendance": {
+      "columns": {
+        "id": "uuid PRIMARY KEY DEFAULT gen_random_uuid()",
+        "student_id": "uuid REFERENCES students(id)",
+        "attendance_date": "date NOT NULL",
+        "status": "text CHECK (status IN ('present', 'absent', 'leave'))"
+      }
+    },
+    "fees": {
+      "columns": {
+        "id": "uuid PRIMARY KEY DEFAULT gen_random_uuid()",
+        "student_id": "uuid REFERENCES students(id)",
+        "month": "text NOT NULL",
+        "academic_year": "text NOT NULL",
+        "tuition_fee": "numeric DEFAULT 0",
+        "exam_fee": "numeric DEFAULT 0",
+        "transport_fee": "numeric DEFAULT 0",
+        "payment_date": "date",
+        "receipt_number": "text UNIQUE",
+        "status": "text DEFAULT 'pending' CHECK (status IN ('paid', 'pending', 'partial'))",
+        "fine_amount": "numeric DEFAULT 0",
+        "paid_amount": "numeric DEFAULT 0",
+        "remaining_amount": "numeric",
+        "total_amount": "numeric",
+        "payment_mode": "text CHECK (payment_mode IN ('cash', 'upi', 'bank', 'online'))",
+        "created_at": "timestamp DEFAULT now()",
+        "updated_at": "timestamp DEFAULT now()"
+      }
+    },
+    "exams": {
+      "columns": {
+        "id": "uuid PRIMARY KEY DEFAULT gen_random_uuid()",
+        "exam_name": "text NOT NULL",
+        "class": "text NOT NULL",
+        "academic_year": "text NOT NULL",
+        "created_at": "timestamp DEFAULT now()"
+      }
+    },
+    "marks": {
+      "columns": {
+        "id": "uuid PRIMARY KEY DEFAULT gen_random_uuid()",
+        "exam_id": "uuid REFERENCES exams(id)",
+        "student_id": "uuid REFERENCES students(id)",
+        "subject_id": "uuid REFERENCES subjects(id)",
+        "max_marks": "integer NOT NULL",
+        "obtained_marks": "numeric NOT NULL"
+      }
+    },
+    "profiles": {
+      "columns": {
+        "id": "uuid PRIMARY KEY REFERENCES auth.users(id)",
+        "name": "text NOT NULL DEFAULT ''",
+        "email": "text NOT NULL DEFAULT ''",
+        "role": "text NOT NULL DEFAULT 'student'"
+      }
+    },
+    "admissions": {
+      "columns": {
+        "id": "uuid PRIMARY KEY DEFAULT gen_random_uuid()",
+        "name": "text NOT NULL",
+        "father_name": "text NOT NULL",
+        "mother_name": "text",
+        "date_of_birth": "date NOT NULL",
+        "gender": "text CHECK (gender IN ('male', 'female', 'other'))",
+        "class": "text NOT NULL",
+        "section": "text",
+        "academic_year": "text NOT NULL",
+        "phone": "text",
+        "email": "text",
+        "address": "text",
+        "photo_url": "text",
+        "aadhaar_last4": "text",
+        "status": "text DEFAULT 'Pending' CHECK (status IN ('Pending', 'Approved', 'Rejected'))",
+        "student_id": "uuid REFERENCES students(id) ON DELETE SET NULL ON UPDATE CASCADE",
+        "created_at": "timestamp with time zone DEFAULT now()"
+      },
+      "constraints": [
+        "UNIQUE(student_id, academic_year, class, section)"
+      ],
+      "indexes": [
+        "CREATE INDEX admissions_student_id_idx ON admissions(student_id)",
+        "CREATE INDEX admissions_status_idx ON admissions(status)"
+      ]
+    }
+  }
+}
