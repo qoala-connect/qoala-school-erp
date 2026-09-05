@@ -44,7 +44,7 @@ export default function SchoolCalendar() {
       const { data, error } = await supabase
         .from('holidays')
         .select('*')
-        .order('date', { ascending: true });
+        .order('start_date', { ascending: true });
       
       if (error) throw error;
 

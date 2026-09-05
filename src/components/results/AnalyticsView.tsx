@@ -114,15 +114,21 @@ export default function AnalyticsView() {
       if (r.result_status === 'pass') passedCount++;
     });
 
-    const averagePercentage = scoredStudentsCount > 0 
-      ? Math.round((totalScoreSum / (scoredStudentsCount * 500)) * 100) 
-      : 76;
-    
-    const passRate = scoredStudentsCount > 0 
-      ? Math.round((passedCount / scoredStudentsCount) * 100) 
-      : 94;
+    const averagePercentage = scoredStudentsCount > 0
+      ? Math.round((totalScoreSum / (scoredStudentsCount * 500)) * 100)
+      : 0;
 
-    // Grade distribution
+    const passRate = scoredStudentsCount > 0
+      ? Math.round((passedCount / scoredStudentsCount) * 100)
+      : 0;
+
+    // Distinction Index: share of evaluated students scoring CBSE A1/A2 (>=81%)
+    const distinctionCount = activeResults.filter(r => (Number(r.percentage) || 0) >= 81).length;
+    const distinctionIndex = scoredStudentsCount > 0
+      ? Math.round((distinctionCount / scoredStudentsCount) * 100)
+      : 0;
+
+    // Grade distribution — real counts only; zero means no results recorded
     const gradeCounts: Record<string, number> = { 'A (90-100%)': 0, 'B (75-89%)': 0, 'C (60-74%)': 0, 'D (33-59%)': 0, 'E (<33%)': 0 };
     activeResults.forEach(r => {
       const pct = Number(r.percentage) || 0;
@@ -133,30 +139,29 @@ export default function AnalyticsView() {
       else gradeCounts['E (<33%)']++;
     });
 
-    const gradeData = Object.entries(gradeCounts).map(([name, count]) => ({
-      name,
-      students: count || (scoredStudentsCount === 0 ? Math.floor(Math.random() * 12 + 4) : 0)
-    }));
+    const gradeData = Object.entries(gradeCounts).map(([name, count]) => ({ name, students: count }));
 
-    // Subject Performance breakdown
+    // Subject Performance breakdown — real averages only; a subject with no
+    // marks recorded yet shows 0 rather than a plausible-looking random score.
     const subjectData = subjects.slice(0, 6).map(sub => {
       const subMarks = activeMarks.filter(m => m.subject_id === sub.id && !m.is_absent);
-      const subAvg = subMarks.length > 0 
+      const subAvg = subMarks.length > 0
         ? Math.round(subMarks.reduce((sum, m) => sum + Number(m.obtained_marks || 0), 0) / subMarks.length)
-        : Math.floor(Math.random() * 20 + 72);
-      
+        : 0;
+
       return {
         subject: sub.subject_name,
         average: subAvg,
-        passRate: subAvg >= 33 ? Math.min(100, subAvg + 15) : 40
+        passRate: subMarks.length > 0 ? (subAvg >= 33 ? Math.min(100, subAvg + 15) : 40) : 0
       };
     });
 
     return {
       totalCandidates: activeStudents.length,
-      evaluatedCount: scoredStudentsCount || activeStudents.length,
+      evaluatedCount: scoredStudentsCount,
       averagePercentage,
       passRate,
+      distinctionIndex,
       gradeData,
       subjectData
     };
@@ -214,7 +219,7 @@ export default function AnalyticsView() {
           { label: 'Enrolled Students', value: metrics.totalCandidates, desc: `${metrics.evaluatedCount} evaluated`, color: 'text-slate-900 bg-slate-50', icon: Users },
           { label: 'Cohort Average', value: `${metrics.averagePercentage}%`, desc: 'Aggregate score across subjects', color: 'text-violet-600 bg-violet-50', icon: TrendingUp },
           { label: 'CBSE Pass Standard', value: `${metrics.passRate}%`, desc: 'Scoring ≥ 33% overall', color: 'text-emerald-600 bg-emerald-50', icon: Trophy },
-          { label: 'Distinction Index', value: '38%', desc: 'Scoring Grade A1/A2', color: 'text-amber-600 bg-amber-50', icon: Award }
+          { label: 'Distinction Index', value: `${metrics.distinctionIndex}%`, desc: 'Scoring Grade A1/A2', color: 'text-amber-600 bg-amber-50', icon: Award }
         ].map((k, i) => (
           <div key={i} className="bg-white border border-slate-200/60 p-4 rounded-2xl shadow-2xs flex flex-col justify-between">
             <div className="flex items-center justify-between">

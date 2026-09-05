@@ -13,6 +13,7 @@ import { AdminStatCard } from '@/components/common/AdminStatCard';
 
 interface DisciplinaryRecord {
   id: string;
+  student_id: string;
   student_name: string;
   class_name: string;
   infraction: string; // e.g. Unexcused absence/exam misconduct
@@ -23,8 +24,16 @@ interface DisciplinaryRecord {
   status: 'Pending' | 'Resolved' | 'Escalated';
 }
 
+interface EnrolledStudent {
+  id: string;
+  name: string;
+  class: string;
+  section: string;
+}
+
 export default function DisciplineManagement() {
   const [records, setRecords] = useState<DisciplinaryRecord[]>([]);
+  const [students, setStudents] = useState<EnrolledStudent[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [severityFilter, setSeverityFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -44,21 +53,28 @@ export default function DisciplineManagement() {
     setIsSyncing(true);
     setErrorState(null);
     try {
-      const { data, error } = await supabase
-        .from('disciplinary_records')
-        .select('*')
-        .order('incident_date', { ascending: false });
-      
-      if (error) throw error;
-      
+      const [recordsRes, studentsRes] = await Promise.all([
+        supabase.from('disciplinary_records').select('*').order('incident_date', { ascending: false }),
+        supabase.from('students').select('id, name, class, section').eq('status', 'active').order('name').limit(2000)
+      ]);
+
+      if (recordsRes.error) throw recordsRes.error;
+
+      if (studentsRes.data) {
+        setStudents(studentsRes.data.map((s: any) => ({
+          id: s.id, name: s.name || 'Student', class: s.class || '', section: s.section || ''
+        })));
+      }
+
       // Map DB columns to interface
-      const mapped = (data || []).map((r: any) => ({
+      const mapped = (recordsRes.data || []).map((r: any) => ({
         id: r.id,
+        student_id: r.student_id || '',
         student_name: r.student_name || 'Student',
         class_name: r.student_class || 'Class',
         infraction: r.description || r.incident_type || '',
         action_taken: r.action_taken || 'Under Review',
-        demerit_points: 5,
+        demerit_points: Number(r.demerit_points) || 0,
         action_date: r.incident_date || new Date().toISOString().substring(0, 10),
         severity: r.severity || 'Medium',
         status: r.status || 'Pending'
@@ -80,8 +96,7 @@ export default function DisciplineManagement() {
   const handleOpenAdd = () => {
     setEditingItem(null);
     setFormData({
-      student_name: '',
-      class_name: 'Class 10th',
+      student_id: '',
       infraction: '',
       action_taken: '',
       demerit_points: 5,
@@ -130,19 +145,22 @@ export default function DisciplineManagement() {
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.student_name || !formData.infraction || !formData.action_taken) {
-      toast.error('Please fill in student name, infraction, and actions taken');
+    if (!formData.student_id || !formData.infraction || !formData.action_taken) {
+      toast.error('Please select the student, and fill in infraction and actions taken');
       return;
     }
 
     setIsSubmitting(true);
     try {
+      const selectedStudent = students.find(s => s.id === formData.student_id);
       const payload: any = {
-        student_name: formData.student_name,
-        student_class: formData.class_name || 'Class 10th',
+        student_id: formData.student_id,
+        student_name: selectedStudent?.name || formData.student_name,
+        student_class: selectedStudent ? `Class ${selectedStudent.class}${selectedStudent.section ? `-${selectedStudent.section}` : ''}` : (formData.class_name || 'Class 10th'),
         incident_type: formData.infraction.substring(0, 50) || 'Misconduct',
         description: formData.infraction,
         action_taken: formData.action_taken,
+        demerit_points: Number(formData.demerit_points) || 0,
         severity: formData.severity || 'Medium',
         incident_date: formData.action_date || new Date().toISOString().substring(0, 10),
         status: formData.status || 'Pending'
@@ -189,6 +207,10 @@ export default function DisciplineManagement() {
     toast.success('Logs exported successfully');
   };
 
+  // Resolves each imported row to a real student_id by exact name match
+  // and inserts into disciplinary_records for real — previously this only
+  // spliced parsed rows into local React state, so imported records
+  // vanished the moment loadData() re-ran or the page refreshed.
   const handleImport = () => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -199,38 +221,67 @@ export default function DisciplineManagement() {
       reader.onload = async (event: any) => {
         try {
           const text = event.target.result;
+          let rows: Array<{ student_name: string; infraction: string; action_taken: string; demerit_points: number; action_date: string; severity: string; status: string }> = [];
+
           if (file.name.endsWith('.json')) {
             const parsed = JSON.parse(text);
             if (Array.isArray(parsed)) {
-              const updated = [...parsed, ...records];
-              setRecords(updated);
-              toast.success(`Imported ${parsed.length} logs from JSON`);
+              rows = parsed.map((p: any) => ({
+                student_name: p.student_name || '',
+                infraction: p.infraction || 'Infraction detail',
+                action_taken: p.action_taken || 'Under Review',
+                demerit_points: Number(p.demerit_points) || 0,
+                action_date: p.action_date || new Date().toISOString().substring(0, 10),
+                severity: p.severity || 'Medium',
+                status: p.status || 'Pending'
+              }));
             }
           } else {
             const lines = text.split('\n').filter(Boolean);
-            const imported: DisciplinaryRecord[] = [];
             for (let i = 1; i < lines.length; i++) {
               const parts = lines[i].split(',').map((p: string) => p.replace(/^"|"$/g, '').trim());
               if (parts.length >= 5) {
-                imported.push({
-                  id: parts[0] || `disc_${Date.now()}_${i}`,
-                  student_name: parts[1] || 'Imported Student',
-                  class_name: parts[2] || 'Class 10th',
+                rows.push({
+                  student_name: parts[1] || '',
                   infraction: parts[3] || 'Infraction detail',
-                  action_taken: parts[4] || 'Suspended',
-                  demerit_points: Number(parts[5]) || 5,
+                  action_taken: parts[4] || 'Under Review',
+                  demerit_points: Number(parts[5]) || 0,
                   action_date: parts[6] || new Date().toISOString().substring(0, 10),
-                  severity: (parts[7] as any) || 'Medium',
-                  status: (parts[8] as any) || 'Pending'
+                  severity: parts[7] || 'Medium',
+                  status: parts[8] || 'Pending'
                 });
               }
             }
-            if (imported.length > 0) {
-              const updated = [...imported, ...records];
-              setRecords(updated);
-              toast.success(`Imported ${imported.length} incidents from CSV`);
-            }
           }
+
+          const matched = rows
+            .map(r => ({ row: r, student: students.find(s => s.name.toLowerCase() === r.student_name.toLowerCase()) }))
+            .filter(m => m.student);
+          const unmatchedCount = rows.length - matched.length;
+
+          if (matched.length === 0) {
+            toast.error('No rows matched an enrolled student by name — nothing imported.');
+            return;
+          }
+
+          const payload = matched.map(({ row, student }) => ({
+            student_id: student!.id,
+            student_name: student!.name,
+            student_class: `Class ${student!.class}${student!.section ? `-${student!.section}` : ''}`,
+            incident_type: row.infraction.substring(0, 50),
+            description: row.infraction,
+            action_taken: row.action_taken,
+            demerit_points: row.demerit_points,
+            severity: row.severity,
+            incident_date: row.action_date,
+            status: row.status
+          }));
+
+          const { error } = await supabase.from('disciplinary_records').insert(payload);
+          if (error) throw error;
+
+          toast.success(`Imported ${matched.length} incident${matched.length === 1 ? '' : 's'}${unmatchedCount > 0 ? ` (${unmatchedCount} skipped — no matching student name)` : ''}.`);
+          await loadData();
         } catch (err: any) {
           toast.error('Import error: ' + err.message);
         }
@@ -649,34 +700,27 @@ export default function DisciplineManagement() {
               </button>
             </div>
             <form onSubmit={handleFormSubmit} className="p-5 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block mb-1">
-                    Student Full Name <span className="text-rose-500">*</span>
-                  </label>
-                  <input 
-                    type="text"
-                    required
-                    placeholder="e.g., Rahul Vishwakarma"
-                    value={formData.student_name || ''}
-                    onChange={(e) => setFormData(prev => ({ ...prev, student_name: e.target.value }))}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-violet-500/10 focus:border-violet-500 transition-all font-medium"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block mb-1">
-                    Class / Grade
-                  </label>
+              <div>
+                <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block mb-1">
+                  Enrolled Student <span className="text-rose-500">*</span>
+                </label>
+                {editingItem ? (
+                  <div className="w-full bg-slate-100 border border-slate-200 rounded-xl py-2 px-3 text-xs text-slate-600 font-semibold">
+                    {formData.student_name} {formData.class_name ? `— ${formData.class_name}` : ''}
+                  </div>
+                ) : (
                   <select
-                    value={formData.class_name || 'Class 12th'}
-                    onChange={(e) => setFormData(prev => ({ ...prev, class_name: e.target.value }))}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-violet-500/10 focus:border-violet-500 transition-all font-semibold cursor-pointer"
+                    required
+                    value={formData.student_id || ''}
+                    onChange={(e) => setFormData((prev: any) => ({ ...prev, student_id: e.target.value }))}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-violet-500/10 focus:border-violet-500 transition-all font-medium cursor-pointer"
                   >
-                    {['Class 1st', 'Class 2nd', 'Class 3rd', 'Class 5th', 'Class 10th', 'Class 12th'].map(c => (
-                      <option key={c} value={c}>{c}</option>
+                    <option value="">Select Student...</option>
+                    {students.map(s => (
+                      <option key={s.id} value={s.id}>{s.name} — Class {s.class}{s.section ? `-${s.section}` : ''}</option>
                     ))}
                   </select>
-                </div>
+                )}
               </div>
 
               <div>

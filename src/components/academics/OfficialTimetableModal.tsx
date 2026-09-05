@@ -606,7 +606,7 @@ export default function OfficialTimetableModal({
                   {/* Timetable In-charge */}
                   <div className="flex flex-col items-center">
                     <div className="h-5 border-b border-slate-500 w-28 flex items-end justify-center pb-0.5">
-                      <span className="text-[7.5px] italic font-serif text-slate-800 font-bold">Deepak Verma</span>
+                      <span className="text-[7.5px] italic font-serif text-slate-500">Time Table In-Charge</span>
                     </div>
                     <span className="text-[6.5px] font-black uppercase text-slate-700 mt-0.5 block">Time Table In-Charge</span>
                   </div>
@@ -614,7 +614,7 @@ export default function OfficialTimetableModal({
                   {/* Academic Coordinator */}
                   <div className="flex flex-col items-center">
                     <div className="h-5 border-b border-slate-500 w-28 flex items-end justify-center pb-0.5">
-                      <span className="text-[7.5px] italic font-serif text-slate-800 font-bold">Sr. Rosily</span>
+                      <span className="text-[7.5px] italic font-serif text-slate-500">Academic Coordinator</span>
                     </div>
                     <span className="text-[6.5px] font-black uppercase text-slate-700 mt-0.5 block">Academic Coordinator</span>
                   </div>
@@ -622,7 +622,7 @@ export default function OfficialTimetableModal({
                   {/* Principal & Seal */}
                   <div className="flex flex-col items-center">
                     <div className="h-5 border-b border-slate-500 w-28 flex items-end justify-center pb-0.5 relative">
-                      <span className="text-[7.5px] italic font-serif text-slate-950 font-black">Fr. Antony Paul</span>
+                      <span className="text-[7.5px] italic font-serif text-slate-500">Principal</span>
                       <div className="absolute -top-3.5 right-0 w-11 h-11 rounded-full border border-blue-900/60 flex flex-col items-center justify-center text-[4px] text-blue-950 font-black uppercase text-center leading-none rotate-12 bg-blue-50/30 pointer-events-none">
                         <span>ST. JOSEPH'S</span>
                         <span className="text-[3px]">BARHALGANJ</span>

@@ -133,27 +133,19 @@ export default function AdmitCardsView() {
     return exams.find(e => e.id === selectedExamId) || exams[0] || null;
   }, [exams, selectedExamId]);
 
-  // Timetable for active exam
+  // Timetable for active exam — built only from real exam_subjects rows
+  // (exam_date/start_time/duration/room, set via Datesheets). An exam with
+  // no subjects scheduled yet shows an empty state rather than a fabricated
+  // CBSE-style subject list with invented dates.
   const subjectTimetable = useMemo(() => {
     const matchingES = examSubjects.filter(es => es.exam_id === selectedExamId);
-    if (matchingES.length > 0) {
-      return matchingES.map((es, idx) => ({
-        code: `SUB-0${idx + 1}`,
-        name: es.subject_name,
-        date: `2027-03-${String(2 + (idx * 4)).padStart(2, '0')}`,
-        time: '09:00 AM - 12:00 PM',
-        room: `Desk #${activeStudent?.roll_number || idx + 1}`
-      }));
-    }
-
-    return [
-      { code: '301', name: 'English Core / Communicative', date: '02-Mar-2027', time: '09:00 AM - 12:00 PM', room: `Desk #${activeStudent?.roll_number || '12'}` },
-      { code: '002', name: 'Hindi Course - A', date: '06-Mar-2027', time: '09:00 AM - 12:00 PM', room: `Desk #${activeStudent?.roll_number || '12'}` },
-      { code: '041', name: 'Mathematics (Standard / Basic)', date: '11-Mar-2027', time: '09:00 AM - 12:00 PM', room: `Desk #${activeStudent?.roll_number || '12'}` },
-      { code: '086', name: 'Science (Theory & Practical)', date: '16-Mar-2027', time: '09:00 AM - 12:00 PM', room: `Desk #${activeStudent?.roll_number || '12'}` },
-      { code: '087', name: 'Social Science (Hist/Civ/Geo/Eco)', date: '21-Mar-2027', time: '09:00 AM - 12:00 PM', room: `Desk #${activeStudent?.roll_number || '12'}` },
-      { code: '402', name: 'Information Technology / AI', date: '25-Mar-2027', time: '09:00 AM - 12:00 PM', room: `Terminal #${activeStudent?.roll_number || '12'}` }
-    ];
+    return matchingES.map((es, idx) => ({
+      code: es.subject_id ? es.subject_id.slice(0, 6).toUpperCase() : `SUB-0${idx + 1}`,
+      name: es.subject_name,
+      date: es.exam_date || 'Not scheduled',
+      time: es.start_time ? `${es.start_time}${es.duration ? ` (${es.duration})` : ''}` : '—',
+      room: es.room || `Desk #${activeStudent?.roll_number || idx + 1}`
+    }));
   }, [examSubjects, selectedExamId, activeStudent]);
 
   // Handle single student PDF download
@@ -735,20 +727,24 @@ export default function AdmitCardsView() {
 
                         <div className="flex items-baseline gap-1 border-b border-slate-200 pb-0.5">
                           <span className="font-bold text-slate-500 uppercase text-[8px] w-28 shrink-0">Mother's Name:</span>
-                          <span className="font-bold text-slate-900 uppercase">{activeStudent?.mother_name || 'Smt. Sunita Devi'}</span>
+                          <span className="font-bold text-slate-900 uppercase">{activeStudent?.mother_name || 'N/A'}</span>
                         </div>
                         <div className="flex items-baseline gap-1 border-b border-slate-200 pb-0.5">
                           <span className="font-bold text-slate-500 uppercase text-[8px] w-28 shrink-0">Father's Name:</span>
-                          <span className="font-bold text-slate-900 uppercase">{activeStudent?.father_name || 'Shri Alok Kumar'}</span>
+                          <span className="font-bold text-slate-900 uppercase">{activeStudent?.father_name || 'N/A'}</span>
                         </div>
 
                         <div className="flex items-baseline gap-1 border-b border-slate-200 pb-0.5">
                           <span className="font-bold text-slate-500 uppercase text-[8px] w-28 shrink-0">Date of Birth:</span>
-                          <span className="font-bold text-slate-900">{activeStudent?.dob || '14/08/2012'}</span>
+                          <span className="font-bold text-slate-900">
+                            {activeStudent?.date_of_birth
+                              ? new Date(activeStudent.date_of_birth).toLocaleDateString('en-IN')
+                              : 'N/A'}
+                          </span>
                         </div>
                         <div className="flex items-baseline gap-1 border-b border-slate-200 pb-0.5">
                           <span className="font-bold text-slate-500 uppercase text-[8px] w-28 shrink-0">Gender / Category:</span>
-                          <span className="font-bold text-slate-900">{activeStudent?.gender || 'Male'} / Regular (CBSE)</span>
+                          <span className="font-bold text-slate-900">{activeStudent?.gender || 'N/A'} / Regular (CBSE)</span>
                         </div>
 
                         <div className="col-span-2 flex items-baseline gap-1 pt-0.5">
@@ -810,7 +806,13 @@ export default function AdmitCardsView() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-300 text-slate-800">
-                        {subjectTimetable.map((sub, idx) => (
+                        {subjectTimetable.length === 0 ? (
+                          <tr>
+                            <td colSpan={7} className="py-6 text-center text-slate-400 font-bold text-[9px]">
+                              No subjects scheduled yet for this exam — add them under Examination → Datesheets.
+                            </td>
+                          </tr>
+                        ) : subjectTimetable.map((sub, idx) => (
                           <tr key={idx} className={idx % 2 === 1 ? 'bg-slate-50/70' : 'bg-white'}>
                             <td className="py-1 px-2 border-r border-slate-900 text-center font-mono font-bold text-slate-600">{idx + 1}</td>
                             <td className="py-1 px-2 border-r border-slate-900 text-center font-mono font-bold text-slate-800">{sub.code}</td>
@@ -864,7 +866,7 @@ export default function AdmitCardsView() {
                     {/* Class Teacher */}
                     <div className="flex flex-col items-center">
                       <div className="h-8 border-b border-slate-400 w-28 flex items-end justify-center pb-0.5">
-                        <span className="text-[7.5px] italic font-serif text-slate-800 font-bold">R. K. Shukla</span>
+                        <span className="text-[7.5px] italic text-slate-400">Class Teacher</span>
                       </div>
                       <span className="text-[7px] font-black uppercase text-slate-600 mt-1 block">Class Teacher</span>
                     </div>
@@ -872,7 +874,7 @@ export default function AdmitCardsView() {
                     {/* Principal */}
                     <div className="flex flex-col items-center">
                       <div className="h-8 border-b border-slate-400 w-28 flex items-end justify-center pb-0.5 relative">
-                        <span className="text-[8px] italic font-serif text-slate-900 font-bold">Fr. Antony Paul</span>
+                        <span className="text-[7.5px] italic text-slate-400">Principal</span>
                         {/* Seal */}
                         <div className="absolute -top-3 right-0 w-11 h-11 rounded-full border border-blue-900/60 flex flex-col items-center justify-center text-[5px] text-blue-900 font-black uppercase text-center leading-none rotate-12 bg-blue-50/20 pointer-events-none">
                           <span>ST. JOSEPH'S</span>

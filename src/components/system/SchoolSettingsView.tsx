@@ -463,7 +463,7 @@ export default function SchoolSettingsView() {
               <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
                 <div>
                   <div className="text-xs font-bold text-slate-800">Two-Factor Authentication (MFA)</div>
-                  <div className="text-[10px] text-slate-400">Require multi-factor auth for administrators</div>
+                  <div className="text-[10px] text-slate-400">Saves as a school policy flag — login does not enforce it yet</div>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input

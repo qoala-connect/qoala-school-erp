@@ -42,12 +42,20 @@ interface DriverProfile {
 
 interface TransitAllotment {
   id: string;
+  student_id: string;
   student_name: string;
   student_class: string;
   route_id: string;
   vehicle_id: string;
   boarding_point: string;
   pickup_time: string;
+}
+
+interface EnrolledStudent {
+  id: string;
+  name: string;
+  class: string;
+  section: string;
 }
 
 type TabType = 'routes' | 'vehicles' | 'drivers' | 'allotments';
@@ -75,6 +83,7 @@ export default function TransportManagement() {
   const [vehicles, setVehicles] = useState<FleetVehicle[]>([]);
   const [drivers, setDrivers] = useState<DriverProfile[]>([]);
   const [allotments, setAllotments] = useState<TransitAllotment[]>([]);
+  const [students, setStudents] = useState<EnrolledStudent[]>([]);
 
   // Bulk selection states
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
@@ -91,12 +100,19 @@ export default function TransportManagement() {
     setIsSyncing(true);
     setErrorState(null);
     try {
-      const [routesRes, vehRes, drvRes, altRes] = await Promise.all([
+      const [routesRes, vehRes, drvRes, altRes, stdRes] = await Promise.all([
         supabase.from('transport_routes').select('*').order('route_name'),
         supabase.from('vehicles').select('*'),
         supabase.from('drivers').select('*'),
-        supabase.from('student_transport').select('*, students(id, name, class, section)')
+        supabase.from('student_transport').select('*, students(id, name, class, section)'),
+        supabase.from('students').select('id, name, class, section').eq('status', 'active').order('name').limit(2000)
       ]);
+
+      if (stdRes.data) {
+        setStudents(stdRes.data.map((s: any) => ({
+          id: s.id, name: s.name || 'Student', class: s.class || '', section: s.section || ''
+        })));
+      }
 
       if (routesRes.data) {
         setRoutes(routesRes.data.map((r: any) => ({
@@ -133,6 +149,7 @@ export default function TransportManagement() {
       if (altRes.data) {
         setAllotments(altRes.data.map((a: any) => ({
           id: a.id,
+          student_id: a.student_id || a.students?.id || '',
           student_name: a.students?.name || 'Student',
           student_class: a.students?.class ? `Grade ${a.students.class}-${a.students.section || 'A'}` : 'N/A',
           route_id: a.route_id || a.route || '',
@@ -230,7 +247,13 @@ export default function TransportManagement() {
           await supabase.from('drivers').insert([payload]);
         }
       } else if (activeTab === 'allotments') {
+        if (!formData.student_id) {
+          toast.error('Please select an enrolled student for this allotment.');
+          setIsSubmitting(false);
+          return;
+        }
         const payload = {
+          student_id: formData.student_id,
           route_id: formData.route_id,
           vehicle_id: formData.vehicle_id,
           boarding_point: formData.boarding_point,
@@ -1009,29 +1032,19 @@ export default function TransportManagement() {
 
                 {activeTab === 'allotments' && (
                   <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider pl-1">Enrolled Student Name</label>
-                        <input 
-                          type="text" 
-                          required
-                          placeholder="e.g. Rohan Sharma"
-                          value={formData.student_name || ''}
-                          onChange={(e) => setFormData({ ...formData, student_name: e.target.value })}
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs text-slate-800 focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 outline-none transition-all h-[36px]"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider pl-1">Student Class & Div</label>
-                        <input 
-                          type="text" 
-                          required
-                          placeholder="e.g. Class 10-A"
-                          value={formData.student_class || ''}
-                          onChange={(e) => setFormData({ ...formData, student_class: e.target.value })}
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs text-slate-800 focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 outline-none transition-all h-[36px]"
-                        />
-                      </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider pl-1">Enrolled Student</label>
+                      <select
+                        required
+                        value={formData.student_id || ''}
+                        onChange={(e) => setFormData({ ...formData, student_id: e.target.value })}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs text-slate-800 focus:ring-2 focus:ring-violet-500/20 h-[36px] outline-none"
+                      >
+                        <option value="">Select Student...</option>
+                        {students.map(s => (
+                          <option key={s.id} value={s.id}>{s.name} — Class {s.class}{s.section ? `-${s.section}` : ''}</option>
+                        ))}
+                      </select>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">

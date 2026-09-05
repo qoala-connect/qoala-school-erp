@@ -105,16 +105,22 @@ export async function fetchTeachers(params?: {
   try {
     let query = supabase.from('teachers').select('*').order('name');
 
-    if (params?.status && params.status !== 'all') {
-      query = query.eq('status', params.status);
+    const filters = params;
+    if (filters?.status && filters.status !== 'all') {
+      query = query.eq('status', filters.status);
     }
 
-    if (params?.department && params.department !== 'all') {
-      query = query.eq('department', params.department);
+    if (filters?.department && filters.department !== 'all') {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(filters.department);
+      if (isUuid) {
+        query = query.eq('department_id', filters.department);
+      } else {
+        query = query.eq('department', filters.department);
+      }
     }
 
-    if (params?.designation && params.designation !== 'all') {
-      query = query.eq('designation', params.designation);
+    if (filters?.designation && filters.designation !== 'all') {
+      query = query.eq('designation', filters.designation);
     }
 
     const { data: teachers, error } = await query;
@@ -236,11 +242,13 @@ export async function saveTeacher(teacher: Partial<Teacher>): Promise<Teacher> {
     if (error) throw error;
     return data as Teacher;
   } else {
-    // Generate employee_id if absent
+    // Generate employee_id if absent. Delegated to a DB sequence via RPC so
+    // two admins onboarding staff at the same moment can't both compute the
+    // same ID (the previous in-memory row count was a race condition).
     if (!payload.employee_id) {
-      const { data: countData } = await supabase.from('teachers').select('id', { count: 'exact' });
-      const seq = (countData?.length || 0) + 1;
-      payload.employee_id = `TCH-${String(seq).padStart(4, '0')}`;
+      const { data: nextId, error: seqError } = await supabase.rpc('next_employee_id');
+      if (seqError) throw seqError;
+      payload.employee_id = nextId as string;
     }
     const { data, error } = await supabase.from('teachers').insert([payload]).select().single();
     if (error) throw error;

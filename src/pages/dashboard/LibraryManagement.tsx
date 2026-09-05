@@ -261,13 +261,42 @@ export default function LibraryManagement() {
     }
   };
 
-  // Export action
+  // Export action — real CSV of whichever tab is active, built from the
+  // same filtered data already on screen (previously this just ran a
+  // 1-second fake spinner and showed a success toast with no file).
   const handleExport = () => {
-    toast.promise(new Promise(resolve => setTimeout(resolve, 1000)), {
-      loading: 'Compiling catalog indices...',
-      success: 'Catalog index sheets exported to stream!',
-      error: 'Export failed'
-    });
+    let header = '';
+    let rows: string[] = [];
+    let filename = '';
+
+    if (activeTab === 'books') {
+      header = 'Title,Author,ISBN,Shelf Location,Total Copies,Issued Copies\n';
+      rows = filteredBooks.map(b => `"${b.title}","${b.author}","${b.isbn}","${b.shelf_location}","${b.total_copies}","${b.issued_copies}"`);
+      filename = 'Book_Catalog';
+    } else if (activeTab === 'categories') {
+      header = 'Category,Section Code\n';
+      rows = filteredCategories.map(c => `"${c.name}","${c.section_code}"`);
+      filename = 'Book_Categories';
+    } else if (activeTab === 'issues') {
+      header = 'Borrower,Role,Issue Date,Due Date,Return Date,Status\n';
+      rows = filteredIssues.map(i => `"${i.borrower_name}","${i.borrower_role}","${i.issue_date}","${i.due_date}","${i.return_date || ''}","${i.status}"`);
+      filename = 'Borrowing_Ledger';
+    } else {
+      header = 'Borrower,Fine Amount,Status\n';
+      rows = filteredFines.map(f => `"${f.borrower_name}","${f.fine_amount}","${f.status}"`);
+      filename = 'Overdue_Fines';
+    }
+
+    const blob = new Blob([header + rows.join('\n')], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `${filename}_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    toast.success('Export downloaded.');
   };
 
   // Print Action

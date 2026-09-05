@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Lock, ArrowRight, ChevronLeft, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { SchoolLogo } from '@/components/SchoolLogo';
 import { toast, Toaster } from 'sonner';
+import { supabase } from '@/lib/supabase';
 
 export default function ResetPassword() {
   const [password, setPassword] = useState('');
@@ -11,7 +12,7 @@ export default function ResetPassword() {
   const [completed, setCompleted] = useState(false);
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password !== confirmPassword) {
       toast.error('Passwords do not match. Please enter identical passwords.');
@@ -23,11 +24,17 @@ export default function ResetPassword() {
     }
 
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) throw error;
       setCompleted(true);
       toast.success('Your portal password has been changed successfully.');
-    }, 1200);
+    } catch (err: any) {
+      console.error('Update password error:', err);
+      toast.error(err.message || 'Failed to update password. Session may have expired.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

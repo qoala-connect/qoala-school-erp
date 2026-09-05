@@ -152,7 +152,20 @@ export default function CertificateGenerator() {
         .eq('status', 'active')
         .order('name');
       if (error) throw error;
-      if (data) setAvailableStudents(data);
+      if (data && data.length > 0) {
+        setAvailableStudents(data);
+        if (!location.state?.student) {
+          const first = data[0];
+          setSelectedStudentId(first.id);
+          setStudentName(first.name || 'Student');
+          setAdmissionNo(first.admission_number || first.admissionNo || 'N/A');
+          setRollNo(first.roll_number || first.rollNo || '1');
+          setClassSection(`Class ${first.class || '10'}${first.section ? `-${first.section}` : ''}`);
+          if (first.father_name) setFatherName(first.father_name);
+          if (first.mother_name) setMotherName(first.mother_name);
+          if (first.date_of_birth) setDob(first.date_of_birth);
+        }
+      }
     } catch (err: any) {
       console.warn('Error loading students for certificates:', err);
     }

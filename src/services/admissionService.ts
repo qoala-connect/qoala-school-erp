@@ -20,6 +20,15 @@ export interface AdmissionFilters {
   sectionFilter?: string;
 }
 
+export interface PageParams {
+  page?: number;
+  pageSize?: number;
+}
+
+// Hard ceiling applied when no explicit page is requested, so an
+// un-paginated caller still can't pull an unbounded number of rows.
+const DEFAULT_PAGE_SIZE = 500;
+
 async function getAuthHeaders(): Promise<HeadersInit> {
   const { data: { session } } = await supabase.auth.getSession();
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -33,7 +42,7 @@ export const admissionService = {
   /**
    * Fetch all admissions with optional filtering and relation joins
    */
-  async fetchAdmissions(filters?: AdmissionFilters): Promise<AdmissionRecord[]> {
+  async fetchAdmissions(filters?: AdmissionFilters, pagination?: PageParams): Promise<AdmissionRecord[]> {
     let query = supabase
       .from('admissions')
       .select(`
@@ -48,6 +57,10 @@ export const admissionService = {
         )
       `)
       .order('created_at', { ascending: false });
+
+    const pageSize = pagination?.pageSize || DEFAULT_PAGE_SIZE;
+    const page = pagination?.page && pagination.page > 0 ? pagination.page : 1;
+    query = query.range((page - 1) * pageSize, page * pageSize - 1);
 
     if (filters?.statusFilter && filters.statusFilter !== 'all') {
       query = query.eq('status', filters.statusFilter);

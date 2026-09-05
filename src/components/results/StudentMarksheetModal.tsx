@@ -1,17 +1,35 @@
-import React, { useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { jsPDF } from 'jspdf';
 import html2canvasSafe from '@/lib/html2canvasSafe';
-import { Printer, Download, X, Loader2, Sparkles, CheckCircle2 } from 'lucide-react';
+import { Printer, Download, X, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import sjsLogoIcon from '@/assets/sjs_logo_icon.jpg';
+
+/** A single real mark row. Accepts either the flat shape (Student360Drawer's
+ *  mapped subject_marks) or the raw nested Supabase join shape (StudentPortal's
+ *  subjectMarks, `subjects(subject_name)` / `exams(exam_name)`) so both callers
+ *  can pass their existing fetch results without extra mapping. */
+interface RawMarkRow {
+  subject_name?: string;
+  subjects?: { subject_name?: string } | null;
+  exam_name?: string;
+  exams?: { exam_name?: string } | null;
+  obtained_marks?: number | null;
+  max_marks?: number | null;
+  is_absent?: boolean | null;
+}
 
 interface StudentMarksheetModalProps {
   isOpen: boolean;
   onClose: () => void;
   student: any;
-  examData?: any;
-  attendanceData?: { total_days: number; present_days: number; percentage: number } | null;
+  /** Real per-subject, per-exam marks. No marks recorded yet renders an
+   *  honest empty state rather than fabricated numbers. */
+  marks?: RawMarkRow[];
+  attendanceData?: { total_days: number; present_days: number; percentage?: number } | null;
   medicalData?: { height?: string; weight?: string; blood_group?: string } | null;
+  classTeacherName?: string;
+  principalName?: string;
 }
 
 // CBSE 8-Point Grading Helper
@@ -26,118 +44,103 @@ const getCBSEGrade = (pct: number): string => {
   return 'E';
 };
 
+function normalizeMark(m: RawMarkRow) {
+  return {
+    subject: m.subject_name || m.subjects?.subject_name || 'Subject',
+    exam: m.exam_name || m.exams?.exam_name || 'Exam',
+    obtained: Number(m.obtained_marks) || 0,
+    max: Number(m.max_marks) || 0,
+    isAbsent: !!m.is_absent
+  };
+}
+
 export default function StudentMarksheetModal({
   isOpen,
   onClose,
   student,
-  examData,
+  marks,
   attendanceData,
-  medicalData
+  medicalData,
+  classTeacherName,
+  principalName
 }: StudentMarksheetModalProps) {
   const marksheetRef = useRef<HTMLDivElement>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
+  // Pivot real marks into one row per subject, one column per exam found in
+  // the data (Half Yearly / Annual / whatever the school actually recorded).
+  const { subjectRows, examColumns, grandTotals } = useMemo(() => {
+    const normalized = (marks || []).filter(m => !m.is_absent || m.obtained_marks != null).map(normalizeMark);
+    const examNames = Array.from(new Set(normalized.map(m => m.exam))).slice(0, 3);
+    const subjectNames = Array.from(new Set(normalized.map(m => m.subject)));
+
+    const rows = subjectNames.map(subject => {
+      const perExam = examNames.map(exam => {
+        const row = normalized.find(m => m.subject === subject && m.exam === exam);
+        if (!row) return { obtained: null as number | null, max: null as number | null, isAbsent: false };
+        return { obtained: row.obtained, max: row.max, isAbsent: row.isAbsent };
+      });
+      const totalObtained = perExam.reduce((s, e) => s + (e.obtained || 0), 0);
+      const totalMax = perExam.reduce((s, e) => s + (e.max || 0), 0);
+      const pct = totalMax > 0 ? Number(((totalObtained / totalMax) * 100).toFixed(2)) : null;
+      return {
+        subject,
+        perExam,
+        totalObtained,
+        totalMax,
+        pct,
+        grade: pct !== null ? getCBSEGrade(pct) : '—'
+      };
+    });
+
+    const grandObtained = rows.reduce((s, r) => s + r.totalObtained, 0);
+    const grandMax = rows.reduce((s, r) => s + r.totalMax, 0);
+    const overallPct = grandMax > 0 ? Number(((grandObtained / grandMax) * 100).toFixed(2)) : null;
+
+    return {
+      subjectRows: rows,
+      examColumns: examNames,
+      grandTotals: {
+        obtained: grandObtained,
+        max: grandMax,
+        pct: overallPct,
+        grade: overallPct !== null ? getCBSEGrade(overallPct) : '—'
+      }
+    };
+  }, [marks]);
+
   if (!isOpen || !student) return null;
 
   const academicSession = student.academic_year || '2026-2027';
-  const rawClass = student.class || 'IV';
-  const section = student.section || 'B';
-  const classDisplay = `${rawClass.replace(/^CLASS\s*/i, '')} ${section}`.trim();
-  
+  const rawClass = student.class || '';
+  const section = student.section || '';
+  const classDisplay = `${String(rawClass).replace(/^CLASS\s*/i, '')} ${section}`.trim() || '—';
+
   const dobFormatted = student.date_of_birth
     ? new Date(student.date_of_birth).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' })
-    : '31/10/2013';
+    : '—';
 
-  const fatherName = (student.father_name || student.guardian_name || 'RAJKUMAR').toUpperCase();
-  const motherName = (student.mother_name || 'LAKSHMINA DEVI').toUpperCase();
-  const studentName = (student.name || 'SHEETAL').toUpperCase();
-  const rollNo = student.roll_number || '11';
-  const admissionNo = student.admission_number || '4007';
+  const fatherName = (student.father_name || student.guardian_name || '')?.toUpperCase() || '—';
+  const motherName = (student.mother_name || '')?.toUpperCase() || '—';
+  const studentName = (student.name || '')?.toUpperCase() || '—';
+  const rollNo = student.roll_number || '—';
+  const admissionNo = student.admission_number || '—';
 
-  // Attendance ratio
-  const totalDays = attendanceData?.total_days || 187;
-  const presentDays = attendanceData?.present_days || 181;
-  const attendanceRatio = `${presentDays}/${totalDays}`;
+  const totalDays = attendanceData?.total_days ?? 0;
+  const presentDays = attendanceData?.present_days ?? 0;
+  const attendanceRatio = totalDays > 0 ? `${presentDays}/${totalDays}` : '—';
 
-  // Health Metrics
-  const height = medicalData?.height || '143 cm';
-  const weight = medicalData?.weight || '27.1 kg';
+  const height = medicalData?.height || '—';
+  const weight = medicalData?.weight || '—';
 
-  // Generate or read authentic 2-Term Scholastic Breakdown
-  const standardSubjects = [
-    { name: 'HINDI I', code: 'HIN1' },
-    { name: 'HINDI II', code: 'HIN2' },
-    { name: 'ENGLISH I', code: 'ENG1' },
-    { name: 'ENGLISH II', code: 'ENG2' },
-    { name: 'MATHEMATICS', code: 'MATH' },
-    { name: 'GENERAL SCIENCE', code: 'SCI' },
-    { name: 'SOCIAL STUDIES', code: 'SST' },
-    { name: 'GENERAL KNOWLEDGE', code: 'GK' },
-    { name: 'COMPUTER', code: 'COMP' },
-    { name: 'MORAL SCIENCE', code: 'MS' }
-  ];
+  const hasAnyMarks = subjectRows.length > 0;
+  const resultStatus = !hasAnyMarks
+    ? 'PENDING'
+    : grandTotals.pct !== null && grandTotals.pct >= 33
+      ? 'PROMOTED'
+      : 'NEEDS IMPROVEMENT';
 
-  // Base marks algorithm to create realistic 2-term breakdown matching official template
-  const rows = standardSubjects.map((sub, idx) => {
-    // Generate high quality coherent numbers seeded by student roll and subject index
-    const seed = (parseInt(rollNo) || 11) + idx * 7;
-    const pa1 = Number((6.5 + (seed % 35) / 10).toFixed(2));
-    const nb1 = 4 + (seed % 2);
-    const se1 = 4 + ((seed + 1) % 2);
-    const hy = 32 + (seed % 42);
-    const term1Total = Number((pa1 + nb1 + se1 + hy).toFixed(2));
-    const term1Grade = getCBSEGrade(term1Total);
-
-    const pa2 = Number((6.0 + ((seed + 3) % 38) / 10).toFixed(2));
-    const nb2 = 4 + ((seed + 1) % 2);
-    const se2 = 4 + (seed % 2);
-    const annual = 35 + ((seed + 5) % 45);
-    const term2Total = Number((pa2 + nb2 + se2 + annual).toFixed(2));
-    const term2Grade = getCBSEGrade(term2Total);
-
-    const total200 = Number((term1Total + term2Total).toFixed(2));
-    const finalPct = Number((total200 / 2).toFixed(2));
-    const finalGrade = getCBSEGrade(finalPct);
-
-    return {
-      name: sub.name,
-      pa1,
-      nb1,
-      se1,
-      hy,
-      term1Total,
-      term1Grade,
-      pa2,
-      nb2,
-      se2,
-      annual,
-      term2Total,
-      term2Grade,
-      total200,
-      finalPct,
-      finalGrade
-    };
-  });
-
-  // Totals Calculation
-  const grandPA1 = Number(rows.reduce((sum, r) => sum + r.pa1, 0).toFixed(2));
-  const grandNB1 = rows.reduce((sum, r) => sum + r.nb1, 0);
-  const grandSE1 = rows.reduce((sum, r) => sum + r.se1, 0);
-  const grandHY = rows.reduce((sum, r) => sum + r.hy, 0);
-  const grandTerm1 = Number(rows.reduce((sum, r) => sum + r.term1Total, 0).toFixed(2));
-  const grandTerm1Grade = getCBSEGrade(grandTerm1 / rows.length);
-
-  const grandPA2 = Number(rows.reduce((sum, r) => sum + r.pa2, 0).toFixed(2));
-  const grandNB2 = rows.reduce((sum, r) => sum + r.nb2, 0);
-  const grandSE2 = rows.reduce((sum, r) => sum + r.se2, 0);
-  const grandAnnual = rows.reduce((sum, r) => sum + r.annual, 0);
-  const grandTerm2 = Number(rows.reduce((sum, r) => sum + r.term2Total, 0).toFixed(2));
-  const grandTerm2Grade = getCBSEGrade(grandTerm2 / rows.length);
-
-  const grandTotalMarks = Number(rows.reduce((sum, r) => sum + r.total200, 0).toFixed(2));
-  const grandMaxMarks = rows.length * 200;
-  const overallPercentage = Number(((grandTotalMarks / grandMaxMarks) * 100).toFixed(2));
-  const overallGrade = getCBSEGrade(overallPercentage);
+  const generatedOn = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
   const handlePrint = () => {
     window.print();
@@ -146,7 +149,7 @@ export default function StudentMarksheetModal({
   const handleDownloadPDF = async () => {
     if (!marksheetRef.current) return;
     setIsGeneratingPdf(true);
-    const toastId = toast.loading('Compiling crisp official CBSE Marksheet PDF...', { id: 'marksheet-pdf' });
+    const toastId = toast.loading('Compiling official CBSE Marksheet PDF...', { id: 'marksheet-pdf' });
     try {
       const canvas = await html2canvasSafe(marksheetRef.current, {
         scale: 2.5,
@@ -169,7 +172,7 @@ export default function StudentMarksheetModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-2 sm:p-4 backdrop-blur-xs">
-      
+
       {/* Print isolation rules */}
       <style>{`
         @page {
@@ -200,7 +203,7 @@ export default function StudentMarksheetModal({
 
       {/* Modal Dialog Card */}
       <div className="relative w-full max-w-5xl bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col max-h-[96vh] overflow-hidden my-auto">
-        
+
         {/* Modal Toolbar */}
         <header className="shrink-0 px-5 py-3 bg-slate-900 text-white flex items-center justify-between z-20">
           <div className="flex items-center gap-3">
@@ -244,7 +247,7 @@ export default function StudentMarksheetModal({
 
         {/* Scrollable Marksheet Sheet */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex justify-center bg-slate-200/60">
-          
+
           <div
             id="official-sjs-marksheet"
             ref={marksheetRef}
@@ -253,12 +256,11 @@ export default function StudentMarksheetModal({
           >
             {/* Inner Border Enclosure */}
             <div className="border border-slate-700 p-3.5 flex flex-col justify-between h-full bg-white relative">
-              
+
               <div className="space-y-2.5">
-                
+
                 {/* 1. Header Section */}
                 <div className="flex items-center justify-between pb-1.5 border-b border-slate-400">
-                  {/* Left: CBSE Emblem Logo */}
                   <div className="w-16 h-16 shrink-0 flex items-center justify-center p-1">
                     <img
                       src="https://upload.wikimedia.org/wikipedia/en/thumb/9/95/CBSE_new_logo.svg/300px-CBSE_new_logo.svg.png"
@@ -270,7 +272,6 @@ export default function StudentMarksheetModal({
                     />
                   </div>
 
-                  {/* Center School Details */}
                   <div className="flex-1 text-center px-2">
                     <h1 className="text-[20px] font-black text-[#1a2b4c] uppercase tracking-tight font-serif leading-none">
                       ST. JOSEPH'S SCHOOL
@@ -286,7 +287,6 @@ export default function StudentMarksheetModal({
                     </p>
                   </div>
 
-                  {/* Right: School Crest Shield Logo */}
                   <div className="w-16 h-16 shrink-0 flex items-center justify-center p-1">
                     <img
                       src={sjsLogoIcon}
@@ -307,7 +307,6 @@ export default function StudentMarksheetModal({
                 {/* 3. Student Biodata Matrix with Photo */}
                 <div className="border border-slate-500 p-2 text-[9.5px] text-slate-900">
                   <div className="flex gap-4">
-                    {/* 2-Column Key Values */}
                     <div className="flex-1 grid grid-cols-2 gap-x-4 gap-y-1">
                       <div className="flex">
                         <span className="w-28 font-bold text-slate-800">NAME</span>
@@ -346,7 +345,6 @@ export default function StudentMarksheetModal({
                       </div>
                     </div>
 
-                    {/* Right Student Photo Box */}
                     <div className="w-[62px] h-[72px] shrink-0 border border-slate-700 bg-slate-100 p-0.5 flex items-center justify-center">
                       <img
                         src={student.photo_url || `https://images.unsplash.com/photo-1544717305-2782549b5136?w=150&auto=format&fit=crop&q=80`}
@@ -361,170 +359,77 @@ export default function StudentMarksheetModal({
                   </div>
                 </div>
 
-                {/* 4. Scholastic Header & Multi-tier Table */}
+                {/* 4. Scholastic Header & Real-Marks Table */}
                 <div className="space-y-0.5">
                   <div className="bg-[#1a2b4c] text-white px-2 py-0.5 font-bold text-[9.5px] uppercase tracking-wider">
                     SCHOLASTIC
                   </div>
 
-                  <table className="w-full border-collapse border border-slate-600 text-[8px] leading-tight">
-                    <thead>
-                      {/* Top Header Level */}
-                      <tr className="bg-[#e8eff9] font-bold text-slate-900 border-b border-slate-600">
-                        <th rowSpan={2} className="py-1 px-1 text-left border-r border-slate-600 w-28">SUBJECTS</th>
-                        <th colSpan={6} className="py-0.5 text-center border-r border-slate-600 font-black">TERM-I</th>
-                        <th colSpan={6} className="py-0.5 text-center border-r border-slate-600 font-black">TERM-II</th>
-                        <th rowSpan={2} className="py-1 px-0.5 text-center border-r border-slate-600 w-14 font-black">
-                          Total Marks<br />Obtd<br />(200)
-                        </th>
-                        <th rowSpan={2} className="py-1 px-0.5 text-center border-r border-slate-600 w-10 font-black">%</th>
-                        <th rowSpan={2} className="py-1 px-0.5 text-center w-9 font-black">GRADE</th>
-                      </tr>
-                      {/* Sub Header Level */}
-                      <tr className="bg-[#f0f4fa] font-bold text-slate-800 border-b border-slate-600 text-[7px]">
-                        <th className="py-0.5 px-0.5 text-center border-r border-slate-400">PA-I<br />(10)</th>
-                        <th className="py-0.5 px-0.5 text-center border-r border-slate-400">Notebook-I<br />(5)</th>
-                        <th className="py-0.5 px-0.5 text-center border-r border-slate-400">Subject Enrichment-I<br />(5)</th>
-                        <th className="py-0.5 px-0.5 text-center border-r border-slate-400">HALF YEARLY<br />(80)</th>
-                        <th className="py-0.5 px-0.5 text-center border-r border-slate-400 font-black">Marks Obtd.<br />(100)</th>
-                        <th className="py-0.5 px-0.5 text-center border-r border-slate-600 font-black">GRADE</th>
-
-                        <th className="py-0.5 px-0.5 text-center border-r border-slate-400">PA-II<br />(10)</th>
-                        <th className="py-0.5 px-0.5 text-center border-r border-slate-400">Notebook-II<br />(5)</th>
-                        <th className="py-0.5 px-0.5 text-center border-r border-slate-400">Subject Enrichment-II<br />(5)</th>
-                        <th className="py-0.5 px-0.5 text-center border-r border-slate-400">ANNUAL<br />(80)</th>
-                        <th className="py-0.5 px-0.5 text-center border-r border-slate-400 font-black">Marks Obtd.<br />(100)</th>
-                        <th className="py-0.5 px-0.5 text-center border-r border-slate-600 font-black">GRADE</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rows.map((r, i) => (
-                        <tr key={i} className="border-b border-slate-300 text-slate-900 font-medium">
-                          <td className="py-0.5 px-1 font-bold border-r border-slate-600 uppercase text-[7.5px]">{r.name}</td>
-                          <td className="py-0.5 px-0.5 text-center border-r border-slate-400">{r.pa1}</td>
-                          <td className="py-0.5 px-0.5 text-center border-r border-slate-400">{r.nb1}</td>
-                          <td className="py-0.5 px-0.5 text-center border-r border-slate-400">{r.se1}</td>
-                          <td className="py-0.5 px-0.5 text-center border-r border-slate-400">{r.hy}</td>
-                          <td className="py-0.5 px-0.5 text-center border-r border-slate-400 font-bold">{r.term1Total}</td>
-                          <td className="py-0.5 px-0.5 text-center border-r border-slate-600 font-bold">{r.term1Grade}</td>
-
-                          <td className="py-0.5 px-0.5 text-center border-r border-slate-400">{r.pa2}</td>
-                          <td className="py-0.5 px-0.5 text-center border-r border-slate-400">{r.nb2}</td>
-                          <td className="py-0.5 px-0.5 text-center border-r border-slate-400">{r.se2}</td>
-                          <td className="py-0.5 px-0.5 text-center border-r border-slate-400">{r.annual}</td>
-                          <td className="py-0.5 px-0.5 text-center border-r border-slate-400 font-bold">{r.term2Total}</td>
-                          <td className="py-0.5 px-0.5 text-center border-r border-slate-600 font-bold">{r.term2Grade}</td>
-
-                          <td className="py-0.5 px-0.5 text-center border-r border-slate-600 font-bold">{r.total200}</td>
-                          <td className="py-0.5 px-0.5 text-center border-r border-slate-600">{r.finalPct}</td>
-                          <td className="py-0.5 px-0.5 text-center font-bold">{r.finalGrade}</td>
-                        </tr>
-                      ))}
-
-                      {/* Grand Total Row */}
-                      <tr className="bg-[#e8eff9] font-bold text-black border-t border-slate-600">
-                        <td className="py-0.5 px-1 border-r border-slate-600 uppercase text-[7.5px] font-black">Grand Total</td>
-                        <td className="py-0.5 px-0.5 text-center border-r border-slate-400 font-bold">{grandPA1}</td>
-                        <td className="py-0.5 px-0.5 text-center border-r border-slate-400 font-bold">{grandNB1}</td>
-                        <td className="py-0.5 px-0.5 text-center border-r border-slate-400 font-bold">{grandSE1}</td>
-                        <td className="py-0.5 px-0.5 text-center border-r border-slate-400 font-bold">{grandHY}</td>
-                        <td className="py-0.5 px-0.5 text-center border-r border-slate-400 font-black">{grandTerm1}</td>
-                        <td className="py-0.5 px-0.5 text-center border-r border-slate-600 font-black">{grandTerm1Grade}</td>
-
-                        <td className="py-0.5 px-0.5 text-center border-r border-slate-400 font-bold">{grandPA2}</td>
-                        <td className="py-0.5 px-0.5 text-center border-r border-slate-400 font-bold">{grandNB2}</td>
-                        <td className="py-0.5 px-0.5 text-center border-r border-slate-400 font-bold">{grandSE2}</td>
-                        <td className="py-0.5 px-0.5 text-center border-r border-slate-400 font-bold">{grandAnnual}</td>
-                        <td className="py-0.5 px-0.5 text-center border-r border-slate-400 font-black">{grandTerm2}</td>
-                        <td className="py-0.5 px-0.5 text-center border-r border-slate-600 font-black">{grandTerm2Grade}</td>
-
-                        <td className="py-0.5 px-0.5 text-center border-r border-slate-600 font-black">{grandTotalMarks}/{grandMaxMarks}</td>
-                        <td className="py-0.5 px-0.5 text-center border-r border-slate-600 font-black">{overallPercentage}</td>
-                        <td className="py-0.5 px-0.5 text-center font-black">{overallGrade}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* 5. Co-Scholastic Activities Table */}
-                <div className="space-y-0.5">
-                  <div className="bg-[#1a2b4c] text-white px-2 py-0.5 font-bold text-[9.5px] uppercase tracking-wider">
-                    CO-SCHOLASTIC
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    {/* Left Co-Scholastic Box */}
-                    <table className="w-full border-collapse border border-slate-600 text-[8px]">
+                  {!hasAnyMarks ? (
+                    <div className="border border-slate-600 py-6 text-center text-[10px] text-slate-500 font-semibold">
+                      No marks have been recorded for this student yet.
+                    </div>
+                  ) : (
+                    <table className="w-full border-collapse border border-slate-600 text-[8.5px] leading-tight">
                       <thead>
-                        <tr className="bg-[#e8eff9] font-bold text-slate-900 border-b border-slate-600 text-[7.5px]">
-                          <th className="py-0.5 px-1.5 text-left border-r border-slate-600">SUBJECTS</th>
-                          <th className="py-0.5 px-1 text-center border-r border-slate-600 w-16">HALF YEARLY</th>
-                          <th className="py-0.5 px-1 text-center w-16">ANNUAL</th>
+                        <tr className="bg-[#e8eff9] font-bold text-slate-900 border-b border-slate-600">
+                          <th rowSpan={2} className="py-1 px-1 text-left border-r border-slate-600 w-32">SUBJECT</th>
+                          {examColumns.map(exam => (
+                            <th key={exam} colSpan={2} className="py-0.5 text-center border-r border-slate-600 font-black">{exam}</th>
+                          ))}
+                          <th rowSpan={2} className="py-1 px-0.5 text-center border-r border-slate-600 w-16 font-black">Total<br />Obtained</th>
+                          <th rowSpan={2} className="py-1 px-0.5 text-center border-r border-slate-600 w-10 font-black">%</th>
+                          <th rowSpan={2} className="py-1 px-0.5 text-center w-9 font-black">GRADE</th>
+                        </tr>
+                        <tr className="bg-[#f0f4fa] font-bold text-slate-800 border-b border-slate-600 text-[7.5px]">
+                          {examColumns.map(exam => (
+                            <React.Fragment key={exam}>
+                              <th className="py-0.5 px-0.5 text-center border-r border-slate-400">Marks</th>
+                              <th className="py-0.5 px-0.5 text-center border-r border-slate-600">Max</th>
+                            </React.Fragment>
+                          ))}
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-300 font-medium">
-                        <tr>
-                          <td className="py-0.5 px-1.5 border-r border-slate-600 font-semibold">HEALTH & PHYSICAL EDUCATION</td>
-                          <td className="py-0.5 px-1 text-center border-r border-slate-600">A1</td>
-                          <td className="py-0.5 px-1 text-center">A1</td>
-                        </tr>
-                        <tr>
-                          <td className="py-0.5 px-1.5 border-r border-slate-600 font-semibold">DISCIPLINE</td>
-                          <td className="py-0.5 px-1 text-center border-r border-slate-600">A1</td>
-                          <td className="py-0.5 px-1 text-center">A1</td>
-                        </tr>
-                        <tr>
-                          <td className="py-0.5 px-1.5 border-r border-slate-600 font-semibold">ART & CRAFT</td>
-                          <td className="py-0.5 px-1 text-center border-r border-slate-600">A1</td>
-                          <td className="py-0.5 px-1 text-center">A1</td>
+                      <tbody>
+                        {subjectRows.map((r, i) => (
+                          <tr key={i} className="border-b border-slate-300 text-slate-900 font-medium">
+                            <td className="py-0.5 px-1 font-bold border-r border-slate-600 uppercase text-[7.5px]">{r.subject}</td>
+                            {r.perExam.map((e, ei) => (
+                              <React.Fragment key={ei}>
+                                <td className="py-0.5 px-0.5 text-center border-r border-slate-400">{e.isAbsent ? 'AB' : (e.obtained ?? '—')}</td>
+                                <td className="py-0.5 px-0.5 text-center border-r border-slate-600">{e.max ?? '—'}</td>
+                              </React.Fragment>
+                            ))}
+                            <td className="py-0.5 px-0.5 text-center border-r border-slate-600 font-bold">{r.totalObtained}/{r.totalMax}</td>
+                            <td className="py-0.5 px-0.5 text-center border-r border-slate-600">{r.pct ?? '—'}</td>
+                            <td className="py-0.5 px-0.5 text-center font-bold">{r.grade}</td>
+                          </tr>
+                        ))}
+
+                        <tr className="bg-[#e8eff9] font-bold text-black border-t border-slate-600">
+                          <td className="py-0.5 px-1 border-r border-slate-600 uppercase text-[7.5px] font-black" colSpan={1 + examColumns.length * 2}>Grand Total</td>
+                          <td className="py-0.5 px-0.5 text-center border-r border-slate-600 font-black">{grandTotals.obtained}/{grandTotals.max}</td>
+                          <td className="py-0.5 px-0.5 text-center border-r border-slate-600 font-black">{grandTotals.pct ?? '—'}</td>
+                          <td className="py-0.5 px-0.5 text-center font-black">{grandTotals.grade}</td>
                         </tr>
                       </tbody>
                     </table>
-
-                    {/* Right Co-Scholastic Box */}
-                    <table className="w-full border-collapse border border-slate-600 text-[8px]">
-                      <thead>
-                        <tr className="bg-[#e8eff9] font-bold text-slate-900 border-b border-slate-600 text-[7.5px]">
-                          <th className="py-0.5 px-1.5 text-left border-r border-slate-600">SUBJECTS</th>
-                          <th className="py-0.5 px-1 text-center border-r border-slate-600 w-16">HALF YEARLY</th>
-                          <th className="py-0.5 px-1 text-center w-16">ANNUAL</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-300 font-medium">
-                        <tr>
-                          <td className="py-0.5 px-1.5 border-r border-slate-600 font-semibold">WORK EDUCATION</td>
-                          <td className="py-0.5 px-1 text-center border-r border-slate-600">A1</td>
-                          <td className="py-0.5 px-1 text-center">A1</td>
-                        </tr>
-                        <tr>
-                          <td className="py-0.5 px-1.5 border-r border-slate-600 font-semibold">ART EDUCATION</td>
-                          <td className="py-0.5 px-1 text-center border-r border-slate-600">A1</td>
-                          <td className="py-0.5 px-1 text-center">A1</td>
-                        </tr>
-                        <tr>
-                          <td className="py-0.5 px-1.5 border-r border-slate-600 font-semibold">GENERAL CONDUCT</td>
-                          <td className="py-0.5 px-1 text-center border-r border-slate-600">A1</td>
-                          <td className="py-0.5 px-1 text-center">A1</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
+                  )}
                 </div>
 
-                {/* 6. Remarks & Health Records */}
+                {/* 5. Remarks & Health Records */}
                 <div className="grid grid-cols-2 gap-2 text-[8.5px]">
-                  {/* Left: Class Teacher Remark */}
                   <div className="border border-slate-600">
                     <div className="bg-[#1a2b4c] text-white px-1.5 py-0.5 font-bold uppercase tracking-wider text-[8px]">
-                      CLASS TEACHER'S REMARK
+                      RESULT
                     </div>
-                    <div className="p-1.5 flex gap-2 font-medium">
-                      <span className="font-bold">ANNUAL</span>
-                      <span className="text-slate-800">Commendable academic progress. Promoted with distinction.</span>
+                    <div className="p-1.5 flex items-center gap-2 font-medium">
+                      <div className="border-2 border-[#1a3880] text-[#1a3880] px-3 py-1 font-extrabold text-[12px] tracking-widest uppercase rounded-xs">
+                        {resultStatus}
+                      </div>
                     </div>
                   </div>
 
-                  {/* Right: Health Records */}
                   <div className="border border-slate-600">
                     <div className="bg-[#1a2b4c] text-white px-1.5 py-0.5 font-bold uppercase tracking-wider text-[8px]">
                       HEALTH RECORDS
@@ -542,17 +447,8 @@ export default function StudentMarksheetModal({
                   </div>
                 </div>
 
-                {/* 7. Result & Stamp & Signatures */}
-                <div className="pt-2 flex items-center justify-between relative">
-                  {/* Result Stamp Box */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-bold text-black">RESULT :</span>
-                    <div className="border-2 border-[#1a3880] text-[#1a3880] px-3 py-1 font-extrabold text-[13px] tracking-widest uppercase rounded-xs rotate-[-3deg] shadow-2xs">
-                      PROMOTED
-                    </div>
-                  </div>
-
-                  {/* Circular Official School Stamp */}
+                {/* 6. Circular Official School Stamp */}
+                <div className="flex justify-end pt-1">
                   <div className="w-20 h-20 rounded-full border-2 border-dashed border-[#1a3880]/80 text-[#1a3880] flex flex-col items-center justify-center p-1 text-[6.5px] font-bold text-center leading-none rotate-[-6deg] select-none">
                     <span>St. Joseph's School</span>
                     <span className="text-[14px] my-0.5 font-serif font-black">✝</span>
@@ -564,17 +460,17 @@ export default function StudentMarksheetModal({
                 <div className="grid grid-cols-4 gap-2 pt-4 text-[8.5px] text-slate-800 font-bold border-t border-slate-300">
                   <div>
                     <span>Date : </span>
-                    <span className="font-medium">21-03-2027</span>
+                    <span className="font-medium">{generatedOn}</span>
                   </div>
                   <div className="text-center">
                     <div className="w-24 border-b border-slate-500 mx-auto pb-3 font-serif italic text-slate-700 text-[10px]">
-                      P. Srivastava
+                      {classTeacherName || ''}
                     </div>
                     <span className="mt-0.5 block">Class Teacher</span>
                   </div>
                   <div className="text-center">
                     <div className="w-24 border-b border-slate-500 mx-auto pb-3 font-serif italic text-slate-700 text-[10px]">
-                      Fr. Principal
+                      {principalName || ''}
                     </div>
                     <span className="mt-0.5 block">Principal</span>
                   </div>
@@ -584,10 +480,9 @@ export default function StudentMarksheetModal({
                   </div>
                 </div>
 
-                {/* 8. CBSE 8-Point Grading Scale Footer Matrix */}
+                {/* 7. CBSE 8-Point Grading Scale Footer Matrix */}
                 <div className="border border-slate-600 mt-2">
                   <div className="grid grid-cols-2 divide-x divide-slate-600 text-[7.5px]">
-                    {/* Left Scale */}
                     <table className="w-full border-collapse">
                       <thead>
                         <tr className="bg-[#e8eff9] font-bold border-b border-slate-600">
@@ -603,7 +498,6 @@ export default function StudentMarksheetModal({
                       </tbody>
                     </table>
 
-                    {/* Right Scale */}
                     <table className="w-full border-collapse">
                       <thead>
                         <tr className="bg-[#e8eff9] font-bold border-b border-slate-600">

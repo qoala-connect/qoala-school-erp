@@ -293,7 +293,7 @@ export default function TeacherAssignmentModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto max-h-[75vh]">
           {/* 1. Teacher Selector */}
           <div>
             <label className="text-xs font-black uppercase text-slate-600 tracking-wider block mb-1">

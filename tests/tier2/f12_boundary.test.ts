@@ -63,12 +63,12 @@ registerTest({
   featureId: 'F12',
   tier: 2,
   milestone: 'M3',
-  description: 'Verifies audit_logs query applies limit or range',
-  expectedOutputSource: 'src/components/system/AuditLogsView.tsx',
+  description: 'Verifies the audit log search is bounded by limit/offset. This is server-side via the audit_log_search RPC (systemService.searchAuditLogs), not a direct .from("audit_logs") client query, so the check follows the code there rather than grepping AuditLogsView.tsx for a table name it never references.',
+  expectedOutputSource: 'src/services/systemService.ts searchAuditLogs',
   fn: () => {
-    const auditView = inspectors.readFile('src/components/system/AuditLogsView.tsx');
-    assert.ok(auditView, 'AuditLogsView exists');
-    assert.contains(auditView, 'audit_logs', 'Must query audit_logs table');
+    const svc = inspectors.readFile('src/services/systemService.ts');
+    assert.contains(svc, 'audit_log_search', 'searchAuditLogs must call the bounded audit_log_search RPC');
+    assert.contains(svc, '_limit', 'searchAuditLogs must pass a bounded _limit to the RPC');
   }
 });
 

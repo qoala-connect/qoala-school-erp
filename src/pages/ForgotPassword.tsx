@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronLeft, Mail, ArrowRight, ShieldCheck } from 'lucide-react';
 import { toast, Toaster } from 'sonner';
+import { supabase } from '@/lib/supabase';
 import { SchoolCrest } from '@/components/SchoolLogo';
 
 export default function ForgotPassword() {
@@ -9,14 +10,27 @@ export default function ForgotPassword() {
   const [isLoading, setIsLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!email.trim()) {
+      toast.error('Please enter your registered email address.');
+      return;
+    }
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}/reset-password`
+      });
+      if (error) throw error;
       setSubmitted(true);
       toast.success('Password recovery instructions sent to: ' + email);
-    }, 1200);
+    } catch (err: any) {
+      console.error('Password reset request error:', err);
+      // For security, if user not found or rate limited, still provide clear feedback
+      toast.error(err.message || 'Unable to process password reset request. Please check email address.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

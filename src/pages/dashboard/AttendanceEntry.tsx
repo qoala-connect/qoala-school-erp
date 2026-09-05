@@ -1288,8 +1288,12 @@ export default function AttendanceEntry() {
                 <span>Institution Overall Rate</span>
                 <TrendingUp size={16} className="text-emerald-600" />
               </div>
-              <div className="text-2xl font-black text-emerald-700">95.4%</div>
-              <p className="text-[11px] text-slate-500 font-medium">Weighted average across all classes in 2026-27.</p>
+              <div className="text-2xl font-black text-emerald-700">
+                {classSummaries.length > 0
+                  ? `${Math.round(classSummaries.reduce((sum, c) => sum + (Number(c.ratio) || 0), 0) / classSummaries.length)}%`
+                  : '—'}
+              </div>
+              <p className="text-[11px] text-slate-500 font-medium">Average across all classes in 2026-27.</p>
             </div>
           </div>
 

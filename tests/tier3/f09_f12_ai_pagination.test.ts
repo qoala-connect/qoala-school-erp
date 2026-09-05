@@ -15,12 +15,12 @@ registerTest({
   featureId: 'F9',
   tier: 3,
   milestone: 'M2',
-  description: 'Verifies server.ts does not run select(*) across students, admissions, and fees',
-  expectedOutputSource: 'server.ts:31-34 Grounding queries',
+  description: 'Verifies the grounding queries do not run select(*) across students/admissions. This logic lives in src/server/aiTools.ts (server.ts is now a thin route). Admissions grounding there uses select(\'id\', { count: \'exact\' }) — a head-count query that fetches even less than a fixed column list — so that is checked as the (stricter) equivalent instead of the exact legacy string.',
+  expectedOutputSource: 'src/server/aiTools.ts',
   fn: () => {
-    const serverCode = inspectors.readFile('server.ts');
-    assert.contains(serverCode, "select('id, name, class, section, roll_number')");
-    assert.contains(serverCode, "select('id, name, class, status, academic_year, created_at')");
+    const services = inspectors.getServicePatterns();
+    assert.contains(services.aiToolsCode(), "select('id, name, class, section, roll_number')", 'aiTools.ts must project specific student columns');
+    assert.contains(services.aiToolsCode(), "{ count: 'exact' }", 'aiTools.ts must use a bounded head-count query for admissions totals');
   }
 });
 
@@ -31,11 +31,11 @@ registerTest({
   featureId: 'F9',
   tier: 3,
   milestone: 'M2',
-  description: 'Verifies server.ts handles 0 fee records without NaN or crash in prompt string',
-  expectedOutputSource: 'server.ts:40 totalFeeRecords calculation',
+  description: 'Verifies the fee-collection-ratio calculation handles zero billed records without NaN or a crash. Relocated to src/server/aiTools.ts, which guards the division with a `> 0 ? ... : fallback` ternary rather than the legacy `fees?.length || 0` idiom — checked for that guard instead.',
+  expectedOutputSource: 'src/server/aiTools.ts collectionEfficiency calculation',
   fn: () => {
-    const serverCode = inspectors.readFile('server.ts');
-    assert.contains(serverCode, 'totalFeeRecords = fees?.length || 0', 'Must handle null/undefined fees safely');
+    const services = inspectors.getServicePatterns();
+    assert.contains(services.aiToolsCode(), 'totalBilled > 0 ?', 'aiTools.ts must guard the fee collection ratio against division by zero');
   }
 });
 

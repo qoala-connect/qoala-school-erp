@@ -17,11 +17,20 @@ export interface FeeFilters {
   statusFilter?: string;
 }
 
+export interface PageParams {
+  page?: number;
+  pageSize?: number;
+}
+
+// Hard ceiling applied when no explicit page is requested, so an
+// un-paginated caller still can't pull an unbounded number of rows.
+const DEFAULT_PAGE_SIZE = 500;
+
 export const feeService = {
   /**
    * Fetch fee ledgers with relational joins and role filtering
    */
-  async fetchFees(filters?: FeeFilters): Promise<StudentFeeLedger[]> {
+  async fetchFees(filters?: FeeFilters, pagination?: PageParams): Promise<StudentFeeLedger[]> {
     let query = supabase
       .from('student_fees')
       .select(`
@@ -54,6 +63,10 @@ export const feeService = {
         )
       `)
       .order('created_at', { ascending: false });
+
+    const pageSize = pagination?.pageSize || DEFAULT_PAGE_SIZE;
+    const page = pagination?.page && pagination.page > 0 ? pagination.page : 1;
+    query = query.range((page - 1) * pageSize, page * pageSize - 1);
 
     if (filters?.academicYearFilter && filters.academicYearFilter !== 'all') {
       query = query.eq('academic_year_id', filters.academicYearFilter);
@@ -402,7 +415,10 @@ export const feeService = {
   /**
    * Fetch all transaction logs
    */
-  async fetchTransactions(): Promise<any[]> {
+  async fetchTransactions(pagination?: PageParams): Promise<any[]> {
+    const pageSize = pagination?.pageSize || DEFAULT_PAGE_SIZE;
+    const page = pagination?.page && pagination.page > 0 ? pagination.page : 1;
+
     const { data, error } = await supabase
       .from('fee_payments')
       .select(`
@@ -440,7 +456,8 @@ export const feeService = {
         )
       `)
       .order('payment_date', { ascending: false })
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range((page - 1) * pageSize, page * pageSize - 1);
 
     if (error) {
       console.error('[feeService.fetchTransactions] Error:', error);

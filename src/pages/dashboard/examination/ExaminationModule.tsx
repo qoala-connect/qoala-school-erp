@@ -280,7 +280,7 @@ export default function ExaminationModule({ view: propView }: ExaminationModuleP
     examList.forEach((ex) => {
       const targetClass = ex.class;
       const classStudents = studentList.filter(s => isSameClass(s.class, targetClass));
-      const totalStudents = classStudents.length || 30;
+      const totalStudents = classStudents.length;
 
       const matchingES = esList.filter(es => es.exam_id === ex.id);
       const subjectsToProcess = matchingES.length > 0 
@@ -323,6 +323,14 @@ export default function ExaminationModule({ view: propView }: ExaminationModuleP
           status = 'submitted';
         }
 
+        // A persisted review_status (set by Submit/Verify/Reopen) takes
+        // precedence over the marks-completeness estimate above — it's
+        // the actual reviewer decision, not an inference.
+        const esRow = esList.find(es => es.exam_id === ex.id && es.subject_id === sub.subject_id);
+        if (esRow?.review_status && esRow.review_status !== 'pending') {
+          status = esRow.review_status as MarksWorkflowStatus;
+        }
+
         tasks.push({
           id: `${ex.id}-${sub.subject_id}`,
           exam_id: ex.id,
@@ -338,7 +346,8 @@ export default function ExaminationModule({ view: propView }: ExaminationModuleP
           max_marks: sub.max_marks,
           pass_marks: sub.pass_marks,
           status,
-          due_date: '2026-08-15'
+          verified_at: esRow?.reviewed_at || undefined,
+          reopen_reason: esRow?.reopen_reason || undefined
         });
       });
     });
@@ -619,24 +628,80 @@ export default function ExaminationModule({ view: propView }: ExaminationModuleP
     setTab('marks');
   };
 
+  // Persists to exam_subjects.review_status (unique on exam_id+subject_id)
+  // so the decision survives a refresh instead of living only in local
+  // React state — compileTeacherTasks reads it back on every reload.
+  const persistReviewStatus = async (
+    task: TeacherExamTask,
+    reviewStatus: 'submitted' | 'verified' | 'reopened',
+    reopenReason?: string
+  ) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error } = await supabase.from('exam_subjects').upsert(
+      {
+        exam_id: task.exam_id,
+        subject_id: task.subject_id,
+        subject_name: task.subject_name,
+        max_marks: task.max_marks,
+        pass_marks: task.pass_marks,
+        review_status: reviewStatus,
+        reopen_reason: reopenReason ?? null,
+        reviewed_by: user?.id ?? null,
+        reviewed_at: new Date().toISOString()
+      },
+      { onConflict: 'exam_id,subject_id' }
+    );
+    if (error) throw error;
+  };
+
   const handleSubmitTask = async (taskId: string) => {
-    setTeacherTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: 'submitted' } : t));
-    toast.success('Assessment gradebook submitted to Examination Controller for audit.');
+    const task = teacherTasks.find(t => t.id === taskId);
+    if (!task) return;
+    if (task.entered_count < task.total_students) {
+      toast.error(`Marks are only entered for ${task.entered_count}/${task.total_students} students — complete the gradebook before submitting.`);
+      return;
+    }
+    try {
+      await persistReviewStatus(task, 'submitted');
+      setTeacherTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: 'submitted' } : t));
+      toast.success('Assessment gradebook submitted to Examination Controller for audit.');
+    } catch (err: any) {
+      toast.error('Could not submit: ' + err.message);
+    }
   };
 
   const handleVerifyTask = async (taskId: string) => {
-    setTeacherTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: 'verified' } : t));
-    toast.success('Assessment verified and cleared for final result calculation.');
+    const task = teacherTasks.find(t => t.id === taskId);
+    if (!task) return;
+    try {
+      await persistReviewStatus(task, 'verified');
+      setTeacherTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: 'verified' } : t));
+      toast.success('Assessment verified and cleared for final result calculation.');
+    } catch (err: any) {
+      toast.error('Could not verify: ' + err.message);
+    }
   };
 
   const handleReopenTask = async (taskId: string, reason: string) => {
-    setTeacherTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: 'in_progress', reopen_reason: reason } : t));
-    toast.info('Assessment reopened for faculty corrections.');
+    const task = teacherTasks.find(t => t.id === taskId);
+    if (!task) return;
+    try {
+      await persistReviewStatus(task, 'reopened', reason);
+      setTeacherTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: 'in_progress', reopen_reason: reason } : t));
+      toast.info('Assessment reopened for faculty corrections.');
+    } catch (err: any) {
+      toast.error('Could not reopen: ' + err.message);
+    }
   };
 
   const handleAssignTeacher = async (taskId: string, teacherId: string, teacherName: string) => {
+    // Local-only: reassigning the evaluator for real requires resolving
+    // this task's class/section/subject to teacher_assignments' class_id/
+    // section_id/academic_year_id foreign keys, which this view doesn't
+    // currently resolve. Reflects immediately here; go to Academic
+    // Assignments to make it permanent.
     setTeacherTasks(prev => prev.map(t => t.id === taskId ? { ...t, teacher_id: teacherId, teacher_name: teacherName } : t));
-    toast.success(`Assigned ${teacherName} as evaluating faculty.`);
+    toast.success(`Showing ${teacherName} as evaluator for this session. Update Academic Assignments to make this permanent.`);
   };
 
   // The useEffect above redirects away; avoid flashing gated content first.
@@ -721,7 +786,7 @@ export default function ExaminationModule({ view: propView }: ExaminationModuleP
                 <AdminStatCard
                   label="Active Assessments"
                   value={exams.length}
-                  subtext="Across 12 classes"
+                  subtext={`Across ${classes.length} class${classes.length === 1 ? '' : 'es'}`}
                   icon={Layers}
                   variant="violet"
                 />

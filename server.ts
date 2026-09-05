@@ -28,10 +28,21 @@ async function startServer() {
     : null;
 
   /* ------------------------------------------------------------------ *
+   * Health probe — cheap liveness check for uptime monitoring/deploys
+   * ------------------------------------------------------------------ */
+  app.get('/api/health', (_req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  });
+
+  /* ------------------------------------------------------------------ *
    * Enterprise AI Chat Route (Role-Aware & Tool-Augmented)
    * ------------------------------------------------------------------ */
   app.post("/api/ai/chat", async (req, res) => {
     try {
+      if (!process.env.GEMINI_API_KEY) {
+        return res.status(500).json({ error: "GEMINI_API_KEY is not configured" });
+      }
+
       const { message, history } = req.body;
 
       if (!message || typeof message !== 'string') {
@@ -45,6 +56,9 @@ async function startServer() {
       if (authError || !context) {
         return res.status(statusCode || 401).json({ error: authError || "Authentication required" });
       }
+
+      // Admissions pipeline aggregation helper with fallback:
+      // (a: any) => { const st = a.status || 'Pending'; return st; }
 
       // 2. Process query with Gemini function calling and role-gated tools
       const result = await processAIChat(

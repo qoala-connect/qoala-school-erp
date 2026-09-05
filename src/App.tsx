@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
+
+// Static imports for core public/auth pages
 import Home from '@/pages/Home';
 import Login from '@/pages/Login';
 import ForgotPassword from '@/pages/ForgotPassword';
@@ -11,32 +13,40 @@ import Maintenance from '@/pages/Maintenance';
 import NotFound from '@/pages/NotFound';
 import Admissions from '@/pages/Admissions';
 import DashboardLayout from '@/components/DashboardLayout';
-import Analytics from '@/pages/dashboard/Analytics';
-import Students from '@/pages/dashboard/Students';
-import Teachers from '@/pages/dashboard/Teachers';
-import Employees from '@/pages/dashboard/Employees';
-import AdmissionsManagement from '@/pages/dashboard/AdmissionsManagement';
-import FeesPortal from '@/pages/dashboard/FeesPortal';
-import Reports from '@/pages/dashboard/Reports';
-import AttendanceEntry from '@/pages/dashboard/AttendanceEntry';
-import MarketingLanding from '@/pages/MarketingLanding';
-import AboutUs from '@/pages/AboutUs';
-import SystemManagement from '@/pages/dashboard/SystemManagement';
-import CertificateGenerator from '@/pages/dashboard/CertificateGenerator';
-import AcademicsManagement from '@/pages/dashboard/AcademicsManagement';
-import TransportManagement from '@/pages/dashboard/TransportManagement';
-import LibraryManagement from '@/pages/dashboard/LibraryManagement';
-import HostelManagement from '@/pages/dashboard/HostelManagement';
-import InventoryManagement from '@/pages/dashboard/InventoryManagement';
-import CommunicationManagement from '@/pages/dashboard/CommunicationManagement';
-import OnlineClasses from '@/pages/dashboard/OnlineClasses';
-import SchoolCalendar from '@/pages/dashboard/SchoolCalendar';
-import MedicalManagement from '@/pages/dashboard/MedicalManagement';
-import DisciplineManagement from '@/pages/dashboard/DisciplineManagement';
-import FrontOfficeManagement from '@/pages/dashboard/FrontOfficeManagement';
-import AIAssistant from '@/pages/dashboard/AIAssistant';
-import ExaminationModule from '@/pages/dashboard/examination/ExaminationModule';
-import StudentPortal from '@/pages/dashboard/StudentPortal';
+
+// Lazy-loaded dashboard and operational modules for optimal chunking
+const Analytics = lazy(() => import('@/pages/dashboard/Analytics'));
+const Students = lazy(() => import('@/pages/dashboard/Students'));
+const Teachers = lazy(() => import('@/pages/dashboard/Teachers'));
+const Employees = lazy(() => import('@/pages/dashboard/Employees'));
+const AdmissionsManagement = lazy(() => import('@/pages/dashboard/AdmissionsManagement'));
+const FeesPortal = lazy(() => import('@/pages/dashboard/FeesPortal'));
+const Reports = lazy(() => import('@/pages/dashboard/Reports'));
+const AttendanceEntry = lazy(() => import('@/pages/dashboard/AttendanceEntry'));
+const MarketingLanding = lazy(() => import('@/pages/MarketingLanding'));
+const AboutUs = lazy(() => import('@/pages/AboutUs'));
+const SystemManagement = lazy(() => import('@/pages/dashboard/SystemManagement'));
+const CertificateGenerator = lazy(() => import('@/pages/dashboard/CertificateGenerator'));
+const AcademicsManagement = lazy(() => import('@/pages/dashboard/AcademicsManagement'));
+const TransportManagement = lazy(() => import('@/pages/dashboard/TransportManagement'));
+const LibraryManagement = lazy(() => import('@/pages/dashboard/LibraryManagement'));
+const HostelManagement = lazy(() => import('@/pages/dashboard/HostelManagement'));
+const InventoryManagement = lazy(() => import('@/pages/dashboard/InventoryManagement'));
+const CommunicationManagement = lazy(() => import('@/pages/dashboard/CommunicationManagement'));
+const OnlineClasses = lazy(() => import('@/pages/dashboard/OnlineClasses'));
+const SchoolCalendar = lazy(() => import('@/pages/dashboard/SchoolCalendar'));
+const MedicalManagement = lazy(() => import('@/pages/dashboard/MedicalManagement'));
+const DisciplineManagement = lazy(() => import('@/pages/dashboard/DisciplineManagement'));
+const FrontOfficeManagement = lazy(() => import('@/pages/dashboard/FrontOfficeManagement'));
+const AIAssistant = lazy(() => import('@/pages/dashboard/AIAssistant'));
+const ExaminationModule = lazy(() => import('@/pages/dashboard/examination/ExaminationModule'));
+const StudentPortal = lazy(() => import('@/pages/dashboard/StudentPortal'));
+
+const RouteLoader = () => (
+  <div className="flex items-center justify-center min-h-[50vh] w-full">
+    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-600"></div>
+  </div>
+);
 
 /**
  * Smart role-based dashboard landing page.
@@ -97,7 +107,8 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <Routes>
+        <Suspense fallback={<RouteLoader />}>
+          <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/about" element={<AboutUs />} />
           <Route path="/presentation" element={<MarketingLanding />} />
@@ -347,7 +358,7 @@ export default function App() {
           <Route path="/dashboard/examination/dashboard" element={<ProtectedRoute allowedPermission="results.view"><DashboardLayout children={<ExaminationModule view="dashboard" />} /></ProtectedRoute>} />
           <Route path="/dashboard/examination/exam-types" element={<ProtectedRoute allowedPermission="results.view"><DashboardLayout children={<ExaminationModule view="exam-types" />} /></ProtectedRoute>} />
           <Route path="/dashboard/examination/exams" element={<ProtectedRoute allowedPermission="results.publish"><DashboardLayout children={<ExaminationModule view="exams" />} /></ProtectedRoute>} />
-          <Route path="/dashboard/examination/schedule" element={<ProtectedRoute allowedPermission="results.view"><DashboardLayout children={<ExaminationModule view="schedule" />} /></ProtectedRoute>} />
+          <Route path="/dashboard/examination/schedule" element={<ProtectedRoute allowedPermission="results.publish"><DashboardLayout children={<ExaminationModule view="schedule" />} /></ProtectedRoute>} />
           <Route path="/dashboard/examination/subject-mapping" element={<ProtectedRoute allowedPermission="results.view"><DashboardLayout children={<ExaminationModule view="subject-mapping" />} /></ProtectedRoute>} />
           <Route path="/dashboard/examination/seating-plan" element={<ProtectedRoute allowedPermission="results.view"><DashboardLayout children={<ExaminationModule view="seating-plan" />} /></ProtectedRoute>} />
           <Route path="/dashboard/examination/hall-allocation" element={<ProtectedRoute allowedPermission="results.view"><DashboardLayout children={<ExaminationModule view="hall-allocation" />} /></ProtectedRoute>} />
@@ -370,6 +381,7 @@ export default function App() {
           {/* Fallback */}
           <Route path="*" element={<NotFound />} />
         </Routes>
+        </Suspense>
       </BrowserRouter>
     </AuthProvider>
   );

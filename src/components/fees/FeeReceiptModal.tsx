@@ -88,19 +88,13 @@ export default function FeeReceiptModal({ isOpen, onClose, fee }: FeeReceiptModa
   const fine = Number(fee.fine_amount ?? 0);
   const discount = Number(fee.discount_amount ?? 0);
   
-  // Format items breakdown cleanly matching reference
-  const items: { sNo: number; description: string; amount: number }[] = [];
-  
-  if (gross >= 5000) {
-    const examFee = 1700;
-    const compositeFee = Math.max(0, gross - examFee);
-    items.push({ sNo: 1, description: 'Exam Fee', amount: examFee });
-    items.push({ sNo: 2, description: 'Composit Annual Fee', amount: compositeFee });
-  } else if (gross > 0) {
-    items.push({ sNo: 1, description: fee.category_name || 'Academic Fee', amount: gross });
-  } else {
-    items.push({ sNo: 1, description: fee.category_name || 'Tuition Fee', amount: paid });
-  }
+  // Format items breakdown — a single real line item for the fee category
+  // actually billed. Previously this split anything over ₹5,000 into a
+  // fabricated "Exam Fee ₹1,700 + Composit Annual Fee" pair that had no
+  // relationship to what the fee category/structure actually billed.
+  const items: { sNo: number; description: string; amount: number }[] = [
+    { sNo: 1, description: fee.category_name || 'Fee Payment', amount: gross > 0 ? gross : paid }
+  ];
 
   if (fine > 0) {
     items.push({ sNo: items.length + 1, description: 'Late Fine / Penalty', amount: fine });
@@ -115,8 +109,8 @@ export default function FeeReceiptModal({ isOpen, onClose, fee }: FeeReceiptModa
 
   // Student & receipt metadata
   const student = fee.students || {};
-  const receiptNo = fee.receipt_number || fee.receipt_no || (fee.id ? String(fee.id).slice(-4).padStart(4, '0') : '1080');
-  const admissionNo = student.admission_number || student.enrollment_number || fee.student_id?.slice(-4) || '3948';
+  const receiptNo = fee.receipt_number || fee.receipt_no || (fee.id ? String(fee.id).slice(-4).padStart(4, '0') : 'N/A');
+  const admissionNo = student.admission_number || student.enrollment_number || 'N/A';
   const studentName = (student.name || fee.student_name || 'STUDENT NAME').toUpperCase();
   const parentName = (student.father_name || student.guardian_name || student.mother_name || 'PARENT NAME').toUpperCase();
   
@@ -126,7 +120,7 @@ export default function FeeReceiptModal({ isOpen, onClose, fee }: FeeReceiptModa
   
   const paymentDate = formatDateDMY(fee.payment_date || fee.created_at || fee.updated_at);
   const payMode = (fee.payment_mode || 'Online').charAt(0).toUpperCase() + (fee.payment_mode || 'Online').slice(1).toLowerCase();
-  const instrumentNo = fee.transaction_id || fee.instrument_no || `67193092${Math.floor(1000 + Math.random() * 9000)}`;
+  const instrumentNo = fee.transaction_id || fee.instrument_no || (payMode.toLowerCase() === 'cash' ? 'N/A' : 'Not recorded');
   const bankName = payMode.toLowerCase() === 'cash' ? 'Cash Counter' : (fee.bank_name || 'Online');
   const remark = fee.remarks || (payMode.toLowerCase() === 'online' ? 'Online Collection Entry' : 'Cash Counter Collection Entry');
   

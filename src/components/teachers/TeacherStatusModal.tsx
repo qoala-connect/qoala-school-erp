@@ -87,7 +87,7 @@ export default function TeacherStatusModal({
           </button>
         </div>
 
-        <div className="p-6 space-y-4">
+        <div className="p-6 space-y-4 overflow-y-auto max-h-[75vh]">
           <div className="space-y-2">
             {(Object.keys(STATUS_CONFIG) as TeacherLifecycleStatus[]).map((st) => {
               const cfg = STATUS_CONFIG[st];

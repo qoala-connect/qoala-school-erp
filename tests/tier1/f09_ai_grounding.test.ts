@@ -56,20 +56,20 @@ registerTest({
   }
 });
 
-// Test 9.4: AI Chat Endpoint Grounding Schema Contract
+// Test 9.4: AI Chat Grounding Schema Contract
 registerTest({
   id: 'T1-F9-04',
-  name: 'AI Grounding: /api/chat system prompt includes verified ERP context metrics',
+  name: 'AI Grounding: /api/ai/chat is grounded with verified ERP context metrics (totalStudents/totalStaff) and a real systemInstruction',
   featureId: 'F9',
   tier: 1,
   milestone: 'M2',
-  description: 'Verifies system prompt is injected with real database counts for students, staff, and fees',
+  description: 'Verifies the chat pipeline is injected with real database counts for students/staff and a grounded systemInstruction. This logic was refactored out of server.ts (now a thin route) into src/server/aiTools.ts (tool-calling KPI lookups) and src/server/aiService.ts (the Gemini call), so the check follows the code there.',
   expectedOutputSource: 'PROJECT.md § Feature Inventory F9',
   fn: () => {
-    const serverCode = inspectors.readFile('server.ts');
-    assert.contains(serverCode, 'totalStudents', 'server.ts must ground prompt with totalStudents');
-    assert.contains(serverCode, 'totalStaff', 'server.ts must ground prompt with totalStaff');
-    assert.contains(serverCode, 'systemInstruction', 'server.ts must pass grounded systemInstruction to Gemini');
+    const services = inspectors.getServicePatterns();
+    assert.contains(services.aiToolsCode(), 'totalStudents', 'aiTools.ts must ground responses with totalStudents');
+    assert.contains(services.aiToolsCode(), 'totalStaff', 'aiTools.ts must ground responses with totalStaff');
+    assert.contains(services.aiServiceCode(), 'systemInstruction', 'aiService.ts must pass a grounded systemInstruction to Gemini');
   }
 });
 
@@ -80,11 +80,11 @@ registerTest({
   featureId: 'F9',
   tier: 1,
   milestone: 'M2',
-  description: 'Verifies server catches database grounding errors without crashing the AI assistant',
+  description: 'Verifies the chat pipeline catches database/model errors without crashing the AI assistant — checked in aiService.ts, where the Gemini call and its fallback now live.',
   expectedOutputSource: 'PROJECT.md § Feature Inventory F9',
   fn: () => {
-    const serverCode = inspectors.readFile('server.ts');
-    assert.contains(serverCode, 'catch (e)', 'server.ts must wrap grounding queries in try/catch');
-    assert.contains(serverCode, 'console.warn', 'server.ts must log warning on grounding query error');
+    const services = inspectors.getServicePatterns();
+    assert.contains(services.aiServiceCode(), 'catch (', 'aiService.ts must wrap grounding/generation calls in try/catch');
+    assert.contains(services.aiServiceCode(), 'console.warn', 'aiService.ts must log a warning on grounding/generation error');
   }
 });

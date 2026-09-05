@@ -42,15 +42,9 @@ export default function StudentAdmitCardModal({
   const rollNo = student.roll_number || '12';
   const hallTicketNo = `SJS-HT-${academicYear.split('-')[0]}-${student.admission_number || '044'}`;
 
-  // Default CBSE timetable mapped to standard syllabus if none provided
-  const schedule = timetable.length > 0 ? timetable : [
-    { subject_code: '301', subject_name: 'English Core / Communicative', date: '02-Mar-2027', time: '09:00 AM - 12:00 PM', hall: 'Main Senior Wing', room: `Desk #${rollNo}` },
-    { subject_code: '002', subject_name: 'Hindi Course - A', date: '06-Mar-2027', time: '09:00 AM - 12:00 PM', hall: 'Main Senior Wing', room: `Desk #${rollNo}` },
-    { subject_code: '041', subject_name: 'Mathematics (Standard / Basic)', date: '11-Mar-2027', time: '09:00 AM - 12:00 PM', hall: 'Main Senior Wing', room: `Desk #${rollNo}` },
-    { subject_code: '086', subject_name: 'Science (Theory & Practical)', date: '16-Mar-2027', time: '09:00 AM - 12:00 PM', hall: 'Main Senior Wing', room: `Desk #${rollNo}` },
-    { subject_code: '087', subject_name: 'Social Science (Hist/Civ/Geo/Eco)', date: '21-Mar-2027', time: '09:00 AM - 12:00 PM', hall: 'Main Senior Wing', room: `Desk #${rollNo}` },
-    { subject_code: '402', subject_name: 'Information Technology / AI', date: '25-Mar-2027', time: '09:00 AM - 12:00 PM', hall: 'IT Lab Block B', room: `Terminal #${rollNo}` }
-  ];
+  // Real schedule only — no subjects scheduled yet renders an empty state
+  // in the table below instead of a fabricated standard CBSE syllabus.
+  const schedule = timetable;
 
   const handlePrint = () => {
     window.print();
@@ -245,20 +239,22 @@ export default function StudentAdmitCardModal({
 
                       <div className="flex items-baseline gap-1 border-b border-slate-200 pb-0.5">
                         <span className="font-bold text-slate-500 uppercase text-[8px] w-28 shrink-0">Mother's Name:</span>
-                        <span className="font-bold text-slate-900 uppercase">{student.mother_name || 'Smt. Sunita Devi'}</span>
+                        <span className="font-bold text-slate-900 uppercase">{student.mother_name || 'N/A'}</span>
                       </div>
                       <div className="flex items-baseline gap-1 border-b border-slate-200 pb-0.5">
                         <span className="font-bold text-slate-500 uppercase text-[8px] w-28 shrink-0">Father's Name:</span>
-                        <span className="font-bold text-slate-900 uppercase">{student.father_name || 'Shri Alok Kumar'}</span>
+                        <span className="font-bold text-slate-900 uppercase">{student.father_name || 'N/A'}</span>
                       </div>
 
                       <div className="flex items-baseline gap-1 border-b border-slate-200 pb-0.5">
                         <span className="font-bold text-slate-500 uppercase text-[8px] w-28 shrink-0">Date of Birth:</span>
-                        <span className="font-bold text-slate-900">{student.date_of_birth || (student as any).dob || '14/08/2012'}</span>
+                        <span className="font-bold text-slate-900">
+                          {student.date_of_birth ? new Date(student.date_of_birth).toLocaleDateString('en-IN') : 'N/A'}
+                        </span>
                       </div>
                       <div className="flex items-baseline gap-1 border-b border-slate-200 pb-0.5">
                         <span className="font-bold text-slate-500 uppercase text-[8px] w-28 shrink-0">Gender / Category:</span>
-                        <span className="font-bold text-slate-900">{student.gender || 'Male'} / Regular (CBSE)</span>
+                        <span className="font-bold text-slate-900">{student.gender || 'N/A'} / Regular (CBSE)</span>
                       </div>
 
                       <div className="col-span-2 flex items-baseline gap-1 pt-0.5">
@@ -320,7 +316,13 @@ export default function StudentAdmitCardModal({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-300 text-slate-800">
-                      {schedule.map((sub, idx) => (
+                      {schedule.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="py-6 text-center text-slate-400 font-bold text-[9px]">
+                            No subjects scheduled yet for this exam.
+                          </td>
+                        </tr>
+                      ) : schedule.map((sub, idx) => (
                         <tr key={idx} className={idx % 2 === 1 ? 'bg-slate-50/70' : 'bg-white'}>
                           <td className="py-1 px-2 border-r border-slate-900 text-center font-mono font-bold text-slate-600">{idx + 1}</td>
                           <td className="py-1 px-2 border-r border-slate-900 text-center font-mono font-bold text-slate-800">{sub.subject_code || `0${idx + 1}`}</td>
@@ -374,7 +376,7 @@ export default function StudentAdmitCardModal({
                   {/* Class Teacher */}
                   <div className="flex flex-col items-center">
                     <div className="h-8 border-b border-slate-400 w-28 flex items-end justify-center pb-0.5">
-                      <span className="text-[7.5px] italic font-serif text-slate-800 font-bold">R. K. Shukla</span>
+                      <span className="text-[7.5px] italic text-slate-400">Class Teacher</span>
                     </div>
                     <span className="text-[7px] font-black uppercase text-slate-600 mt-1 block">Class Teacher</span>
                   </div>
@@ -382,7 +384,7 @@ export default function StudentAdmitCardModal({
                   {/* School Seal & Principal */}
                   <div className="flex flex-col items-center">
                     <div className="h-8 border-b border-slate-400 w-28 flex items-end justify-center pb-0.5 relative">
-                      <span className="text-[8px] italic font-serif text-slate-900 font-bold">Fr. Antony Paul</span>
+                      <span className="text-[7.5px] italic text-slate-400">Principal</span>
                       {/* Circular School Seal */}
                       <div className="absolute -top-3 right-0 w-11 h-11 rounded-full border border-blue-900/60 flex flex-col items-center justify-center text-[5px] text-blue-900 font-black uppercase text-center leading-none rotate-12 bg-blue-50/20 pointer-events-none">
                         <span>ST. JOSEPH'S</span>

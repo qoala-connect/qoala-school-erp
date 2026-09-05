@@ -88,47 +88,29 @@ export default function DatesheetsView() {
         setFormData(prev => ({ ...prev, subject_id: subData[0].id }));
       }
 
-      // Compile active schedule slots from exam_subjects & exams
+      // Compile active schedule slots from real exam_subjects rows only —
+      // an exam with no subjects scheduled yet shows the empty state below
+      // rather than a fabricated 5-subject placeholder schedule.
       const compiledSlots: DatesheetSlot[] = [];
       examData.forEach(ex => {
         const matchingSubjects = esData.filter(es => es.exam_id === ex.id);
-        if (matchingSubjects.length > 0) {
-          matchingSubjects.forEach((es, idx) => {
-            const sub = subData.find(s => s.id === es.subject_id);
-            compiledSlots.push({
-              id: es.id,
-              exam_id: ex.id,
-              exam_name: ex.exam_name,
-              class_name: ex.class,
-              subject_id: es.subject_id,
-              subject_name: es.subject_name || sub?.subject_name || 'Subject',
-              exam_date: `2026-07-${15 + (idx * 2)}`,
-              start_time: '09:00 AM',
-              duration: '3 Hours',
-              room: 'Main Examination Hall',
-              max_marks: es.max_marks || 100,
-              status: 'Published'
-            });
+        matchingSubjects.forEach((es) => {
+          const sub = subData.find(s => s.id === es.subject_id);
+          compiledSlots.push({
+            id: es.id,
+            exam_id: ex.id,
+            exam_name: ex.exam_name,
+            class_name: ex.class,
+            subject_id: es.subject_id,
+            subject_name: es.subject_name || sub?.subject_name || 'Subject',
+            exam_date: es.exam_date || '',
+            start_time: es.start_time || '',
+            duration: es.duration || '',
+            room: es.room || '',
+            max_marks: es.max_marks || 100,
+            status: 'Published'
           });
-        } else {
-          // If no explicit exam_subjects rows, build default subject schedule for the exam
-          subData.slice(0, 5).forEach((sub, idx) => {
-            compiledSlots.push({
-              id: `${ex.id}-${sub.id}`,
-              exam_id: ex.id,
-              exam_name: ex.exam_name,
-              class_name: ex.class,
-              subject_id: sub.id,
-              subject_name: sub.subject_name,
-              exam_date: `2026-07-${15 + (idx * 2)}`,
-              start_time: '09:00 AM',
-              duration: '3 Hours',
-              room: 'Hall A',
-              max_marks: 100,
-              status: 'Published'
-            });
-          });
-        }
+        });
       });
 
       setDatesheets(compiledSlots);
@@ -151,14 +133,21 @@ export default function DatesheetsView() {
     const selectedSub = subjects.find(s => s.id === formData.subject_id);
 
     try {
-      // Upsert into exam_subjects in Supabase
+      // Upsert into exam_subjects in Supabase — persists the actual date,
+      // time, duration and venue the admin just entered, so the schedule
+      // shown here and on admit cards is real, not fabricated.
       const { data, error } = await supabase.from('exam_subjects').insert({
         exam_id: formData.exam_id,
         subject_id: formData.subject_id,
         subject_name: selectedSub?.subject_name || 'Subject',
         max_marks: Number(formData.max_marks) || 100,
-        pass_marks: 33
+        pass_marks: 33,
+        exam_date: formData.exam_date,
+        start_time: formData.start_time,
+        duration: formData.duration,
+        room: formData.room
       }).select().single();
+      if (error) throw error;
 
       const newSlot: DatesheetSlot = {
         id: data?.id || Math.random().toString(),
@@ -297,14 +286,14 @@ export default function DatesheetsView() {
                       </span>
                     </td>
                     <td className="py-3 px-4 font-bold text-slate-800">{slot.subject_name}</td>
-                    <td className="py-3 px-4 text-center font-mono font-bold text-slate-600">{slot.exam_date}</td>
+                    <td className="py-3 px-4 text-center font-mono font-bold text-slate-600">{slot.exam_date || 'Not scheduled'}</td>
                     <td className="py-3 px-4 text-center">
                       <div className="flex items-center justify-center gap-1.5 text-slate-600">
                         <Clock size={13} className="text-slate-400" />
-                        <span>{slot.start_time} ({slot.duration})</span>
+                        <span>{slot.start_time ? `${slot.start_time} (${slot.duration || '—'})` : '—'}</span>
                       </div>
                     </td>
-                    <td className="py-3 px-4 text-center text-indigo-700 font-semibold">{slot.room}</td>
+                    <td className="py-3 px-4 text-center text-indigo-700 font-semibold">{slot.room || '—'}</td>
                     <td className="py-3 px-4 text-center font-mono font-bold text-slate-900">{slot.max_marks} pts</td>
                     <td className="py-3 px-4 text-right pr-5">
                       <button 

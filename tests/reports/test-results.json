@@ -1,24 +1,24 @@
 {
   "total": 164,
-  "passed": 112,
-  "failed": 52,
+  "passed": 164,
+  "failed": 0,
   "skipped": 0,
-  "durationMs": 1265,
+  "durationMs": 395,
   "tierBreakdown": {
     "1": {
       "total": 65,
-      "passed": 36,
-      "failed": 29
+      "passed": 65,
+      "failed": 0
     },
     "2": {
       "total": 65,
-      "passed": 48,
-      "failed": 17
+      "passed": 65,
+      "failed": 0
     },
     "3": {
       "total": 19,
-      "passed": 13,
-      "failed": 6
+      "passed": 19,
+      "failed": 0
     },
     "4": {
       "total": 15,
@@ -49,43 +49,43 @@
     },
     "F5": {
       "total": 12,
-      "passed": 4,
-      "failed": 8
+      "passed": 12,
+      "failed": 0
     },
     "F6": {
       "total": 12,
-      "passed": 4,
-      "failed": 8
+      "passed": 12,
+      "failed": 0
     },
     "F7": {
       "total": 14,
-      "passed": 4,
-      "failed": 10
+      "passed": 14,
+      "failed": 0
     },
     "F8": {
       "total": 10,
-      "passed": 1,
-      "failed": 9
+      "passed": 10,
+      "failed": 0
     },
     "F9": {
       "total": 12,
-      "passed": 7,
-      "failed": 5
+      "passed": 12,
+      "failed": 0
     },
     "F10": {
       "total": 21,
-      "passed": 17,
-      "failed": 4
+      "passed": 21,
+      "failed": 0
     },
     "F11": {
       "total": 13,
-      "passed": 11,
-      "failed": 2
+      "passed": 13,
+      "failed": 0
     },
     "F12": {
       "total": 11,
-      "passed": 5,
-      "failed": 6
+      "passed": 11,
+      "failed": 0
     },
     "F13": {
       "total": 10,
@@ -101,7 +101,7 @@
       "tier": 1,
       "milestone": "M1",
       "status": "PASSED",
-      "durationMs": 2
+      "durationMs": 1
     },
     {
       "id": "T1-F1-02",
@@ -110,7 +110,7 @@
       "tier": 1,
       "milestone": "M1",
       "status": "PASSED",
-      "durationMs": 2
+      "durationMs": 0
     },
     {
       "id": "T1-F1-03",
@@ -128,7 +128,7 @@
       "tier": 1,
       "milestone": "M1",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T1-F1-05",
@@ -146,7 +146,7 @@
       "tier": 1,
       "milestone": "M1",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T1-F2-02",
@@ -173,7 +173,7 @@
       "tier": 1,
       "milestone": "M1",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T1-F2-05",
@@ -191,7 +191,7 @@
       "tier": 1,
       "milestone": "M1",
       "status": "PASSED",
-      "durationMs": 5
+      "durationMs": 2
     },
     {
       "id": "T1-F3-02",
@@ -200,7 +200,7 @@
       "tier": 1,
       "milestone": "M1",
       "status": "PASSED",
-      "durationMs": 5
+      "durationMs": 2
     },
     {
       "id": "T1-F3-03",
@@ -209,7 +209,7 @@
       "tier": 1,
       "milestone": "M1",
       "status": "PASSED",
-      "durationMs": 5
+      "durationMs": 2
     },
     {
       "id": "T1-F3-04",
@@ -218,7 +218,7 @@
       "tier": 1,
       "milestone": "M1",
       "status": "PASSED",
-      "durationMs": 5
+      "durationMs": 2
     },
     {
       "id": "T1-F3-05",
@@ -227,7 +227,7 @@
       "tier": 1,
       "milestone": "M1",
       "status": "PASSED",
-      "durationMs": 6
+      "durationMs": 2
     },
     {
       "id": "T1-F4-01",
@@ -245,7 +245,7 @@
       "tier": 1,
       "milestone": "M1",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T1-F4-03",
@@ -272,7 +272,7 @@
       "tier": 1,
       "milestone": "M1",
       "status": "PASSED",
-      "durationMs": 2
+      "durationMs": 0
     },
     {
       "id": "T1-F5-01",
@@ -280,14 +280,8 @@
       "featureId": "F5",
       "tier": 1,
       "milestone": "M2",
-      "status": "FAILED",
-      "durationMs": 22,
-      "error": {
-        "message": "Must have migration affecting disciplinary_records",
-        "stack": "AssertionError: Must have migration affecting disciplinary_records\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f05_rls_leaks.test.ts:22:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "disciplinary_records",
-        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
-      }
+      "status": "PASSED",
+      "durationMs": 6
     },
     {
       "id": "T1-F5-02",
@@ -296,7 +290,7 @@
       "tier": 1,
       "milestone": "M2",
       "status": "PASSED",
-      "durationMs": 20
+      "durationMs": 6
     },
     {
       "id": "T1-F5-03",
@@ -305,7 +299,7 @@
       "tier": 1,
       "milestone": "M2",
       "status": "PASSED",
-      "durationMs": 19
+      "durationMs": 6
     },
     {
       "id": "T1-F5-04",
@@ -313,14 +307,8 @@
       "featureId": "F5",
       "tier": 1,
       "milestone": "M2",
-      "status": "FAILED",
-      "durationMs": 20,
-      "error": {
-        "message": "Must define separate SELECT policy for online_classes",
-        "stack": "AssertionError: Must define separate SELECT policy for online_classes\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f05_rls_leaks.test.ts:80:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "online_classes_read_enrolled",
-        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
-      }
+      "status": "PASSED",
+      "durationMs": 6
     },
     {
       "id": "T1-F5-05",
@@ -328,14 +316,8 @@
       "featureId": "F5",
       "tier": 1,
       "milestone": "M2",
-      "status": "FAILED",
-      "durationMs": 21,
-      "error": {
-        "message": "Must define owner SELECT policy on disciplinary_records",
-        "stack": "AssertionError: Must define owner SELECT policy on disciplinary_records\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f05_rls_leaks.test.ts:95:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "disciplinary_records_owner_select",
-        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
-      }
+      "status": "PASSED",
+      "durationMs": 6
     },
     {
       "id": "T1-F6-01",
@@ -343,14 +325,8 @@
       "featureId": "F6",
       "tier": 1,
       "milestone": "M2",
-      "status": "FAILED",
-      "durationMs": 17,
-      "error": {
-        "message": "guard_profile_role_change must inspect NEW.status IS DISTINCT FROM OLD.status",
-        "stack": "AssertionError: guard_profile_role_change must inspect NEW.status IS DISTINCT FROM OLD.status\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f06_escalation_guard.test.ts:22:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "NEW.status IS DISTINCT FROM OLD.status",
-        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
-      }
+      "status": "PASSED",
+      "durationMs": 6
     },
     {
       "id": "T1-F6-02",
@@ -359,7 +335,7 @@
       "tier": 1,
       "milestone": "M2",
       "status": "PASSED",
-      "durationMs": 20
+      "durationMs": 6
     },
     {
       "id": "T1-F6-03",
@@ -367,14 +343,8 @@
       "featureId": "F6",
       "tier": 1,
       "milestone": "M2",
-      "status": "FAILED",
-      "durationMs": 20,
-      "error": {
-        "message": "Must define function guard_teacher_profile_update()",
-        "stack": "AssertionError: Must define function guard_teacher_profile_update()\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f06_escalation_guard.test.ts:56:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "guard_teacher_profile_update",
-        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
-      }
+      "status": "PASSED",
+      "durationMs": 6
     },
     {
       "id": "T1-F6-04",
@@ -382,14 +352,8 @@
       "featureId": "F6",
       "tier": 1,
       "milestone": "M2",
-      "status": "FAILED",
-      "durationMs": 25,
-      "error": {
-        "message": "Must check designation alteration",
-        "stack": "AssertionError: Must check designation alteration\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f06_escalation_guard.test.ts:71:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "NEW.designation IS DISTINCT FROM OLD.designation",
-        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
-      }
+      "status": "PASSED",
+      "durationMs": 5
     },
     {
       "id": "T1-F6-05",
@@ -397,14 +361,8 @@
       "featureId": "F6",
       "tier": 1,
       "milestone": "M2",
-      "status": "FAILED",
-      "durationMs": 22,
-      "error": {
-        "message": "Must create trigger trigger_guard_teacher_update on public.teachers",
-        "stack": "AssertionError: Must create trigger trigger_guard_teacher_update on public.teachers\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f06_escalation_guard.test.ts:87:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "CREATE TRIGGER trigger_guard_teacher_update",
-        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
-      }
+      "status": "PASSED",
+      "durationMs": 7
     },
     {
       "id": "T1-F7-01",
@@ -412,14 +370,8 @@
       "featureId": "F7",
       "tier": 1,
       "milestone": "M2",
-      "status": "FAILED",
-      "durationMs": 22,
-      "error": {
-        "message": "Must create fee_payments_staff_all policy",
-        "stack": "AssertionError: Must create fee_payments_staff_all policy\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f07_role_lockouts.test.ts:22:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "CREATE POLICY \"fee_payments_staff_all\" ON public.fee_payments",
-        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
-      }
+      "status": "PASSED",
+      "durationMs": 6
     },
     {
       "id": "T1-F7-02",
@@ -427,14 +379,8 @@
       "featureId": "F7",
       "tier": 1,
       "milestone": "M2",
-      "status": "FAILED",
-      "durationMs": 20,
-      "error": {
-        "message": "Must define fee_payments_owner_select policy",
-        "stack": "AssertionError: Must define fee_payments_owner_select policy\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f07_role_lockouts.test.ts:41:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "CREATE POLICY \"fee_payments_owner_select\" ON public.fee_payments",
-        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
-      }
+      "status": "PASSED",
+      "durationMs": 6
     },
     {
       "id": "T1-F7-03",
@@ -442,14 +388,8 @@
       "featureId": "F7",
       "tier": 1,
       "milestone": "M2",
-      "status": "FAILED",
-      "durationMs": 20,
-      "error": {
-        "message": "Must define leave_requests_staff_select policy",
-        "stack": "AssertionError: Must define leave_requests_staff_select policy\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f07_role_lockouts.test.ts:60:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "CREATE POLICY \"leave_requests_staff_select\" ON public.leave_requests",
-        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
-      }
+      "status": "PASSED",
+      "durationMs": 6
     },
     {
       "id": "T1-F7-04",
@@ -458,7 +398,7 @@
       "tier": 1,
       "milestone": "M2",
       "status": "PASSED",
-      "durationMs": 20
+      "durationMs": 6
     },
     {
       "id": "T1-F7-05",
@@ -466,14 +406,8 @@
       "featureId": "F7",
       "tier": 1,
       "milestone": "M2",
-      "status": "FAILED",
-      "durationMs": 20,
-      "error": {
-        "message": "Must define policy on receipt_counters",
-        "stack": "AssertionError: Must define policy on receipt_counters\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f07_role_lockouts.test.ts:94:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "CREATE POLICY \"receipt_counters_admin_all\" ON public.receipt_counters",
-        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
-      }
+      "status": "PASSED",
+      "durationMs": 12
     },
     {
       "id": "T1-F8-01",
@@ -481,14 +415,8 @@
       "featureId": "F8",
       "tier": 1,
       "milestone": "M2",
-      "status": "FAILED",
-      "durationMs": 19,
-      "error": {
-        "message": "Must create index on disciplinary_records(student_id)",
-        "stack": "AssertionError: Must create index on disciplinary_records(student_id)\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f08_db_indexing.test.ts:22:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "CREATE INDEX IF NOT EXISTS idx_disciplinary_records_student_id ON public.disciplinary_records(student_id)",
-        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
-      }
+      "status": "PASSED",
+      "durationMs": 5
     },
     {
       "id": "T1-F8-02",
@@ -496,14 +424,8 @@
       "featureId": "F8",
       "tier": 1,
       "milestone": "M2",
-      "status": "FAILED",
-      "durationMs": 25,
-      "error": {
-        "message": "Must index admissions.academic_year_id",
-        "stack": "AssertionError: Must index admissions.academic_year_id\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f08_db_indexing.test.ts:41:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "idx_admissions_academic_year_id",
-        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
-      }
+      "status": "PASSED",
+      "durationMs": 6
     },
     {
       "id": "T1-F8-03",
@@ -511,14 +433,8 @@
       "featureId": "F8",
       "tier": 1,
       "milestone": "M2",
-      "status": "FAILED",
-      "durationMs": 45,
-      "error": {
-        "message": "Must drop duplicate idx_admissions_status",
-        "stack": "AssertionError: Must drop duplicate idx_admissions_status\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f08_db_indexing.test.ts:58:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "DROP INDEX IF EXISTS public.idx_admissions_status",
-        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
-      }
+      "status": "PASSED",
+      "durationMs": 5
     },
     {
       "id": "T1-F8-04",
@@ -526,14 +442,8 @@
       "featureId": "F8",
       "tier": 1,
       "milestone": "M2",
-      "status": "FAILED",
-      "durationMs": 58,
-      "error": {
-        "message": "Must update fee_collection_summary",
-        "stack": "AssertionError: Must update fee_collection_summary\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f08_db_indexing.test.ts:75:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "CREATE OR REPLACE VIEW public.fee_collection_summary",
-        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
-      }
+      "status": "PASSED",
+      "durationMs": 5
     },
     {
       "id": "T1-F8-05",
@@ -541,14 +451,8 @@
       "featureId": "F8",
       "tier": 1,
       "milestone": "M2",
-      "status": "FAILED",
-      "durationMs": 30,
-      "error": {
-        "message": "Must update pending_fees_summary_view",
-        "stack": "AssertionError: Must update pending_fees_summary_view\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f08_db_indexing.test.ts:91:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "CREATE OR REPLACE VIEW public.pending_fees_summary_view",
-        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
-      }
+      "status": "PASSED",
+      "durationMs": 7
     },
     {
       "id": "T1-F9-01",
@@ -556,14 +460,8 @@
       "featureId": "F9",
       "tier": 1,
       "milestone": "M2",
-      "status": "FAILED",
-      "durationMs": 4,
-      "error": {
-        "message": "server.ts must query student_fees for AI grounding",
-        "stack": "AssertionError: server.ts must query student_fees for AI grounding\n    at Object.strictEqual (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:40:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f09_ai_grounding.test.ts:23:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "student_fees",
-        "actual": "fees"
-      }
+      "status": "PASSED",
+      "durationMs": 1
     },
     {
       "id": "T1-F9-02",
@@ -571,14 +469,8 @@
       "featureId": "F9",
       "tier": 1,
       "milestone": "M2",
-      "status": "FAILED",
-      "durationMs": 1,
-      "error": {
-        "message": "server.ts must query student_fees",
-        "stack": "AssertionError: server.ts must query student_fees\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f09_ai_grounding.test.ts:38:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "student_fees",
-        "actual": "import express from \"express\";\nimport path from \"path\";\nimport { createServer as createViteServer } from \"vite\";\nimport { GoogleGenAI } from \"@google/genai\";\nimport { createClient } from \"@supabase/su... [truncated 13384 chars]"
-      }
+      "status": "PASSED",
+      "durationMs": 1
     },
     {
       "id": "T1-F9-03",
@@ -586,23 +478,17 @@
       "featureId": "F9",
       "tier": 1,
       "milestone": "M2",
-      "status": "FAILED",
-      "durationMs": 3,
-      "error": {
-        "message": "teacherService must not use countData.length race condition",
-        "stack": "AssertionError: teacherService must not use countData.length race condition\n    at Object.notStrictEqual (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:47:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f09_ai_grounding.test.ts:55:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "memory-count-race",
-        "actual": "memory-count-race"
-      }
+      "status": "PASSED",
+      "durationMs": 1
     },
     {
       "id": "T1-F9-04",
-      "name": "AI Grounding: /api/chat system prompt includes verified ERP context metrics",
+      "name": "AI Grounding: /api/ai/chat is grounded with verified ERP context metrics (totalStudents/totalStaff) and a real systemInstruction",
       "featureId": "F9",
       "tier": 1,
       "milestone": "M2",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 1
     },
     {
       "id": "T1-F9-05",
@@ -610,14 +496,8 @@
       "featureId": "F9",
       "tier": 1,
       "milestone": "M2",
-      "status": "FAILED",
-      "durationMs": 0,
-      "error": {
-        "message": "server.ts must wrap grounding queries in try/catch",
-        "stack": "AssertionError: server.ts must wrap grounding queries in try/catch\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f09_ai_grounding.test.ts:87:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "catch (e)",
-        "actual": "import express from \"express\";\nimport path from \"path\";\nimport { createServer as createViteServer } from \"vite\";\nimport { GoogleGenAI } from \"@google/genai\";\nimport { createClient } from \"@supabase/su... [truncated 13384 chars]"
-      }
+      "status": "PASSED",
+      "durationMs": 1
     },
     {
       "id": "T1-F10-01",
@@ -625,14 +505,8 @@
       "featureId": "F10",
       "tier": 1,
       "milestone": "M3",
-      "status": "FAILED",
-      "durationMs": 4,
-      "error": {
-        "message": "Reports.tsx must have active onClick handlers on export buttons",
-        "stack": "AssertionError: Reports.tsx must have active onClick handlers on export buttons\n    at Object.isTrue (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:27:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f10_action_buttons.test.ts:22:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": true,
-        "actual": false
-      }
+      "status": "PASSED",
+      "durationMs": 2
     },
     {
       "id": "T1-F10-02",
@@ -640,14 +514,8 @@
       "featureId": "F10",
       "tier": 1,
       "milestone": "M3",
-      "status": "FAILED",
-      "durationMs": 4,
-      "error": {
-        "message": "TransportManagement must populate student_id on insert",
-        "stack": "AssertionError: TransportManagement must populate student_id on insert\n    at Object.isTrue (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:27:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f10_action_buttons.test.ts:37:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": true,
-        "actual": false
-      }
+      "status": "PASSED",
+      "durationMs": 1
     },
     {
       "id": "T1-F10-03",
@@ -655,14 +523,8 @@
       "featureId": "F10",
       "tier": 1,
       "milestone": "M3",
-      "status": "FAILED",
-      "durationMs": 4,
-      "error": {
-        "message": "MedicalManagement must populate student_id on insert",
-        "stack": "AssertionError: MedicalManagement must populate student_id on insert\n    at Object.isTrue (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:27:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f10_action_buttons.test.ts:52:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": true,
-        "actual": false
-      }
+      "status": "PASSED",
+      "durationMs": 1
     },
     {
       "id": "T1-F10-04",
@@ -670,14 +532,8 @@
       "featureId": "F10",
       "tier": 1,
       "milestone": "M3",
-      "status": "FAILED",
-      "durationMs": 4,
-      "error": {
-        "message": "SchoolCalendar must query start_date on holidays",
-        "stack": "AssertionError: SchoolCalendar must query start_date on holidays\n    at Object.isTrue (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:27:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f10_action_buttons.test.ts:67:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": true,
-        "actual": false
-      }
+      "status": "PASSED",
+      "durationMs": 1
     },
     {
       "id": "T1-F10-05",
@@ -686,7 +542,7 @@
       "tier": 1,
       "milestone": "M3",
       "status": "PASSED",
-      "durationMs": 5
+      "durationMs": 1
     },
     {
       "id": "T1-F11-01",
@@ -694,14 +550,8 @@
       "featureId": "F11",
       "tier": 1,
       "milestone": "M3",
-      "status": "FAILED",
-      "durationMs": 1,
-      "error": {
-        "message": "DashboardLayout must implement or render Breadcrumb navigation",
-        "stack": "AssertionError: DashboardLayout must implement or render Breadcrumb navigation\n    at Object.isTrue (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:27:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f11_ui_consistency.test.ts:23:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": true,
-        "actual": false
-      }
+      "status": "PASSED",
+      "durationMs": 0
     },
     {
       "id": "T1-F11-02",
@@ -710,7 +560,7 @@
       "tier": 1,
       "milestone": "M3",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T1-F11-03",
@@ -719,7 +569,7 @@
       "tier": 1,
       "milestone": "M3",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T1-F11-04",
@@ -727,14 +577,8 @@
       "featureId": "F11",
       "tier": 1,
       "milestone": "M3",
-      "status": "FAILED",
-      "durationMs": 1,
-      "error": {
-        "message": "AdmissionsManagement must display empty state message",
-        "stack": "AssertionError: AdmissionsManagement must display empty state message\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f11_ui_consistency.test.ts:69:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "No applications found",
-        "actual": "import React, { useState, useEffect, useMemo, useRef } from 'react';\r\nimport { createPortal } from 'react-dom';\r\nimport {\r\n  Search,\r\n  Download,\r\n  XCircle,\r\n  Phone,\r\n  RefreshCcw,\r\n  GraduationCap,... [truncated 50996 chars]"
-      }
+      "status": "PASSED",
+      "durationMs": 1
     },
     {
       "id": "T1-F11-05",
@@ -743,7 +587,7 @@
       "tier": 1,
       "milestone": "M3",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T1-F12-01",
@@ -751,14 +595,8 @@
       "featureId": "F12",
       "tier": 1,
       "milestone": "M3",
-      "status": "FAILED",
-      "durationMs": 3,
-      "error": {
-        "message": "admissionService must support bounded query pagination",
-        "stack": "AssertionError: admissionService must support bounded query pagination\n    at Object.isTrue (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:27:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f12_query_perf.test.ts:22:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": true,
-        "actual": false
-      }
+      "status": "PASSED",
+      "durationMs": 2
     },
     {
       "id": "T1-F12-02",
@@ -766,14 +604,8 @@
       "featureId": "F12",
       "tier": 1,
       "milestone": "M3",
-      "status": "FAILED",
-      "durationMs": 3,
-      "error": {
-        "message": "feeService must support bounded query pagination",
-        "stack": "AssertionError: feeService must support bounded query pagination\n    at Object.isTrue (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:27:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f12_query_perf.test.ts:37:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": true,
-        "actual": false
-      }
+      "status": "PASSED",
+      "durationMs": 2
     },
     {
       "id": "T1-F12-03",
@@ -781,14 +613,8 @@
       "featureId": "F12",
       "tier": 1,
       "milestone": "M3",
-      "status": "FAILED",
-      "durationMs": 1,
-      "error": {
-        "message": "feeService must apply limit or range to transaction queries",
-        "stack": "AssertionError: feeService must apply limit or range to transaction queries\n    at Object.isTrue (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:27:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier1\\f12_query_perf.test.ts:53:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": true,
-        "actual": false
-      }
+      "status": "PASSED",
+      "durationMs": 0
     },
     {
       "id": "T1-F12-04",
@@ -797,7 +623,7 @@
       "tier": 1,
       "milestone": "M3",
       "status": "PASSED",
-      "durationMs": 2
+      "durationMs": 1
     },
     {
       "id": "T1-F12-05",
@@ -833,7 +659,7 @@
       "tier": 1,
       "milestone": "M4",
       "status": "PASSED",
-      "durationMs": 18
+      "durationMs": 5
     },
     {
       "id": "T1-F13-04",
@@ -851,7 +677,7 @@
       "tier": 1,
       "milestone": "M4",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T2-F1-01",
@@ -860,7 +686,7 @@
       "tier": 2,
       "milestone": "M1",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T2-F1-02",
@@ -878,7 +704,7 @@
       "tier": 2,
       "milestone": "M1",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T2-F1-04",
@@ -896,7 +722,7 @@
       "tier": 2,
       "milestone": "M1",
       "status": "PASSED",
-      "durationMs": 2
+      "durationMs": 0
     },
     {
       "id": "T2-F2-01",
@@ -914,7 +740,7 @@
       "tier": 2,
       "milestone": "M1",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T2-F2-03",
@@ -923,7 +749,7 @@
       "tier": 2,
       "milestone": "M1",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T2-F2-04",
@@ -932,7 +758,7 @@
       "tier": 2,
       "milestone": "M1",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T2-F2-05",
@@ -941,7 +767,7 @@
       "tier": 2,
       "milestone": "M1",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T2-F3-01",
@@ -950,7 +776,7 @@
       "tier": 2,
       "milestone": "M1",
       "status": "PASSED",
-      "durationMs": 2
+      "durationMs": 1
     },
     {
       "id": "T2-F3-02",
@@ -959,7 +785,7 @@
       "tier": 2,
       "milestone": "M1",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T2-F3-03",
@@ -968,7 +794,7 @@
       "tier": 2,
       "milestone": "M1",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T2-F3-04",
@@ -977,7 +803,7 @@
       "tier": 2,
       "milestone": "M1",
       "status": "PASSED",
-      "durationMs": 2
+      "durationMs": 1
     },
     {
       "id": "T2-F3-05",
@@ -986,7 +812,7 @@
       "tier": 2,
       "milestone": "M1",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T2-F4-01",
@@ -1004,7 +830,7 @@
       "tier": 2,
       "milestone": "M1",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T2-F4-03",
@@ -1013,7 +839,7 @@
       "tier": 2,
       "milestone": "M1",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T2-F4-04",
@@ -1022,7 +848,7 @@
       "tier": 2,
       "milestone": "M1",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T2-F4-05",
@@ -1031,7 +857,7 @@
       "tier": 2,
       "milestone": "M1",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T2-F5-01",
@@ -1040,7 +866,7 @@
       "tier": 2,
       "milestone": "M2",
       "status": "PASSED",
-      "durationMs": 19
+      "durationMs": 7
     },
     {
       "id": "T2-F5-02",
@@ -1048,14 +874,8 @@
       "featureId": "F5",
       "tier": 2,
       "milestone": "M2",
-      "status": "FAILED",
-      "durationMs": 19,
-      "error": {
-        "message": "Owner policy must join on family_id to isolate records across families",
-        "stack": "AssertionError: Owner policy must join on family_id to isolate records across families\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier2\\f05_boundary.test.ts:44:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "s.family_id IN (SELECT p.family_id FROM public.parents p WHERE p.user_id = auth.uid())",
-        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
-      }
+      "status": "PASSED",
+      "durationMs": 7
     },
     {
       "id": "T2-F5-03",
@@ -1063,14 +883,8 @@
       "featureId": "F5",
       "tier": 2,
       "milestone": "M2",
-      "status": "FAILED",
-      "durationMs": 19,
-      "error": {
-        "message": "Owner policy must include student user_id matching condition",
-        "stack": "AssertionError: Owner policy must include student user_id matching condition\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier2\\f05_boundary.test.ts:63:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "s.user_id = auth.uid()",
-        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
-      }
+      "status": "PASSED",
+      "durationMs": 8
     },
     {
       "id": "T2-F5-04",
@@ -1078,14 +892,8 @@
       "featureId": "F5",
       "tier": 2,
       "milestone": "M2",
-      "status": "FAILED",
-      "durationMs": 20,
-      "error": {
-        "message": "Policy check must use public.is_staff()",
-        "stack": "AssertionError: Policy check must use public.is_staff()\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier2\\f05_boundary.test.ts:83:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "WITH CHECK (public.is_staff())",
-        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
-      }
+      "status": "PASSED",
+      "durationMs": 7
     },
     {
       "id": "T2-F5-05",
@@ -1093,14 +901,8 @@
       "featureId": "F5",
       "tier": 2,
       "milestone": "M2",
-      "status": "FAILED",
-      "durationMs": 19,
-      "error": {
-        "message": "Expected string to contain \"DROP POLICY IF EXISTS \"disciplinary_staff_all\" ON public.disciplinary_records\"",
-        "stack": "AssertionError: Expected string to contain \"DROP POLICY IF EXISTS \"disciplinary_staff_all\" ON public.disciplinary_records\"\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier2\\f05_boundary.test.ts:98:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "DROP POLICY IF EXISTS \"disciplinary_staff_all\" ON public.disciplinary_records",
-        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
-      }
+      "status": "PASSED",
+      "durationMs": 7
     },
     {
       "id": "T2-F6-01",
@@ -1109,7 +911,7 @@
       "tier": 2,
       "milestone": "M2",
       "status": "PASSED",
-      "durationMs": 19
+      "durationMs": 6
     },
     {
       "id": "T2-F6-02",
@@ -1117,14 +919,8 @@
       "featureId": "F6",
       "tier": 2,
       "milestone": "M2",
-      "status": "FAILED",
-      "durationMs": 19,
-      "error": {
-        "message": "Trigger must guard status column modifications",
-        "stack": "AssertionError: Trigger must guard status column modifications\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier2\\f06_boundary.test.ts:41:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "NEW.status IS DISTINCT FROM OLD.status",
-        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
-      }
+      "status": "PASSED",
+      "durationMs": 5
     },
     {
       "id": "T2-F6-03",
@@ -1132,14 +928,8 @@
       "featureId": "F6",
       "tier": 2,
       "milestone": "M2",
-      "status": "FAILED",
-      "durationMs": 26,
-      "error": {
-        "message": "Trigger must protect employee_id against alteration",
-        "stack": "AssertionError: Trigger must protect employee_id against alteration\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier2\\f06_boundary.test.ts:60:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "NEW.employee_id IS DISTINCT FROM OLD.employee_id",
-        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
-      }
+      "status": "PASSED",
+      "durationMs": 7
     },
     {
       "id": "T2-F6-04",
@@ -1147,14 +937,8 @@
       "featureId": "F6",
       "tier": 2,
       "milestone": "M2",
-      "status": "FAILED",
-      "durationMs": 22,
-      "error": {
-        "message": "Functions must secure search_path",
-        "stack": "AssertionError: Functions must secure search_path\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier2\\f06_boundary.test.ts:80:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "SET search_path = public, pg_temp",
-        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
-      }
+      "status": "PASSED",
+      "durationMs": 5
     },
     {
       "id": "T2-F6-05",
@@ -1163,7 +947,7 @@
       "tier": 2,
       "milestone": "M2",
       "status": "PASSED",
-      "durationMs": 19
+      "durationMs": 5
     },
     {
       "id": "T2-F7-01",
@@ -1172,7 +956,7 @@
       "tier": 2,
       "milestone": "M2",
       "status": "PASSED",
-      "durationMs": 19
+      "durationMs": 6
     },
     {
       "id": "T2-F7-02",
@@ -1180,14 +964,8 @@
       "featureId": "F7",
       "tier": 2,
       "milestone": "M2",
-      "status": "FAILED",
-      "durationMs": 18,
-      "error": {
-        "message": "Expected string to contain \"SELECT id FROM public.students WHERE user_id = auth.uid()\"",
-        "stack": "AssertionError: Expected string to contain \"SELECT id FROM public.students WHERE user_id = auth.uid()\"\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier2\\f07_boundary.test.ts:39:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "SELECT id FROM public.students WHERE user_id = auth.uid()",
-        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
-      }
+      "status": "PASSED",
+      "durationMs": 5
     },
     {
       "id": "T2-F7-03",
@@ -1195,14 +973,8 @@
       "featureId": "F7",
       "tier": 2,
       "milestone": "M2",
-      "status": "FAILED",
-      "durationMs": 18,
-      "error": {
-        "message": "Must join student_fees to fee_payments",
-        "stack": "AssertionError: Must join student_fees to fee_payments\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier2\\f07_boundary.test.ts:56:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "sf.id = fee_payments.student_fee_id",
-        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
-      }
+      "status": "PASSED",
+      "durationMs": 6
     },
     {
       "id": "T2-F7-04",
@@ -1210,14 +982,8 @@
       "featureId": "F7",
       "tier": 2,
       "milestone": "M2",
-      "status": "FAILED",
-      "durationMs": 18,
-      "error": {
-        "message": "Must create receipt_counters_admin_all policy",
-        "stack": "AssertionError: Must create receipt_counters_admin_all policy\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier2\\f07_boundary.test.ts:72:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "CREATE POLICY \"receipt_counters_admin_all\" ON public.receipt_counters",
-        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
-      }
+      "status": "PASSED",
+      "durationMs": 6
     },
     {
       "id": "T2-F7-05",
@@ -1226,7 +992,7 @@
       "tier": 2,
       "milestone": "M2",
       "status": "PASSED",
-      "durationMs": 19
+      "durationMs": 6
     },
     {
       "id": "T2-F8-01",
@@ -1234,14 +1000,8 @@
       "featureId": "F8",
       "tier": 2,
       "milestone": "M2",
-      "status": "FAILED",
-      "durationMs": 19,
-      "error": {
-        "message": "Expected string to contain \"idx_timetable_class_id\"",
-        "stack": "AssertionError: Expected string to contain \"idx_timetable_class_id\"\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier2\\f08_boundary.test.ts:22:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "idx_timetable_class_id",
-        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
-      }
+      "status": "PASSED",
+      "durationMs": 7
     },
     {
       "id": "T2-F8-02",
@@ -1249,14 +1009,8 @@
       "featureId": "F8",
       "tier": 2,
       "milestone": "M2",
-      "status": "FAILED",
-      "durationMs": 32,
-      "error": {
-        "message": "Expected string to contain \"idx_student_transport_route_id\"",
-        "stack": "AssertionError: Expected string to contain \"idx_student_transport_route_id\"\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier2\\f08_boundary.test.ts:41:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "idx_student_transport_route_id",
-        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
-      }
+      "status": "PASSED",
+      "durationMs": 5
     },
     {
       "id": "T2-F8-03",
@@ -1264,14 +1018,8 @@
       "featureId": "F8",
       "tier": 2,
       "milestone": "M2",
-      "status": "FAILED",
-      "durationMs": 19,
-      "error": {
-        "message": "fee_collection_summary must filter fp.voided_at IS NULL",
-        "stack": "AssertionError: fee_collection_summary must filter fp.voided_at IS NULL\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier2\\f08_boundary.test.ts:57:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "fp.voided_at IS NULL",
-        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
-      }
+      "status": "PASSED",
+      "durationMs": 5
     },
     {
       "id": "T2-F8-04",
@@ -1279,14 +1027,8 @@
       "featureId": "F8",
       "tier": 2,
       "milestone": "M2",
-      "status": "FAILED",
-      "durationMs": 19,
-      "error": {
-        "message": "Must compute days_overdue using (CURRENT_DATE - sf.due_date)",
-        "stack": "AssertionError: Must compute days_overdue using (CURRENT_DATE - sf.due_date)\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier2\\f08_boundary.test.ts:76:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "(CURRENT_DATE - sf.due_date) AS days_overdue",
-        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
-      }
+      "status": "PASSED",
+      "durationMs": 5
     },
     {
       "id": "T2-F8-05",
@@ -1295,7 +1037,7 @@
       "tier": 2,
       "milestone": "M2",
       "status": "PASSED",
-      "durationMs": 20
+      "durationMs": 7
     },
     {
       "id": "T2-F9-01",
@@ -1313,7 +1055,7 @@
       "tier": 2,
       "milestone": "M2",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 1
     },
     {
       "id": "T2-F9-03",
@@ -1322,7 +1064,7 @@
       "tier": 2,
       "milestone": "M2",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 6
     },
     {
       "id": "T2-F9-04",
@@ -1331,7 +1073,7 @@
       "tier": 2,
       "milestone": "M2",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T2-F9-05",
@@ -1339,14 +1081,8 @@
       "featureId": "F9",
       "tier": 2,
       "milestone": "M2",
-      "status": "FAILED",
-      "durationMs": 0,
-      "error": {
-        "message": "server.ts must define /api/health endpoint",
-        "stack": "AssertionError: server.ts must define /api/health endpoint\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier2\\f09_boundary.test.ts:89:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "app.get('/api/health'",
-        "actual": "import express from \"express\";\nimport path from \"path\";\nimport { createServer as createViteServer } from \"vite\";\nimport { GoogleGenAI } from \"@google/genai\";\nimport { createClient } from \"@supabase/su... [truncated 13384 chars]"
-      }
+      "status": "PASSED",
+      "durationMs": 0
     },
     {
       "id": "T2-F10-01",
@@ -1364,7 +1100,7 @@
       "tier": 2,
       "milestone": "M3",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T2-F10-03",
@@ -1373,7 +1109,7 @@
       "tier": 2,
       "milestone": "M3",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T2-F10-04",
@@ -1391,7 +1127,7 @@
       "tier": 2,
       "milestone": "M3",
       "status": "PASSED",
-      "durationMs": 2
+      "durationMs": 0
     },
     {
       "id": "T2-F11-01",
@@ -1400,7 +1136,7 @@
       "tier": 2,
       "milestone": "M3",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T2-F11-02",
@@ -1409,7 +1145,7 @@
       "tier": 2,
       "milestone": "M3",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 2
     },
     {
       "id": "T2-F11-03",
@@ -1418,7 +1154,7 @@
       "tier": 2,
       "milestone": "M3",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T2-F11-04",
@@ -1436,7 +1172,7 @@
       "tier": 2,
       "milestone": "M3",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T2-F12-01",
@@ -1445,7 +1181,7 @@
       "tier": 2,
       "milestone": "M3",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T2-F12-02",
@@ -1462,14 +1198,8 @@
       "featureId": "F12",
       "tier": 2,
       "milestone": "M3",
-      "status": "FAILED",
-      "durationMs": 1,
-      "error": {
-        "message": "Must push department filter to Supabase query",
-        "stack": "AssertionError: Must push department filter to Supabase query\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier2\\f12_boundary.test.ts:55:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "query.eq('department_id', filters.department)",
-        "actual": "import { supabase } from '@/lib/supabase';\n\nexport type TeacherLifecycleStatus =\n  | 'Draft'\n  | 'Active'\n  | 'On Leave'\n  | 'Inactive'\n  | 'Transferred'\n  | 'Resigned'\n  | 'Retired'\n  | 'Archived';\n\n... [truncated 21172 chars]"
-      }
+      "status": "PASSED",
+      "durationMs": 0
     },
     {
       "id": "T2-F12-04",
@@ -1477,14 +1207,8 @@
       "featureId": "F12",
       "tier": 2,
       "milestone": "M3",
-      "status": "FAILED",
-      "durationMs": 1,
-      "error": {
-        "message": "Must query audit_logs table",
-        "stack": "AssertionError: Must query audit_logs table\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier2\\f12_boundary.test.ts:71:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "audit_logs",
-        "actual": "import React, { useEffect, useState, useCallback } from 'react';\nimport { \n  searchAuditLogs, \n  fetchAuditLogFacets, \n  AuditLogRow, \n  AuditLogFacets \n} from '@/services/systemService';\nimport { use... [truncated 17333 chars]"
-      }
+      "status": "PASSED",
+      "durationMs": 0
     },
     {
       "id": "T2-F12-05",
@@ -1493,7 +1217,7 @@
       "tier": 2,
       "milestone": "M3",
       "status": "PASSED",
-      "durationMs": 2
+      "durationMs": 1
     },
     {
       "id": "T2-F13-01",
@@ -1511,7 +1235,7 @@
       "tier": 2,
       "milestone": "M4",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T2-F13-03",
@@ -1520,7 +1244,7 @@
       "tier": 2,
       "milestone": "M4",
       "status": "PASSED",
-      "durationMs": 3
+      "durationMs": 0
     },
     {
       "id": "T2-F13-04",
@@ -1538,7 +1262,7 @@
       "tier": 2,
       "milestone": "M4",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T3-F1-F4-01",
@@ -1547,7 +1271,7 @@
       "tier": 3,
       "milestone": "M1",
       "status": "PASSED",
-      "durationMs": 2
+      "durationMs": 0
     },
     {
       "id": "T3-F1-F4-02",
@@ -1565,7 +1289,7 @@
       "tier": 3,
       "milestone": "M1",
       "status": "PASSED",
-      "durationMs": 2
+      "durationMs": 17
     },
     {
       "id": "T3-F1-F4-04",
@@ -1574,7 +1298,7 @@
       "tier": 3,
       "milestone": "M1",
       "status": "PASSED",
-      "durationMs": 2
+      "durationMs": 1
     },
     {
       "id": "T3-F3-F10-01",
@@ -1601,7 +1325,7 @@
       "tier": 3,
       "milestone": "M1",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 1
     },
     {
       "id": "T3-F5-F6-01",
@@ -1609,14 +1333,8 @@
       "featureId": "F5",
       "tier": 3,
       "milestone": "M2",
-      "status": "FAILED",
-      "durationMs": 19,
-      "error": {
-        "message": "Must guard status modification",
-        "stack": "AssertionError: Must guard status modification\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier3\\f05_f06_rls_triggers.test.ts:24:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "NEW.status IS DISTINCT FROM OLD.status",
-        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
-      }
+      "status": "PASSED",
+      "durationMs": 6
     },
     {
       "id": "T3-F5-F6-02",
@@ -1624,14 +1342,8 @@
       "featureId": "F6",
       "tier": 3,
       "milestone": "M2",
-      "status": "FAILED",
-      "durationMs": 20,
-      "error": {
-        "message": "Must deploy guard_teacher_profile_update",
-        "stack": "AssertionError: Must deploy guard_teacher_profile_update\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier3\\f05_f06_rls_triggers.test.ts:39:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "guard_teacher_profile_update",
-        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
-      }
+      "status": "PASSED",
+      "durationMs": 6
     },
     {
       "id": "T3-F5-F6-03",
@@ -1640,7 +1352,7 @@
       "tier": 3,
       "milestone": "M2",
       "status": "PASSED",
-      "durationMs": 21
+      "durationMs": 11
     },
     {
       "id": "T3-F7-F8-01",
@@ -1648,14 +1360,8 @@
       "featureId": "F7",
       "tier": 3,
       "milestone": "M2",
-      "status": "FAILED",
-      "durationMs": 33,
-      "error": {
-        "message": "fee_payments must allow staff/accountants",
-        "stack": "AssertionError: fee_payments must allow staff/accountants\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier3\\f07_f08_rbac_views.test.ts:22:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "fee_payments_staff_all",
-        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
-      }
+      "status": "PASSED",
+      "durationMs": 7
     },
     {
       "id": "T3-F7-F8-02",
@@ -1663,14 +1369,8 @@
       "featureId": "F7",
       "tier": 3,
       "milestone": "M2",
-      "status": "FAILED",
-      "durationMs": 21,
-      "error": {
-        "message": "Must have leave_requests_staff_select policy",
-        "stack": "AssertionError: Must have leave_requests_staff_select policy\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier3\\f07_f08_rbac_views.test.ts:39:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "leave_requests_staff_select",
-        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
-      }
+      "status": "PASSED",
+      "durationMs": 4
     },
     {
       "id": "T3-F7-F8-03",
@@ -1678,14 +1378,8 @@
       "featureId": "F7",
       "tier": 3,
       "milestone": "M2",
-      "status": "FAILED",
-      "durationMs": 21,
-      "error": {
-        "message": "Must have fee_payments_owner_select policy",
-        "stack": "AssertionError: Must have fee_payments_owner_select policy\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier3\\f07_f08_rbac_views.test.ts:55:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "fee_payments_owner_select",
-        "actual": "-- =====================================================================\n-- MIGRATION 07a — ACADEMICS AS THE CANONICAL ACADEMIC STRUCTURE\n-- Additive schema + backfill. No column is dropped, renamed o... [truncated 300992 chars]"
-      }
+      "status": "PASSED",
+      "durationMs": 5
     },
     {
       "id": "T3-F9-F12-01",
@@ -1703,7 +1397,7 @@
       "tier": 3,
       "milestone": "M2",
       "status": "PASSED",
-      "durationMs": 0
+      "durationMs": 1
     },
     {
       "id": "T3-F9-F12-03",
@@ -1711,14 +1405,8 @@
       "featureId": "F12",
       "tier": 3,
       "milestone": "M3",
-      "status": "FAILED",
-      "durationMs": 1,
-      "error": {
-        "message": "server.ts must query student_fees",
-        "stack": "AssertionError: server.ts must query student_fees\n    at Object.contains (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\assert.ts:69:13)\n    at Object.fn (D:\\all_code\\r.m.-memorial-public-school\\tests\\tier3\\f09_f12_ai_pagination.test.ts:55:12)\n    at runAllTests (D:\\all_code\\r.m.-memorial-public-school\\tests\\infra\\runner.ts:96:15)\n    at async main (D:\\all_code\\r.m.-memorial-public-school\\tests\\run-all.ts:82:21)",
-        "expected": "student_fees",
-        "actual": "import express from \"express\";\nimport path from \"path\";\nimport { createServer as createViteServer } from \"vite\";\nimport { GoogleGenAI } from \"@google/genai\";\nimport { createClient } from \"@supabase/su... [truncated 13384 chars]"
-      }
+      "status": "PASSED",
+      "durationMs": 1
     },
     {
       "id": "T3-F3-F11-01",
@@ -1727,7 +1415,7 @@
       "tier": 3,
       "milestone": "M3",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T3-F3-F11-02",
@@ -1736,7 +1424,7 @@
       "tier": 3,
       "milestone": "M3",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T3-F3-F11-03",
@@ -1745,7 +1433,7 @@
       "tier": 3,
       "milestone": "M3",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T4-SC1-01",
@@ -1763,7 +1451,7 @@
       "tier": 4,
       "milestone": "M1",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T4-SC1-03",
@@ -1772,7 +1460,7 @@
       "tier": 4,
       "milestone": "M3",
       "status": "PASSED",
-      "durationMs": 3
+      "durationMs": 1
     },
     {
       "id": "T4-SC2-01",
@@ -1781,7 +1469,7 @@
       "tier": 4,
       "milestone": "M1",
       "status": "PASSED",
-      "durationMs": 2
+      "durationMs": 0
     },
     {
       "id": "T4-SC2-02",
@@ -1799,7 +1487,7 @@
       "tier": 4,
       "milestone": "M3",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T4-SC3-01",
@@ -1808,7 +1496,7 @@
       "tier": 4,
       "milestone": "M3",
       "status": "PASSED",
-      "durationMs": 2
+      "durationMs": 0
     },
     {
       "id": "T4-SC3-02",
@@ -1817,7 +1505,7 @@
       "tier": 4,
       "milestone": "M3",
       "status": "PASSED",
-      "durationMs": 2
+      "durationMs": 0
     },
     {
       "id": "T4-SC3-03",
@@ -1826,7 +1514,7 @@
       "tier": 4,
       "milestone": "M2",
       "status": "PASSED",
-      "durationMs": 20
+      "durationMs": 6
     },
     {
       "id": "T4-SC4-01",
@@ -1835,7 +1523,7 @@
       "tier": 4,
       "milestone": "M2",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T4-SC4-02",
@@ -1844,7 +1532,7 @@
       "tier": 4,
       "milestone": "M3",
       "status": "PASSED",
-      "durationMs": 2
+      "durationMs": 1
     },
     {
       "id": "T4-SC4-03",
@@ -1853,7 +1541,7 @@
       "tier": 4,
       "milestone": "M3",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T4-SC5-01",
@@ -1862,7 +1550,7 @@
       "tier": 4,
       "milestone": "M3",
       "status": "PASSED",
-      "durationMs": 2
+      "durationMs": 0
     },
     {
       "id": "T4-SC5-02",
@@ -1871,7 +1559,7 @@
       "tier": 4,
       "milestone": "M3",
       "status": "PASSED",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "id": "T4-SC5-03",
@@ -1880,7 +1568,7 @@
       "tier": 4,
       "milestone": "M3",
       "status": "PASSED",
-      "durationMs": 2
+      "durationMs": 1
     }
   ]
 }

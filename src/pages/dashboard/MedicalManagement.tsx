@@ -13,6 +13,7 @@ import { AdminStatCard } from '@/components/common/AdminStatCard';
 
 interface MedicalRecord {
   id: string;
+  student_id: string;
   student_name: string;
   class_name: string;
   blood_group: string;
@@ -24,8 +25,16 @@ interface MedicalRecord {
   status: 'Fit' | 'Under-Medical-Care' | 'Chronic-Condition';
 }
 
+interface EnrolledStudent {
+  id: string;
+  name: string;
+  class: string;
+  section: string;
+}
+
 export default function MedicalManagement() {
   const [records, setRecords] = useState<MedicalRecord[]>([]);
+  const [students, setStudents] = useState<EnrolledStudent[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -44,15 +53,26 @@ export default function MedicalManagement() {
     setIsSyncing(true);
     setErrorState(null);
     try {
-      const { data, error } = await supabase
-        .from('student_medical')
-        .select('*, students(id, name, class, section)')
-        .order('created_at', { ascending: false });
-      
+      const [medicalRes, studentsRes] = await Promise.all([
+        supabase
+          .from('student_medical')
+          .select('*, students(id, name, class, section)')
+          .order('created_at', { ascending: false }),
+        supabase.from('students').select('id, name, class, section').eq('status', 'active').order('name').limit(2000)
+      ]);
+
+      const { data, error } = medicalRes;
       if (error) throw error;
+
+      if (studentsRes.data) {
+        setStudents(studentsRes.data.map((s: any) => ({
+          id: s.id, name: s.name || 'Student', class: s.class || '', section: s.section || ''
+        })));
+      }
 
       const mapped: MedicalRecord[] = (data || []).map((m: any) => ({
         id: m.id,
+        student_id: m.student_id || m.students?.id || '',
         student_name: m.students?.name || 'Student Member',
         class_name: m.students?.class ? `Class ${m.students.class}` : 'General',
         blood_group: m.blood_group || 'O+',
@@ -81,8 +101,7 @@ export default function MedicalManagement() {
   const handleOpenAdd = () => {
     setEditingItem(null);
     setFormData({
-      student_name: '',
-      class_name: 'Class 10th',
+      student_id: '',
       blood_group: 'A+',
       allergies: 'None',
       vaccinations: 'All Standard Vaccinations Complete',
@@ -138,6 +157,10 @@ export default function MedicalManagement() {
       toast.error('Please specify blood group and details');
       return;
     }
+    if (!editingItem && !formData.student_id) {
+      toast.error('Please select the enrolled student this record belongs to');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -161,7 +184,7 @@ export default function MedicalManagement() {
       } else {
         const { error } = await supabase
           .from('student_medical')
-          .insert([payload]);
+          .insert([{ ...payload, student_id: formData.student_id }]);
         if (error) throw error;
         toast.success('Student health card registered');
       }
@@ -217,6 +240,7 @@ export default function MedicalManagement() {
               if (parts.length >= 5) {
                 imported.push({
                   id: parts[0] || `med_${Date.now()}_${i}`,
+                  student_id: '',
                   student_name: parts[1] || 'Imported Student',
                   class_name: parts[2] || 'Class 10th',
                   blood_group: parts[3] || 'O+',
@@ -634,34 +658,27 @@ export default function MedicalManagement() {
               </button>
             </div>
             <form onSubmit={handleFormSubmit} className="p-5 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block mb-1">
-                    Student Full Name <span className="text-rose-500">*</span>
-                  </label>
-                  <input 
-                    type="text"
-                    required
-                    placeholder="e.g., Aarav Mishra"
-                    value={formData.student_name || ''}
-                    onChange={(e) => setFormData(prev => ({ ...prev, student_name: e.target.value }))}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-rose-500/10 focus:border-rose-500 transition-all font-medium"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block mb-1">
-                    Student Class / Grade
-                  </label>
+              <div>
+                <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block mb-1">
+                  Enrolled Student <span className="text-rose-500">*</span>
+                </label>
+                {editingItem ? (
+                  <div className="w-full bg-slate-100 border border-slate-200 rounded-xl py-2 px-3 text-xs text-slate-600 font-semibold">
+                    {formData.student_name} {formData.class_name ? `— ${formData.class_name}` : ''}
+                  </div>
+                ) : (
                   <select
-                    value={formData.class_name || 'Class 12th'}
-                    onChange={(e) => setFormData(prev => ({ ...prev, class_name: e.target.value }))}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-rose-500/10 focus:border-rose-500 transition-all font-semibold cursor-pointer"
+                    required
+                    value={formData.student_id || ''}
+                    onChange={(e) => setFormData((prev: any) => ({ ...prev, student_id: e.target.value }))}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-rose-500/10 focus:border-rose-500 transition-all font-medium cursor-pointer"
                   >
-                    {['Class 1st', 'Class 2nd', 'Class 3rd', 'Class 5th', 'Class 10th', 'Class 12th'].map(c => (
-                      <option key={c} value={c}>{c}</option>
+                    <option value="">Select Student...</option>
+                    {students.map(s => (
+                      <option key={s.id} value={s.id}>{s.name} — Class {s.class}{s.section ? `-${s.section}` : ''}</option>
                     ))}
                   </select>
-                </div>
+                )}
               </div>
 
               <div className="grid grid-cols-3 gap-4">

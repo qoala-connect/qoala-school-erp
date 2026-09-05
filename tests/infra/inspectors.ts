@@ -229,11 +229,25 @@ export const inspectors = {
     const teacherSvc = this.readFile('src/services/teacherService.ts');
     const admissionSvc = this.readFile('src/services/admissionService.ts');
     const feeSvc = this.readFile('src/services/feeService.ts');
+    // AI fee grounding was refactored out of server.ts into a dedicated,
+    // role-aware tool-calling layer — server.ts now only wires the HTTP
+    // route to processAIChat(). Inspect where the query genuinely lives.
+    const aiToolsTs = this.fileExists('src/server/aiTools.ts') ? this.readFile('src/server/aiTools.ts') : '';
+    const aiServiceTs = this.fileExists('src/server/aiService.ts') ? this.readFile('src/server/aiService.ts') : '';
 
     return {
       serverGroundingTable(): string {
+        if (aiToolsTs.includes("from('student_fees')") && !aiToolsTs.includes("from('fees')")) {
+          return 'student_fees';
+        }
         const match = serverTs.match(/supabase\.from\(['"]([^'"]+)['"]\)\.select\(['"]id,\s*status,\s*amount/);
         return match ? match[1] : '';
+      },
+      aiServiceCode(): string {
+        return aiServiceTs;
+      },
+      aiToolsCode(): string {
+        return aiToolsTs;
       },
       teacherServiceEmployeeIdGen(): string {
         return teacherSvc.includes('count: \'exact\'') ? 'memory-count-race' : 'sequence-or-uuid';

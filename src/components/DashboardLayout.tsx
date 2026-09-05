@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   LayoutDashboard, 
@@ -73,6 +73,40 @@ function SidebarItem({ icon: Icon, label, path, active, collapsed, onClick }: Si
         )}
       </motion.div>
     </Link>
+  );
+}
+
+interface BreadcrumbCategory {
+  title: string;
+  items: { label: string; path: string }[];
+}
+
+/**
+ * Derives "Dashboard / Section / Page" from the same nav config that builds
+ * the sidebar, matched against the current route — one source of truth, no
+ * per-page wiring required.
+ */
+function Breadcrumbs({ categories, pathname }: { categories: BreadcrumbCategory[]; pathname: string }) {
+  if (pathname === '/dashboard') return null;
+
+  let match: { categoryTitle: string; itemLabel: string } | null = null;
+  for (const cat of categories) {
+    const item = cat.items.find(i => i.path === pathname);
+    if (item) {
+      match = { categoryTitle: cat.title, itemLabel: item.label };
+      break;
+    }
+  }
+  if (!match) return null;
+
+  return (
+    <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-400 mb-3 select-none">
+      <Link to="/dashboard" className="hover:text-slate-700 transition-colors">Dashboard</Link>
+      <ChevronRight className="w-3 h-3 text-slate-300 flex-shrink-0" />
+      <span className="text-slate-500">{match.categoryTitle}</span>
+      <ChevronRight className="w-3 h-3 text-slate-300 flex-shrink-0" />
+      <span className="text-slate-700">{match.itemLabel}</span>
+    </nav>
   );
 }
 
@@ -355,6 +389,48 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const [allStudents, setAllStudents] = useState<any[]>([]);
   const [allEmployees, setAllEmployees] = useState<any[]>([]);
   const [allExams, setAllExams] = useState<any[]>([]);
+
+  // Notifications & User Menu States
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [notifications, setNotifications] = useState<Array<{ id: string; title: string; content?: string; publish_date?: string; is_read?: boolean }>>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const notificationsRef = useRef<HTMLDivElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    async function fetchNotifications() {
+      try {
+        const { data: noticesData } = await supabase
+          .from('notices')
+          .select('id, title, content, publish_date')
+          .order('publish_date', { ascending: false })
+          .limit(6);
+        if (noticesData && noticesData.length > 0) {
+          setNotifications(noticesData.map(n => ({ ...n, is_read: false })));
+          setUnreadCount(noticesData.length);
+        }
+      } catch (err) {
+        console.warn('Failed to load notices for notifications popover:', err);
+      }
+    }
+    fetchNotifications();
+  }, []);
+
+  // Close notifications and user menu on click outside
+  useEffect(() => {
+    function handleGlobalClick(e: MouseEvent) {
+      if (notificationsRef.current && !notificationsRef.current.contains(e.target as Node)) {
+        setIsNotificationsOpen(false);
+      }
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setIsUserMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleGlobalClick);
+    return () => document.removeEventListener('mousedown', handleGlobalClick);
+  }, []);
 
   useEffect(() => {
     async function fetchSearchContext() {
@@ -768,34 +844,182 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
  
           {/* Header Right (Notifications, User avatar, role info) */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            <button className="relative w-8 h-8 bg-slate-50 hover:bg-slate-100 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-800 transition-all border border-slate-200/40">
-              <Bell className="w-3.5 h-3.5" />
-              <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-rose-500 rounded-full border border-white" />
-            </button>
- 
-            <div className="flex items-center gap-2 pl-3 border-l border-slate-100">
-              <div className="text-right hidden md:block">
-                <div className="text-xs font-semibold text-slate-800 tracking-tight uppercase leading-none">
-                  {user?.email?.split('@')[0] || 'GUEST USER'}
+            {/* Notification Popover Button & Dropdown */}
+            <div className="relative" ref={notificationsRef}>
+              <button 
+                onClick={() => setIsNotificationsOpen(prev => !prev)}
+                aria-label="View notifications and circulars"
+                aria-expanded={isNotificationsOpen}
+                className="relative w-8 h-8 bg-slate-50 hover:bg-slate-100 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-800 transition-all border border-slate-200/40 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              >
+                <Bell className="w-3.5 h-3.5" />
+                {unreadCount > 0 && (
+                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full border border-white" />
+                )}
+              </button>
+
+              <AnimatePresence>
+                {isNotificationsOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute right-0 top-10 w-80 sm:w-96 bg-white rounded-2xl shadow-xl border border-slate-200/80 z-50 overflow-hidden"
+                  >
+                    <div className="p-3.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Bell className="w-4 h-4 text-blue-600" />
+                        <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">Official Notices & Alerts</h4>
+                      </div>
+                      {unreadCount > 0 && (
+                        <button
+                          onClick={() => setUnreadCount(0)}
+                          className="text-[10px] font-bold text-blue-600 hover:text-blue-800 transition-colors cursor-pointer"
+                        >
+                          Mark all read
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="max-h-72 overflow-y-auto divide-y divide-slate-100">
+                      {notifications.length === 0 ? (
+                        <div className="p-6 text-center text-xs text-slate-400 font-medium">
+                          No recent notices or alerts at this time.
+                        </div>
+                      ) : (
+                        notifications.map((n) => (
+                          <div
+                            key={n.id}
+                            className="p-3 hover:bg-slate-50/80 transition-colors text-left group"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <h5 className="text-xs font-bold text-slate-800 group-hover:text-blue-700 transition-colors line-clamp-1">
+                                {n.title}
+                              </h5>
+                              {n.publish_date && (
+                                <span className="text-[9.5px] text-slate-400 font-mono shrink-0">
+                                  {new Date(n.publish_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                                </span>
+                              )}
+                            </div>
+                            {n.content && (
+                              <p className="text-[11px] text-slate-500 font-normal line-clamp-2 mt-1">
+                                {n.content}
+                              </p>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    <div className="p-2 bg-slate-50/50 border-t border-slate-100 text-center">
+                      <Link
+                        to="/dashboard/communication"
+                        onClick={() => setIsNotificationsOpen(false)}
+                        className="text-[11px] font-bold text-blue-600 hover:text-blue-800 block py-1"
+                      >
+                        Open Communication Center →
+                      </Link>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Interactive User Avatar Menu */}
+            <div className="relative pl-3 border-l border-slate-100" ref={userMenuRef}>
+              <button
+                onClick={() => setIsUserMenuOpen(prev => !prev)}
+                aria-label="User account menu"
+                aria-expanded={isUserMenuOpen}
+                className="flex items-center gap-2 cursor-pointer group focus:outline-none"
+              >
+                <div className="text-right hidden md:block">
+                  <div className="text-xs font-semibold text-slate-800 tracking-tight uppercase leading-none group-hover:text-blue-700 transition-colors">
+                    {user?.email?.split('@')[0] || 'GUEST USER'}
+                  </div>
+                  <div className="text-[8.5px] font-semibold text-violet-600 uppercase tracking-wider mt-0.5 leading-none">
+                    {roleLabel}
+                  </div>
                 </div>
-                <div className="text-[8.5px] font-semibold text-violet-600 uppercase tracking-wider mt-0.5 leading-none">
-                  {roleLabel}
+                <div className="w-8 h-8 rounded-full border border-violet-100 p-0.5 shadow-2xs overflow-hidden bg-slate-50 shrink-0 group-hover:ring-2 group-hover:ring-blue-500/20 transition-all">
+                  <img 
+                    src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.email || 'admin'}`} 
+                    className="w-full h-full rounded-full object-cover"
+                    referrerPolicy="no-referrer"
+                    alt="User avatar"
+                  />
                 </div>
-              </div>
-              <div className="w-8 h-8 rounded-full border border-violet-100 p-0.5 shadow-2xs overflow-hidden bg-slate-50 shrink-0">
-                <img 
-                  src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.email || 'admin'}`} 
-                  className="w-full h-full rounded-full object-cover"
-                  referrerPolicy="no-referrer"
-                  alt="User avatar"
-                />
-              </div>
+              </button>
+
+              <AnimatePresence>
+                {isUserMenuOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute right-0 top-11 w-52 bg-white rounded-2xl shadow-xl border border-slate-200/80 z-50 overflow-hidden py-1.5 text-xs font-semibold"
+                  >
+                    <div className="px-3.5 py-2 border-b border-slate-100 bg-slate-50/50">
+                      <div className="font-bold text-slate-800 truncate">{user?.email}</div>
+                      <div className="text-[10px] text-violet-600 font-extrabold uppercase mt-0.5">{roleLabel}</div>
+                    </div>
+
+                    {isStudentOrParent ? (
+                      <Link
+                        to="/dashboard/portal"
+                        onClick={() => setIsUserMenuOpen(false)}
+                        className="w-full px-3.5 py-2 text-left hover:bg-slate-50 flex items-center gap-2 text-slate-700 transition-colors"
+                      >
+                        <GraduationCap className="w-3.5 h-3.5 text-blue-600" />
+                        <span>My Student Portal</span>
+                      </Link>
+                    ) : (
+                      <Link
+                        to="/dashboard"
+                        onClick={() => setIsUserMenuOpen(false)}
+                        className="w-full px-3.5 py-2 text-left hover:bg-slate-50 flex items-center gap-2 text-slate-700 transition-colors"
+                      >
+                        <LayoutDashboard className="w-3.5 h-3.5 text-blue-600" />
+                        <span>Executive Dashboard</span>
+                      </Link>
+                    )}
+
+                    {can('settings.manage') && (
+                      <Link
+                        to="/dashboard/system/settings"
+                        onClick={() => setIsUserMenuOpen(false)}
+                        className="w-full px-3.5 py-2 text-left hover:bg-slate-50 flex items-center gap-2 text-slate-700 transition-colors"
+                      >
+                        <Settings className="w-3.5 h-3.5 text-slate-500" />
+                        <span>School Settings</span>
+                      </Link>
+                    )}
+
+                    <div className="border-t border-slate-100 my-1" />
+
+                    <button
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        handleLogout();
+                      }}
+                      className="w-full px-3.5 py-2 text-left hover:bg-rose-50 flex items-center gap-2 text-rose-600 transition-colors cursor-pointer"
+                    >
+                      <LogOut className="w-3.5 h-3.5 text-rose-600" />
+                      <span>Sign Out</span>
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
         </header>
  
         {/* Scrollable Viewport (Responsive Padding) */}
         <div className="flex-1 overflow-x-hidden overflow-y-auto p-3 sm:p-4 lg:p-5 relative custom-scrollbar bg-[#F8FAFC]">
+          <Breadcrumbs categories={filteredCategories} pathname={location.pathname} />
           <AnimatePresence mode="wait">
             <motion.div
               key={location.pathname}

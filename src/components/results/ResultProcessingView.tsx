@@ -122,8 +122,9 @@ export default function ResultProcessingView() {
       setExistingResults(resList);
 
       // Determine initial publication status
+      const currentExam = exams.find(e => e.id === examId);
       if (resList.length > 0 && resList.every(r => r.published)) {
-        setPublicationStatus('Published');
+        setPublicationStatus(currentExam?.locked ? 'Locked' : 'Published');
       } else if (resList.length > 0) {
         setPublicationStatus('Verified');
       } else {
@@ -343,14 +344,17 @@ export default function ResultProcessingView() {
       toast.success('Results PUBLISHED live to Student & Parent Portals!');
     } else if (publicationStatus === 'Published') {
       setPublicationStatus('Locked');
-      toast.success('Results LOCKED. Further marks modifications are strictly protected.');
+      if (selectedExamId) {
+        await supabase.from('exams').update({ locked: true }).eq('id', selectedExamId);
+      }
+      toast.success('Results LOCKED.');
     } else {
       setPublicationStatus('Draft');
       if (selectedExamId) {
-        await supabase
-          .from('exam_results')
-          .update({ published: false })
-          .eq('exam_id', selectedExamId);
+        await Promise.all([
+          supabase.from('exam_results').update({ published: false }).eq('exam_id', selectedExamId),
+          supabase.from('exams').update({ locked: false }).eq('id', selectedExamId)
+        ]);
       }
       toast.info('Results reset to DRAFT mode.');
     }

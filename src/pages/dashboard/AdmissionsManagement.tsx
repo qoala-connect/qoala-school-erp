@@ -1010,7 +1010,7 @@ export default function AdmissionsManagement() {
                 <GraduationCap className="w-7 h-7" />
               </span>
               <h3 className="text-sm sm:text-base font-bold text-slate-900">
-                {admissions.length === 0 ? 'No applications yet' : 'No applications match these filters'}
+                {admissions.length === 0 ? 'No applications yet' : 'No applications found'}
               </h3>
               <p className="text-xs text-slate-500 max-w-sm mt-1.5">
                 {admissions.length === 0

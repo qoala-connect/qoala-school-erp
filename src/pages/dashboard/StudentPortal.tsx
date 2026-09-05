@@ -106,6 +106,7 @@ export default function StudentPortal() {
   const [assignments, setAssignments] = useState<RealAssignment[]>([]);
   const [feesList, setFeesList] = useState<RealFeeItem[]>([]);
   const [examResults, setExamResults] = useState<any[]>([]);
+  const [examSubjects, setExamSubjects] = useState<any[]>([]);
   const [subjectMarks, setSubjectMarks] = useState<any[]>([]);
   const [timetableRecords, setTimetableRecords] = useState<any[]>([]);
   const [classSubjects, setClassSubjects] = useState<any[]>([]);
@@ -181,10 +182,11 @@ export default function StudentPortal() {
         subjectsRes,
         assignmentsRes,
         submissionsRes,
-        noticesRes
+        noticesRes,
+        examSubjectsRes
       ] = await Promise.all([
-        supabase.from('student_medical_records').select('*').eq('student_id', studentRecord.id).maybeSingle(),
-        supabase.from('student_transport').select('*').eq('student_id', studentRecord.id).maybeSingle(),
+        supabase.from('student_medical').select('*').eq('student_id', studentRecord.id).maybeSingle(),
+        supabase.from('student_transport').select('*, transport_routes(route_name), vehicles(vehicle_number)').eq('student_id', studentRecord.id).maybeSingle(),
         supabase.from('attendance').select('*').eq('student_id', studentRecord.id).order('attendance_date', { ascending: false }),
         supabase.from('student_fees').select('*, fee_categories(category_name), fee_payments(*)').eq('student_id', studentRecord.id).order('created_at', { ascending: false }),
         supabase.from('exam_results').select('*, exams(exam_name, academic_year)').eq('student_id', studentRecord.id),
@@ -193,7 +195,8 @@ export default function StudentPortal() {
         supabase.from('class_subjects').select('*, subjects(subject_name, subject_code)').eq('class', studentRecord.class),
         supabase.from('assignments').select('*, subjects(subject_name, subject_code), teachers(name)').eq('class', studentRecord.class).order('due_date', { ascending: true }),
         supabase.from('student_assignment_submissions').select('*').eq('student_id', studentRecord.id),
-        supabase.from('notices').select('*').order('created_at', { ascending: false }).limit(6)
+        supabase.from('notices').select('*').order('created_at', { ascending: false }).limit(6),
+        supabase.from('exam_subjects').select('*, subjects(subject_name)')
       ]);
 
       if (medicalRes.data) setMedical(medicalRes.data);
@@ -202,6 +205,7 @@ export default function StudentPortal() {
       if (timetableRes.data) setTimetableRecords(timetableRes.data);
       if (classSubjects.length === 0 && subjectsRes.data) setClassSubjects(subjectsRes.data);
       if (examResultsRes.data) setExamResults(examResultsRes.data);
+      if (examSubjectsRes.data) setExamSubjects(examSubjectsRes.data);
       if (marksRes.data) setSubjectMarks(marksRes.data);
       if (noticesRes.data) setSchoolNotices(noticesRes.data);
 
@@ -569,7 +573,7 @@ export default function StudentPortal() {
                 </div>
                 <div>
                   <span className="font-extrabold text-slate-900 text-xs block">Fee Receipts</span>
-                  <span className="text-[10px] text-emerald-700 font-bold">100% Cleared</span>
+                  <span className="text-[10px] text-emerald-700 font-bold">{totalOutstanding === 0 ? 'Cleared' : `₹${totalOutstanding.toLocaleString('en-IN')} Due`}</span>
                 </div>
               </button>
 
@@ -582,7 +586,9 @@ export default function StudentPortal() {
                 </div>
                 <div>
                   <span className="font-extrabold text-slate-900 text-xs block">Report Card</span>
-                  <span className="text-[10px] text-amber-700 font-bold">Grade A1 (90.8%)</span>
+                  <span className="text-[10px] text-amber-700 font-bold">
+                    {latestExamResult ? `Grade ${latestExamResult.grade} (${latestExamResult.percentage}%)` : 'Not published yet'}
+                  </span>
                 </div>
               </button>
 
@@ -642,8 +648,8 @@ export default function StudentPortal() {
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                    {(timetableRecords.filter(s => s.day_of_week === selectedDay).length > 0
-                      ? timetableRecords.filter(s => s.day_of_week === selectedDay).slice(0, 3)
+                    {(timetableRecords.filter(s => s.day === selectedDay).length > 0
+                      ? timetableRecords.filter(s => s.day === selectedDay).slice(0, 3)
                       : timetableRecords.slice(0, 3)
                     ).map((slot, idx) => (
                       <div key={slot.id || idx} className="p-3 bg-white border border-slate-200/80 rounded-xl space-y-1">
@@ -1207,19 +1213,15 @@ export default function StudentPortal() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-400 font-semibold">CBSE Roll Number:</span>
-                    <span className="font-mono font-bold text-slate-900">#{student.roll_number || '10'}</span>
+                    <span className="font-mono font-bold text-slate-900">{student.roll_number ? `#${student.roll_number}` : 'Not assigned'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-400 font-semibold">Admission Number:</span>
-                    <span className="font-mono font-bold text-slate-900">{student.admission_number}</span>
+                    <span className="font-mono font-bold text-slate-900">{student.admission_number || 'Not on file'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-400 font-semibold">Academic Session:</span>
                     <span className="font-bold text-slate-900">{student.academic_year || '2026-27'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400 font-semibold">School House:</span>
-                    <span className="font-bold text-blue-700">Raman House (Blue)</span>
                   </div>
                 </div>
               </div>
@@ -1238,16 +1240,16 @@ export default function StudentPortal() {
                   <div className="flex justify-between">
                     <span className="text-slate-400 font-semibold">Date of Birth:</span>
                     <span className="font-bold text-slate-900">
-                      {student.date_of_birth ? new Date(student.date_of_birth).toLocaleDateString('en-IN') : '14-Aug-2009'}
+                      {student.date_of_birth ? new Date(student.date_of_birth).toLocaleDateString('en-IN') : 'Not on file'}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-400 font-semibold">Gender:</span>
-                    <span className="font-bold text-slate-900 capitalize">{student.gender || 'Female'}</span>
+                    <span className="font-bold text-slate-900 capitalize">{student.gender || 'Not on file'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-400 font-semibold">Blood Group:</span>
-                    <span className="font-bold text-rose-700">{medical?.blood_group || 'O+ (Positive)'}</span>
+                    <span className="font-bold text-rose-700">{medical?.blood_group || (student as any).blood_group || 'Not on file'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-400 font-semibold">Social Category:</span>
@@ -1307,7 +1309,7 @@ export default function StudentPortal() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-400 font-semibold">Assigned Doctor:</span>
-                    <span className="font-bold text-slate-900">{medical?.doctor_name || 'Dr. V. K. Rai (MD)'}</span>
+                    <span className="font-bold text-slate-900">{medical?.doctor_name || 'Not on file'}</span>
                   </div>
                 </div>
               </div>
@@ -1319,22 +1321,24 @@ export default function StudentPortal() {
                   School Transport
                 </div>
                 <div className="space-y-2.5">
-                  <div className="flex justify-between">
-                    <span className="text-slate-400 font-semibold">Allotted Route:</span>
-                    <span className="font-bold text-slate-900">{transport?.route_name || 'Route #04 (Barhalganj Crossing)'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400 font-semibold">Bus Vehicle Reg:</span>
-                    <span className="font-mono font-bold text-slate-900">{transport?.vehicle_no || 'UP-53-T-4812'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400 font-semibold">Designated Driver:</span>
-                    <span className="font-bold text-slate-900">{transport?.driver_name || 'Mr. Harish Chandra'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400 font-semibold">Driver Phone:</span>
-                    <span className="font-mono font-bold text-slate-900">{transport?.driver_phone || '+91 94500-11223'}</span>
-                  </div>
+                  {transport ? (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400 font-semibold">Allotted Route:</span>
+                        <span className="font-bold text-slate-900">{(transport as any).transport_routes?.route_name || 'Not on file'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400 font-semibold">Bus Vehicle Reg:</span>
+                        <span className="font-mono font-bold text-slate-900">{(transport as any).vehicles?.vehicle_number || 'Not on file'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400 font-semibold">Boarding Point:</span>
+                        <span className="font-bold text-slate-900">{(transport as any).boarding_point || 'Not on file'}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-slate-400 text-center py-2">No transport allotment on file.</p>
+                  )}
                 </div>
               </div>
 
@@ -1386,35 +1390,33 @@ export default function StudentPortal() {
           <div className="space-y-6 max-w-2xl">
             <div>
               <h3 className="text-sm font-bold text-slate-900">School Transport Allotment</h3>
-              <p className="text-xs text-slate-500">Bus route, boarding point, and emergency driver credentials.</p>
+              <p className="text-xs text-slate-500">Bus route, boarding point, and pickup timing.</p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase block">Transit Route</span>
-                <span className="text-sm font-bold text-slate-900">Route #04 (Barhalganj - Gorakhpur Road)</span>
+            {transport ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Transit Route</span>
+                  <span className="text-sm font-bold text-slate-900">{(transport as any).transport_routes?.route_name || 'Not on file'}</span>
+                </div>
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Vehicle Registration</span>
+                  <span className="text-sm font-bold text-slate-900 font-mono">{(transport as any).vehicles?.vehicle_number || 'Not on file'}</span>
+                </div>
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Boarding Point</span>
+                  <span className="text-sm font-bold text-slate-900">{(transport as any).boarding_point || 'Not on file'}</span>
+                </div>
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Pickup Time</span>
+                  <span className="text-sm font-bold text-slate-900 font-mono">{(transport as any).pickup_time || 'Not on file'}</span>
+                </div>
               </div>
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase block">Vehicle Registration</span>
-                <span className="text-sm font-bold text-slate-900 font-mono">UP-53-T-4812 (Bus 04)</span>
+            ) : (
+              <div className="p-8 bg-slate-50 rounded-2xl border border-slate-200/70 text-center text-slate-400 text-sm">
+                No transport allotment on file for this student.
               </div>
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase block">Pickup Point</span>
-                <span className="text-sm font-bold text-slate-900">Barhalganj Main Chowk</span>
-              </div>
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase block">Pickup / Drop Time</span>
-                <span className="text-sm font-bold text-slate-900 font-mono">07:25 AM / 02:15 PM</span>
-              </div>
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase block">Designated Driver</span>
-                <span className="text-sm font-bold text-slate-900">Mr. Harish Chandra</span>
-              </div>
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase block">Driver Contact</span>
-                <span className="text-sm font-bold text-slate-900 font-mono">+91 94500-11223</span>
-              </div>
-            </div>
+            )}
           </div>
         )}
 
@@ -1510,6 +1512,15 @@ export default function StudentPortal() {
         onClose={() => setAdmitCardOpen(false)}
         student={student}
         exam={examResults[0]?.exams}
+        timetable={examSubjects
+          .filter(es => !examResults[0]?.exam_id || es.exam_id === examResults[0].exam_id)
+          .map(es => ({
+            subject_code: es.subject_id ? String(es.subject_id).slice(0, 6).toUpperCase() : undefined,
+            subject_name: es.subject_name || es.subjects?.subject_name || 'Subject',
+            date: es.exam_date || undefined,
+            time: es.start_time ? `${es.start_time}${es.duration ? ` (${es.duration})` : ''}` : undefined,
+            room: es.room || undefined
+          }))}
       />
 
       {/* 9. OFFICIAL CBSE ANNUAL PROGRESS REPORT / MARKSHEET MODAL */}
@@ -1517,11 +1528,13 @@ export default function StudentPortal() {
         isOpen={marksheetModalOpen}
         onClose={() => setMarksheetModalOpen(false)}
         student={student}
-        examData={examResults}
+        marks={subjectMarks}
         attendanceData={{
-          total_days: 187,
-          present_days: Math.round(187 * (attendanceRecords.filter(r => r.status === 'present' || r.status === 'late').length / (attendanceRecords.length || 1))),
-          percentage: attendanceRecords.length > 0 ? Math.round((attendanceRecords.filter(r => r.status === 'present' || r.status === 'late').length / attendanceRecords.length) * 100) : 96
+          total_days: attendanceRecords.length,
+          present_days: attendanceRecords.filter(r => r.status === 'present' || r.status === 'late').length,
+          percentage: attendanceRecords.length > 0
+            ? Math.round((attendanceRecords.filter(r => r.status === 'present' || r.status === 'late').length / attendanceRecords.length) * 100)
+            : undefined
         }}
         medicalData={medical}
       />

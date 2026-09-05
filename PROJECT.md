@@ -29,9 +29,9 @@ The School ERP is a React 18 + Vite + TypeScript single-page application backed 
 |---|------|-------|-------------|--------|
 | E2E | E2E Testing Suite Track | Design opaque-box test infrastructure and Tiers 1-4 test cases covering all features F1-F13; publish TEST_READY.md | none | DONE |
 | M1 | Navigation Alignment, Route Security & Deduplication | F1, F2, F3, F4 | none | DONE |
-| M2 | Database, Schema, RBAC, RLS & Security Hardening | F5, F6, F7, F8, F9 | none | IN_PROGRESS |
-| M3 | UI/UX Consistency, Action Authenticity & Performance | F10, F11, F12 | M1, M2 | PLANNED |
-| M4 | Verification, Quality Gate & Comprehensive Audit Report | F13, pass 100% E2E tests, audit sections A-L | E2E, M1, M2, M3 | PLANNED |
+| M2 | Database, Schema, RBAC, RLS & Security Hardening | F5, F6, F7, F8, F9 | none | DONE |
+| M3 | UI/UX Consistency, Action Authenticity & Performance | F10, F11, F12 | M1, M2 | DONE |
+| M4 | Verification, Quality Gate & Comprehensive Audit Report | F13, pass 100% E2E tests, audit sections A-L | E2E, M1, M2, M3 | DONE |
 
 ## Interface Contracts
 ### Routing & Navigation

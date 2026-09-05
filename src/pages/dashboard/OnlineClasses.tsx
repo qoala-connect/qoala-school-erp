@@ -669,7 +669,7 @@ export default function OnlineClasses() {
                   <input 
                     type="text"
                     required
-                    placeholder="Dr. John Doe"
+                    placeholder="e.g., Dr. R. K. Sharma"
                     value={formData.teacher_name || ''}
                     onChange={(e) => setFormData(prev => ({ ...prev, teacher_name: e.target.value }))}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-violet-500/10 focus:border-violet-500 transition-all font-medium"

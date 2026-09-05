@@ -120,7 +120,7 @@ export default function StructuredMessageRenderer({ payload, accessToken, onActi
   // 2. ATTENDANCE TABLE & STATS
   if (type === 'attendance_table') {
     const { percentage, present, absent, total, absentStudents, logs } = data;
-    const rate = percentage !== undefined ? percentage : (total ? Math.round((present / total) * 100) : 92);
+    const rate = percentage !== undefined ? percentage : (total ? Math.round((present / total) * 100) : null);
 
     return (
       <div className="p-3.5 bg-gradient-to-br from-slate-50 to-blue-50/40 border border-blue-100/80 rounded-2xl my-2 space-y-3 shadow-3xs">
@@ -131,9 +131,9 @@ export default function StructuredMessageRenderer({ payload, accessToken, onActi
           </div>
           <span className={cn(
             "px-2 py-0.5 rounded-full text-[10px] font-extrabold",
-            rate >= 75 ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
+            rate === null ? "bg-slate-100 text-slate-600" : rate >= 75 ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
           )}>
-            {rate}% Attendance
+            {rate === null ? 'No data' : `${rate}% Attendance`}
           </span>
         </div>
 
@@ -141,15 +141,15 @@ export default function StructuredMessageRenderer({ payload, accessToken, onActi
         <div className="grid grid-cols-3 gap-2 text-center text-xs">
           <div className="p-2 bg-white rounded-xl border border-slate-200/80">
             <span className="text-[9.5px] font-bold text-slate-400 uppercase block">Total Days</span>
-            <span className="font-black text-slate-800">{total || (data.presentCount ? data.presentCount + data.absentCount : 30)}</span>
+            <span className="font-black text-slate-800">{total ?? (data.presentCount != null && data.absentCount != null ? data.presentCount + data.absentCount : '—')}</span>
           </div>
           <div className="p-2 bg-emerald-50/80 rounded-xl border border-emerald-100">
             <span className="text-[9.5px] font-bold text-emerald-600 uppercase block">Present</span>
-            <span className="font-black text-emerald-700">{present ?? data.presentCount ?? 28}</span>
+            <span className="font-black text-emerald-700">{present ?? data.presentCount ?? '—'}</span>
           </div>
           <div className="p-2 bg-rose-50/80 rounded-xl border border-rose-100">
             <span className="text-[9.5px] font-bold text-rose-600 uppercase block">Absent</span>
-            <span className="font-black text-rose-700">{absent ?? data.absentCount ?? 2}</span>
+            <span className="font-black text-rose-700">{absent ?? data.absentCount ?? '—'}</span>
           </div>
         </div>
 
@@ -223,7 +223,7 @@ export default function StructuredMessageRenderer({ payload, accessToken, onActi
 
         {Array.isArray(defaulters) && defaulters.length > 0 && (
           <div className="space-y-1 pt-1 border-t border-violet-100 text-[10.5px]">
-            <span className="font-bold text-amber-700 block text-[10px]">Sample Accounts Pending:</span>
+            <span className="font-bold text-amber-700 block text-[10px]">Pending Student Accounts:</span>
             <div className="space-y-1">
               {defaulters.slice(0, 4).map((d: any, idx: number) => (
                 <div key={idx} className="flex justify-between items-center text-slate-700 bg-white p-1.5 rounded-lg border border-slate-200">
@@ -252,7 +252,7 @@ export default function StructuredMessageRenderer({ payload, accessToken, onActi
           </div>
           {grade && (
             <span className="px-2.5 py-0.5 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-full text-[10px] font-black">
-              Grade {grade} ({percentage || '90.8%'})
+              Grade {grade} ({percentage != null ? `${percentage}%` : 'N/A'})
             </span>
           )}
         </div>

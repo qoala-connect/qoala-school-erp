@@ -25,7 +25,7 @@ export default function AdmissionLetterModal({ isOpen, onClose, record }: Admiss
   };
 
   const appNo = record.application_number || `SJS/ADM/${record.academic_year || '2026-27'}/${record.id.slice(-4)}`;
-  const rollNo = record.assigned_roll_number || record.section ? `R-${record.class}${record.section || 'A'}-0${Math.floor(10 + Math.random() * 89)}` : 'PROVISIONAL';
+  const rollNo = record.assigned_roll_number || 'PROVISIONAL';
 
   return (
     <BodyPortal>

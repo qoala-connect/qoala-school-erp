@@ -50,11 +50,13 @@ registerTest({
   featureId: 'F9',
   tier: 2,
   milestone: 'M2',
-  description: 'Verifies employee_id follows standard school identifier pattern TCH-XXXX',
-  expectedOutputSource: 'src/services/teacherService.ts:243',
+  description: 'Verifies employee_id follows standard school identifier pattern TCH-XXXX. Generation moved from a client-side in-memory count (a race condition) to the DB-side next_employee_id() sequence function, so the TCH- prefix now lives in the migration SQL rather than teacherService.ts.',
+  expectedOutputSource: 'src/services/teacherService.ts + next_employee_id() migration',
   fn: () => {
     const teacherCode = inspectors.readFile('src/services/teacherService.ts');
-    assert.contains(teacherCode, 'TCH-', 'Employee ID must begin with TCH- prefix');
+    const migrations = inspectors.getAllMigrationSql();
+    assert.contains(teacherCode, 'next_employee_id', 'teacherService.ts must call the atomic next_employee_id() RPC');
+    assert.contains(migrations, 'TCH-', 'next_employee_id() must generate the TCH- prefixed format');
   }
 });
 

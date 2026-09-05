@@ -257,12 +257,12 @@ export default function Student360Drawer({
         if (trans) {
           setTransportData({
             id: trans.id,
-            route_name: trans.transport_routes?.route_name || trans.route || 'Barhalganj Local Route',
-            vehicle_no: trans.vehicles?.vehicle_number || 'UP-53-BT-2026',
-            boarding_point: trans.boarding_point || trans.pickup_point || 'Main Bus Stop',
-            pickup_time: trans.pickup_time || '07:30 AM',
-            driver_name: trans.driver_name || 'Staff Driver',
-            driver_phone: trans.driver_phone || '9450881215'
+            route_name: trans.transport_routes?.route_name || 'Not on file',
+            vehicle_no: trans.vehicles?.vehicle_number || 'Not on file',
+            boarding_point: trans.boarding_point || 'Not on file',
+            pickup_time: trans.pickup_time || 'Not on file',
+            driver_name: 'Not tracked per student',
+            driver_phone: 'Not tracked per student'
           });
         } else {
           setTransportData(null);
@@ -278,8 +278,8 @@ export default function Student360Drawer({
 
         const mapped = (books || []).map((b: any) => ({
           id: b.id,
-          book_title: b.library_books?.title || 'Academic Reference Book',
-          author: b.library_books?.author || 'Standard Author',
+          book_title: b.library_books?.title || 'Book record unavailable',
+          author: b.library_books?.author || 'Unknown author',
           isbn: b.library_books?.isbn || 'N/A',
           issue_date: b.issue_date,
           due_date: b.due_date,
@@ -1558,7 +1558,7 @@ export default function Student360Drawer({
         isOpen={isMarksheetModalOpen}
         onClose={() => setIsMarksheetModalOpen(false)}
         student={student}
-        examData={examData}
+        marks={examData?.subject_marks}
         attendanceData={attendanceData}
         medicalData={medicalData}
       />

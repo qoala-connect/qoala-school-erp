@@ -147,8 +147,8 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
       
       const totalDays = attLogs?.length || 0;
       const presentDays = attLogs?.filter(a => a.status === 'present').length || 0;
-      const pct = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 96; // default high attendance if session starting
-      setAttendanceSummary({ total_days: totalDays || 180, present_days: presentDays || 173, percentage: pct });
+      const pct = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 0;
+      setAttendanceSummary({ total_days: totalDays, present_days: presentDays, percentage: pct });
 
       // 4. Fetch Co-scholastic data
       const { data: coData } = await supabase
@@ -554,11 +554,11 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
                 </div>
                 <div className="grid grid-cols-[90px_1fr] gap-x-2 border-b border-slate-100 pb-0.5">
                   <span className="text-slate-400 uppercase text-[7px]">Admission No</span>
-                  <span className="text-slate-950 font-mono">{activeStudent?.admission_number || 'SD-2026-001'}</span>
+                  <span className="text-slate-950 font-mono">{activeStudent?.admission_number || 'N/A'}</span>
                 </div>
                 <div className="grid grid-cols-[90px_1fr] gap-x-2 border-b border-slate-100 pb-0.5">
                   <span className="text-slate-400 uppercase text-[7px]">Father's Name</span>
-                  <span className="text-slate-950 uppercase">{activeStudent?.father_name || 'Shri Alok Kumar'}</span>
+                  <span className="text-slate-950 uppercase">{activeStudent?.father_name || 'N/A'}</span>
                 </div>
                 <div className="grid grid-cols-[90px_1fr] gap-x-2 border-b border-slate-100 pb-0.5">
                   <span className="text-slate-400 uppercase text-[7px]">Class & Section</span>
@@ -566,7 +566,7 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
                 </div>
                 <div className="grid grid-cols-[90px_1fr] gap-x-2 border-b border-slate-100 pb-0.5">
                   <span className="text-slate-400 uppercase text-[7px]">Mother's Name</span>
-                  <span className="text-slate-950 uppercase">{activeStudent?.mother_name || 'Smt. Sunita Devi'}</span>
+                  <span className="text-slate-950 uppercase">{activeStudent?.mother_name || 'N/A'}</span>
                 </div>
                 <div className="grid grid-cols-[90px_1fr] gap-x-2 border-b border-slate-100 pb-0.5">
                   <span className="text-slate-400 uppercase text-[7px]">Roll Number</span>
@@ -574,7 +574,11 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
                 </div>
                 <div className="grid grid-cols-[90px_1fr] gap-x-2">
                   <span className="text-slate-400 uppercase text-[7px]">Attendance Record</span>
-                  <span className="text-emerald-700 font-mono">{attendanceSummary?.percentage || 96}% ({attendanceSummary?.present_days}/{attendanceSummary?.total_days} Days)</span>
+                  <span className="text-emerald-700 font-mono">
+                    {attendanceSummary && attendanceSummary.total_days > 0
+                      ? `${attendanceSummary.percentage}% (${attendanceSummary.present_days}/${attendanceSummary.total_days} Days)`
+                      : 'No attendance recorded'}
+                  </span>
                 </div>
                 <div className="grid grid-cols-[90px_1fr] gap-x-2">
                   <span className="text-slate-400 uppercase text-[7px]">Result Status</span>
@@ -666,16 +670,16 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
                   <div className="grid grid-cols-2 border-b border-slate-300">
                     <div className="p-1.5 border-r border-slate-300">
                       <span className="text-slate-400 block text-[6px] uppercase">Height / Weight</span>
-                      <span className="text-slate-900 font-mono">148 cm / 42 kg</span>
+                      <span className="text-slate-900 font-mono">Not on file</span>
                     </div>
                     <div className="p-1.5">
                       <span className="text-slate-400 block text-[6px] uppercase">Blood Group</span>
-                      <span className="text-slate-900 font-mono font-black">O+</span>
+                      <span className="text-slate-900 font-mono font-black">{activeStudent?.blood_group || 'Not on file'}</span>
                     </div>
                   </div>
                   <div className="p-1.5">
                     <span className="text-slate-400 block text-[6px] uppercase">Vision & Dental</span>
-                    <span className="text-slate-900">Normal / Satisfactory</span>
+                    <span className="text-slate-900">Not on file</span>
                   </div>
                 </div>
               </div>
@@ -714,7 +718,7 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
               </div>
 
               <div className="text-center border-t border-slate-300 pt-1 w-24 mx-auto">
-                <span className="italic block font-bold text-slate-800 font-serif text-[9px] leading-none mb-0.5">M. K. Vance</span>
+                <span className="italic block font-bold text-slate-800 font-serif text-[9px] leading-none mb-0.5">Exam Controller</span>
                 <span className="text-[5.5px] font-black uppercase text-slate-400 block">Exam Controller</span>
               </div>
 
