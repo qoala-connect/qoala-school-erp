@@ -114,10 +114,14 @@ export default function ExaminationModule({ view: propView }: ExaminationModuleP
   const canViewTab = can(requiredTabPermission);
 
   useEffect(() => {
+    if (role === 'student' || role === 'parent') {
+      navigate('/dashboard/portal?tab=examination', { replace: true });
+      return;
+    }
     if (!canViewTab) {
       navigate('/unauthorized', { replace: true });
     }
-  }, [canViewTab, navigate]);
+  }, [role, canViewTab, navigate]);
 
   const setTab = (tabName: string, extraParams: Record<string, string> = {}) => {
     setSearchParams({ tab: tabName, ...extraParams });

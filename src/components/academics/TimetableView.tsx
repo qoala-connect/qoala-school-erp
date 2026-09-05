@@ -1,19 +1,22 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Clock, Plus, Edit2, Trash2, RefreshCw, CalendarDays, FileSpreadsheet,
-  AlertTriangle, UserX, CheckCircle2, Users, BookOpen, ShieldCheck, Sparkles, ChevronRight
+  AlertTriangle, UserX, CheckCircle2, Users, BookOpen, ShieldCheck, Sparkles, ChevronRight,
+  Printer, UserCheck, Calendar
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import { useAcademicYear } from '@/context/AcademicYearContext';
+import { supabase } from '@/lib/supabase';
 import OfficialTimetableModal, { TimetableGridSlot } from './OfficialTimetableModal';
 import {
   fetchClasses, fetchSectionDirectory, fetchClassSubjects, fetchSubjects, fetchTeacherOptions,
-  fetchTimetable, fetchYearTimetableIndex, saveTimetableSlot, deleteTimetableSlot,
+  fetchTimetable, fetchYearTimetableIndex, fetchTeacherWeeklySchedule, saveTimetableSlot, deleteTimetableSlot,
   TIMETABLE_DAYS, DAY_LABELS,
   type SchoolClass, type SectionDirectoryRow, type ClassSubjectRow, type Subject, type TimetableSlot,
-  type TimetableIndexRow,
+  type TimetableIndexRow, type TeacherTimetableSlot,
 } from '@/services/academicsService';
 import {
   AsyncBlock, EmptyBlock, Field, GhostButton, IconButton, Modal, Panel,
@@ -24,9 +27,15 @@ import {
  * Enterprise weekly teaching schedule matrix for school classes & sections.
  */
 export default function TimetableView({ onNavigateView }: { onNavigateView: (view: string) => void }) {
-  const { can } = useAuth();
+  const { user, role, can } = useAuth();
+  const navigate = useNavigate();
   const { selectedYearId, selectedYear } = useAcademicYear();
   const mayManage = can('academics.manage');
+  const isTeacher = role === 'teacher' || role === 'class_teacher';
+
+  const [activeTab, setActiveTab] = useState<'my_schedule' | 'class_schedule'>(
+    isTeacher ? 'my_schedule' : 'class_schedule'
+  );
 
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [classId, setClassId] = useState('');
@@ -37,6 +46,12 @@ export default function TimetableView({ onNavigateView }: { onNavigateView: (vie
   const [teachers, setTeachers] = useState<Array<{ id: string; name: string; employee_id: string | null; department?: string | null; designation?: string | null; subjects_taught?: string | null; subject_codes?: string | null }>>([]);
   const [slots, setSlots] = useState<TimetableSlot[]>([]);
 
+  // Teacher Schedule States
+  const [currentTeacher, setCurrentTeacher] = useState<any>(null);
+  const [selectedTeacherId, setSelectedTeacherId] = useState<string>('');
+  const [teacherWeeklySlots, setTeacherWeeklySlots] = useState<TeacherTimetableSlot[]>([]);
+  const [teacherLoading, setTeacherLoading] = useState(false);
+
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<TimetableSlot | null>(null);
@@ -46,6 +61,58 @@ export default function TimetableView({ onNavigateView }: { onNavigateView: (vie
   const [busy, setBusy] = useState(false);
   const [addAt, setAddAt] = useState<{ day: string; period: number } | null>(null);
   const [yearIndex, setYearIndex] = useState<TimetableIndexRow[]>([]);
+
+  // Load teacher profile
+  useEffect(() => {
+    let cancelled = false;
+    async function loadTeacher() {
+      try {
+        let tProfile: any = null;
+        if (user?.id) {
+          const { data } = await supabase.from('teachers').select('*').eq('user_id', user.id).maybeSingle();
+          tProfile = data;
+        }
+        if (!tProfile && user?.email) {
+          const { data } = await supabase.from('teachers').select('*').ilike('email', user.email).maybeSingle();
+          tProfile = data;
+        }
+        if (!tProfile) {
+          const { data } = await supabase.from('teachers').select('*').eq('is_active', true).order('created_at').limit(1).maybeSingle();
+          tProfile = data;
+        }
+        if (cancelled) return;
+        setCurrentTeacher(tProfile);
+        if (tProfile) {
+          setSelectedTeacherId(tProfile.id);
+        }
+      } catch (err) {
+        console.error('Failed to resolve teacher profile:', err);
+      }
+    }
+    loadTeacher();
+    return () => { cancelled = true; };
+  }, [user]);
+
+  // Load selected teacher's weekly schedule
+  const loadTeacherSchedule = useCallback(async (tId: string) => {
+    if (!tId || !selectedYearId) return;
+    setTeacherLoading(true);
+    try {
+      const sch = await fetchTeacherWeeklySchedule(tId, selectedYearId);
+      setTeacherWeeklySlots(sch);
+    } catch (err) {
+      console.error('Failed to load teacher weekly schedule:', err);
+      setTeacherWeeklySlots([]);
+    } finally {
+      setTeacherLoading(false);
+    }
+  }, [selectedYearId]);
+
+  useEffect(() => {
+    if (selectedTeacherId && selectedYearId) {
+      loadTeacherSchedule(selectedTeacherId);
+    }
+  }, [selectedTeacherId, selectedYearId, loadTeacherSchedule]);
 
   // Class list and teacher list, once.
   useEffect(() => {
@@ -211,6 +278,37 @@ export default function TimetableView({ onNavigateView }: { onNavigateView: (vie
     return { filled, assignedCount, unassigned, clashing, coveragePct };
   }, [slots, clashes, classes]);
 
+  // Teacher Schedule Grid mapping
+  const teacherGrid = useMemo(() => {
+    const map = new Map<string, TeacherTimetableSlot[]>();
+    for (const s of teacherWeeklySlots) {
+      if (s.period_number === null) continue;
+      const key = `${s.day}|${s.period_number}`;
+      const list = map.get(key) ?? [];
+      list.push(s);
+      map.set(key, list);
+    }
+    return map;
+  }, [teacherWeeklySlots]);
+
+  const teacherPeriods = useMemo(() => {
+    const highest = teacherWeeklySlots.reduce((m, s) => Math.max(m, s.period_number ?? 0), 0);
+    return Array.from({ length: Math.max(8, highest) }, (_, i) => i + 1);
+  }, [teacherWeeklySlots]);
+
+  const teacherSummary = useMemo(() => {
+    const totalSlots = teacherWeeklySlots.length;
+    const distinctClasses = new Set(teacherWeeklySlots.map(s => `${s.class_name}-${s.section_name}`).filter(Boolean));
+    const distinctSubjects = new Set(teacherWeeklySlots.map(s => s.subject_name).filter(Boolean));
+    const dailyAvg = (totalSlots / 6).toFixed(1);
+    return {
+      totalSlots,
+      classesCount: distinctClasses.size,
+      subjectsCount: distinctSubjects.size,
+      dailyAvg,
+    };
+  }, [teacherWeeklySlots]);
+
   const openAdd = (day?: string, period?: number) => {
     setEditing(null);
     setAddAt(day && period ? { day, period } : null);
@@ -224,9 +322,244 @@ export default function TimetableView({ onNavigateView }: { onNavigateView: (vie
   };
 
   const currentClassName = classes.find(c => c.id === classId)?.class_name ?? '';
+  const activeTeacher = teachers.find(t => t.id === selectedTeacherId) || currentTeacher;
 
   return (
     <>
+      {/* Top Tab Bar: My Teaching Schedule vs Class Matrix */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4 bg-white p-2.5 rounded-2xl border border-slate-100 shadow-2xs">
+        <div className="flex items-center gap-1.5 p-1 bg-slate-100/80 rounded-xl">
+          <button
+            onClick={() => setActiveTab('my_schedule')}
+            className={cn(
+              "px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer",
+              activeTab === 'my_schedule'
+                ? "bg-white text-blue-700 shadow-xs"
+                : "text-slate-600 hover:text-slate-900"
+            )}
+          >
+            <UserCheck size={14} />
+            <span>My Teaching Schedule</span>
+            {teacherWeeklySlots.length > 0 && (
+              <span className={cn(
+                "px-1.5 py-0.2 rounded-full text-[10px] font-mono",
+                activeTab === 'my_schedule' ? "bg-blue-100 text-blue-800 font-black" : "bg-slate-200 text-slate-700"
+              )}>
+                {teacherWeeklySlots.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('class_schedule')}
+            className={cn(
+              "px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer",
+              activeTab === 'class_schedule'
+                ? "bg-white text-blue-700 shadow-xs"
+                : "text-slate-600 hover:text-slate-900"
+            )}
+          >
+            <BookOpen size={14} />
+            <span>Class & Section Timetables</span>
+          </button>
+        </div>
+
+        {activeTab === 'my_schedule' && (
+          <div className="flex items-center gap-2">
+            {!isTeacher && teachers.length > 0 && (
+              <div className="flex items-center gap-2">
+                <label htmlFor="tt-teacher-select" className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                  Teacher:
+                </label>
+                <select
+                  id="tt-teacher-select"
+                  value={selectedTeacherId}
+                  onChange={(e) => setSelectedTeacherId(e.target.value)}
+                  className={cn(selectClass, 'w-auto text-xs font-bold text-slate-800')}
+                >
+                  {teachers.map(t => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} {t.employee_id ? `(${t.employee_id})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <button
+              onClick={() => window.print()}
+              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+              title="Print personal timetable"
+            >
+              <Printer size={13} /> Print Schedule
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* VIEW 1: MY TEACHING SCHEDULE (PERSONAL MATRIX) */}
+      {activeTab === 'my_schedule' && (
+        <Panel
+          title={`${activeTeacher?.name || 'Faculty'} — Weekly Teaching Matrix`}
+          description={
+            activeTeacher?.designation
+              ? `${activeTeacher.designation} • ${activeTeacher.department || 'Academic Faculty'} • ${selectedYear?.name || 'Current Academic Year'}`
+              : `Personal weekly lecture schedule for ${selectedYear?.name || 'this academic session'}`
+          }
+          action={
+            <div className="flex items-center gap-2">
+              <GhostButton onClick={() => selectedTeacherId && loadTeacherSchedule(selectedTeacherId)} title="Reload schedule" disabled={teacherLoading}>
+                <RefreshCw size={13} className={cn(teacherLoading && 'animate-spin')} aria-hidden="true" /> Refresh
+              </GhostButton>
+            </div>
+          }
+        >
+          {/* Workload Metrics Strip */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 border-b border-slate-100 bg-white">
+            <div className="p-3 rounded-xl border border-slate-100 bg-slate-50/50">
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Weekly Workload</p>
+              <div className="flex items-baseline gap-1.5 mt-1">
+                <span className="text-xl font-black text-blue-700 tabular-nums">{teacherSummary.totalSlots}</span>
+                <span className="text-xs text-slate-500 font-medium">periods / week</span>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl border border-slate-100 bg-slate-50/50">
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Assigned Classes</p>
+              <div className="flex items-baseline gap-1.5 mt-1">
+                <span className="text-xl font-black text-slate-900 tabular-nums">{teacherSummary.classesCount}</span>
+                <span className="text-xs text-slate-500 font-medium">distinct sections</span>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl border border-slate-100 bg-slate-50/50">
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Daily Average</p>
+              <div className="flex items-baseline gap-1.5 mt-1">
+                <span className="text-xl font-black text-emerald-700 tabular-nums">{teacherSummary.dailyAvg}</span>
+                <span className="text-xs text-slate-500 font-medium">lectures / day</span>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl border border-slate-100 bg-slate-50/50">
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Subject Coverage</p>
+              <div className="flex items-baseline gap-1.5 mt-1">
+                <span className="text-xl font-black text-slate-900 tabular-nums">{teacherSummary.subjectsCount}</span>
+                <span className="text-xs text-slate-500 font-medium">subjects taught</span>
+              </div>
+            </div>
+          </div>
+
+          <AsyncBlock
+            isLoading={teacherLoading}
+            error={null}
+            isEmpty={teacherWeeklySlots.length === 0}
+            onRetry={() => selectedTeacherId && loadTeacherSchedule(selectedTeacherId)}
+            loadingLabel="Loading weekly teaching schedule"
+            empty={
+              <EmptyBlock
+                icon={Calendar}
+                title="No lectures scheduled"
+                description={`No periods are currently assigned to this faculty member in ${selectedYear?.name ?? 'this academic session'}.`}
+              />
+            }
+          >
+            <TableScroll>
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/80 border-b border-slate-200">
+                    <th scope="col" className="w-20 px-3 py-2.5 text-center text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                      Period
+                    </th>
+                    {TIMETABLE_DAYS.map(day => (
+                      <th key={day} scope="col"
+                        className="px-3 py-2.5 text-left text-[10px] font-black text-slate-600 uppercase tracking-widest border-l border-slate-200 min-w-[170px]">
+                        <span className="px-2 py-0.5 rounded bg-slate-200/70 text-slate-800 font-black mr-1.5">
+                          {day.toUpperCase()}
+                        </span>
+                        {DAY_LABELS[day]}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {teacherPeriods.map(period => (
+                    <tr key={period} className="align-top hover:bg-slate-50/30 transition-colors">
+                      <th scope="row" className="px-3 py-2.5 bg-slate-50/40 text-center border-r border-slate-100">
+                        <div className="flex flex-col items-center">
+                          <span className="text-xs font-black text-slate-900 tabular-nums">P{period}</span>
+                          <span className="text-[9px] font-semibold text-slate-400 font-mono mt-0.5">
+                            Period {period}
+                          </span>
+                        </div>
+                      </th>
+                      {TIMETABLE_DAYS.map(day => {
+                        const cellSlots = teacherGrid.get(`${day}|${period}`) ?? [];
+                        return (
+                          <td key={day} className="p-1.5 border-l border-slate-100">
+                            {cellSlots.length === 0 ? (
+                              <div className="min-h-[72px] rounded-xl border border-dashed border-slate-200/70 bg-slate-50/20 flex flex-col items-center justify-center text-slate-300 text-[10px] font-medium select-none">
+                                <span>Free / Prep</span>
+                              </div>
+                            ) : (
+                              <div className="space-y-1.5">
+                                {cellSlots.map(slot => (
+                                  <div
+                                    key={slot.id}
+                                    className="group relative rounded-xl border border-blue-200 bg-blue-50/40 p-2.5 transition-all shadow-2xs hover:shadow-xs hover:border-blue-300"
+                                  >
+                                    <div className="flex items-start justify-between gap-1.5">
+                                      <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                                        {slot.subject_code && (
+                                          <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200 text-[9px] font-black tracking-wider uppercase shrink-0">
+                                            {slot.subject_code}
+                                          </span>
+                                        )}
+                                        <p className="text-xs font-black text-slate-900 leading-snug truncate">
+                                          {slot.subject_name || 'Class Subject'}
+                                        </p>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center justify-between gap-1 mt-1.5">
+                                      <span className="px-1.5 py-0.5 rounded bg-white text-blue-800 border border-blue-200/80 text-[10px] font-bold">
+                                        Class {slot.class_name} - Sec {slot.section_name}
+                                      </span>
+                                      <span className="text-[10px] text-slate-500 font-semibold font-mono">
+                                        {slot.start_time} - {slot.end_time}
+                                      </span>
+                                    </div>
+
+                                    <div className="flex items-center justify-between pt-1.5 mt-1.5 border-t border-blue-200/50">
+                                      <button
+                                        onClick={() => navigate('/dashboard/attendance', { state: { selectedClass: slot.class_name, selectedSection: slot.section_name } })}
+                                        className="text-[9px] font-bold text-emerald-700 hover:text-emerald-800 hover:underline cursor-pointer"
+                                      >
+                                        Mark Attendance →
+                                      </button>
+                                      <button
+                                        onClick={() => navigate('/dashboard/examination?tab=marks')}
+                                        className="text-[9px] font-bold text-indigo-700 hover:text-indigo-800 hover:underline cursor-pointer"
+                                      >
+                                        Marks Entry →
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableScroll>
+          </AsyncBlock>
+        </Panel>
+      )}
+
+      {/* VIEW 2: CLASS & SECTION MASTER TIMETABLE */}
+      {activeTab === 'class_schedule' && (
       <Panel
         title="Class Academic Timetable"
         description={selectedYear ? `Live weekly schedule matrix for ${selectedYear.name}` : undefined}
@@ -497,6 +830,7 @@ export default function TimetableView({ onNavigateView }: { onNavigateView: (vie
           </>
         </AsyncBlock>
       </Panel>
+      )}
 
       {/* Add / Edit Period Modal with Time-Availability Intelligence */}
       {isFormOpen && selectedYearId && (

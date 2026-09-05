@@ -29,6 +29,7 @@ import {
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import { useAuth } from '@/context/AuthContext';
 import AdminHeader from '@/components/common/AdminHeader';
 import AdminStatCard from '@/components/common/AdminStatCard';
 
@@ -156,6 +157,19 @@ export default function AttendanceEntry() {
   const [students, setStudents] = useState<Student[]>([]);
   const [classOptions, setClassOptions] = useState<string[]>([]);
   const [sectionOptions, setSectionOptions] = useState<string[]>([]);
+  const { user, role } = useAuth();
+
+  // Defense-in-depth: Redirect students/parents to their personal attendance ledger
+  useEffect(() => {
+    if (role === 'student' || role === 'parent') {
+      navigate('/dashboard/portal?tab=attendance', { replace: true });
+    }
+  }, [role, navigate]);
+
+  const isTeacher = role === 'teacher' || role === 'class_teacher';
+  const [teacherAssignedClasses, setTeacherAssignedClasses] = useState<Array<{ class_name: string; section_name: string }>>([]);
+  const [teacherProfile, setTeacherProfile] = useState<any>(null);
+
   const [selectedClass, setSelectedClass] = useState<string>(location.state?.selectedClass || '');
   const [selectedSection, setSelectedSection] = useState<string>(location.state?.selectedSection || '');
   const [selectedDate, setSelectedDate] = useState<string>(
@@ -193,6 +207,56 @@ export default function AttendanceEntry() {
 
   // Calendar Tab States
   const [allHolidays, setAllHolidays] = useState<HolidayInfo[]>([]);
+
+  // Load teacher assigned classes
+  useEffect(() => {
+    async function loadTeacherClasses() {
+      if (!isTeacher) return;
+      try {
+        let tProfile: any = null;
+        if (user?.id) {
+          const { data } = await supabase.from('teachers').select('*').eq('user_id', user.id).maybeSingle();
+          tProfile = data;
+        }
+        if (!tProfile && user?.email) {
+          const { data } = await supabase.from('teachers').select('*').ilike('email', user.email).maybeSingle();
+          tProfile = data;
+        }
+        if (!tProfile) {
+          const { data } = await supabase.from('teachers').select('*').eq('is_active', true).order('created_at').limit(1).maybeSingle();
+          tProfile = data;
+        }
+
+        if (tProfile) {
+          setTeacherProfile(tProfile);
+          const { data: slots } = await supabase
+            .from('timetable')
+            .select('classes (class_name), sections (section_name)')
+            .eq('teacher_id', tProfile.id);
+
+          const assigned = new Map<string, { class_name: string; section_name: string }>();
+          (slots || []).forEach((s: any) => {
+            const cName = s.classes?.class_name;
+            const sName = s.sections?.section_name;
+            if (cName && sName) {
+              assigned.set(`${cName}_${sName}`, { class_name: cName, section_name: sName });
+            }
+          });
+
+          const assignedList = Array.from(assigned.values());
+          setTeacherAssignedClasses(assignedList);
+
+          if (assignedList.length > 0 && !location.state?.selectedClass) {
+            setSelectedClass(assignedList[0].class_name);
+            setSelectedSection(assignedList[0].section_name);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to resolve teacher classes in AttendanceEntry:', err);
+      }
+    }
+    loadTeacherClasses();
+  }, [user, isTeacher, location.state]);
 
   // 1. Fetch Academic Metadata & Class/Section Options
   const fetchMetadata = useCallback(async () => {
@@ -752,6 +816,41 @@ export default function AttendanceEntry() {
       {/* ========================================================================= */}
       {activeTab === 'register' && (
         <div className="space-y-4">
+          {/* Teacher Assigned Classes Quick Switch Strip */}
+          {isTeacher && teacherAssignedClasses.length > 0 && (
+            <div className="bg-blue-50/80 border border-blue-200 rounded-2xl p-3 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
+              <div className="flex items-center gap-2">
+                <GraduationCap className="w-4 h-4 text-blue-700" />
+                <span className="text-xs font-bold text-blue-950">
+                  Your Assigned Classes ({teacherProfile?.name || 'Faculty'}):
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {teacherAssignedClasses.map((ac) => {
+                  const isSelected = selectedClass === ac.class_name && selectedSection === ac.section_name;
+                  return (
+                    <button
+                      key={`${ac.class_name}_${ac.section_name}`}
+                      onClick={() => {
+                        setSelectedClass(ac.class_name);
+                        setSelectedSection(ac.section_name);
+                      }}
+                      className={cn(
+                        "px-3 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer",
+                        isSelected
+                          ? "bg-blue-600 text-white shadow-xs"
+                          : "bg-white text-blue-700 border border-blue-200 hover:bg-blue-100/50"
+                      )}
+                    >
+                      <span>Class {ac.class_name} - Sec {ac.section_name}</span>
+                      {isSelected && <CheckCircle2 size={12} className="text-blue-100" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Holiday Alert Banner (if date coincides with school holiday) */}
           {activeHoliday && (
             <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-3 text-amber-900 shadow-2xs">

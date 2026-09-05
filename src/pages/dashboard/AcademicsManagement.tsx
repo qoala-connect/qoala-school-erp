@@ -67,10 +67,16 @@ const LEGACY_TAB_MAP: Record<string, AcademicsViewId> = {
 export default function AcademicsManagement() {
   const navigate = useNavigate();
   const location = useLocation();
-  const params = useParams<{ view?: string }>();
-  const { can } = useAuth();
+  const { role, can } = useAuth();
   const { years, selectedYear, selectedYearId, selectYear, isLoading, error, refresh, isViewingHistory } =
     useAcademicYear();
+
+  // Defense-in-depth: Redirect students/parents to their personal class timetable
+  useEffect(() => {
+    if (role === 'student' || role === 'parent') {
+      navigate('/dashboard/portal?tab=timetable', { replace: true });
+    }
+  }, [role, navigate]);
 
   const legacyTab = (location.state as any)?.activeTab as string | undefined;
 

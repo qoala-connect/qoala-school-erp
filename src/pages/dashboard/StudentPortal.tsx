@@ -191,7 +191,7 @@ export default function StudentPortal() {
         supabase.from('student_fees').select('*, fee_categories(category_name), fee_payments(*)').eq('student_id', studentRecord.id).order('created_at', { ascending: false }),
         supabase.from('exam_results').select('*, exams(exam_name, academic_year)').eq('student_id', studentRecord.id),
         supabase.from('marks').select('*, exams(exam_name), subjects(subject_name, subject_code)').eq('student_id', studentRecord.id),
-        supabase.from('timetable').select('*, subjects(subject_name, subject_code), teachers(name)').eq('class', studentRecord.class).order('period_number', { ascending: true }),
+        supabase.from('timetable').select('*, classes(class_name), sections(section_name), subjects(subject_name, subject_code), teachers(name)').order('period_number', { ascending: true }),
         supabase.from('class_subjects').select('*, subjects(subject_name, subject_code)').eq('class', studentRecord.class),
         supabase.from('assignments').select('*, subjects(subject_name, subject_code), teachers(name)').eq('class', studentRecord.class).order('due_date', { ascending: true }),
         supabase.from('student_assignment_submissions').select('*').eq('student_id', studentRecord.id),
@@ -202,7 +202,19 @@ export default function StudentPortal() {
       if (medicalRes.data) setMedical(medicalRes.data);
       if (transportRes.data) setTransport(transportRes.data);
       if (attendanceRes.data) setAttendanceRecords(attendanceRes.data);
-      if (timetableRes.data) setTimetableRecords(timetableRes.data);
+      
+      // Filter timetable strictly to this student's class and section
+      if (timetableRes.data) {
+        const filteredTimetable = timetableRes.data.filter((slot: any) => {
+          const slotClassName = slot.classes?.class_name || slot.class;
+          const matchClass = String(slotClassName || '').trim() === String(studentRecord.class || '').trim();
+          const slotSectionName = slot.sections?.section_name;
+          const matchSection = !slot.section_id || !slotSectionName || String(slotSectionName).trim().toUpperCase() === String(studentRecord.section || '').trim().toUpperCase();
+          return matchClass && matchSection;
+        });
+        setTimetableRecords(filteredTimetable);
+      }
+
       if (classSubjects.length === 0 && subjectsRes.data) setClassSubjects(subjectsRes.data);
       if (examResultsRes.data) setExamResults(examResultsRes.data);
       if (examSubjectsRes.data) setExamSubjects(examSubjectsRes.data);

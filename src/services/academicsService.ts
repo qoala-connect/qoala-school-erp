@@ -722,10 +722,28 @@ export async function fetchYearTimetableIndex(academicYearId: string): Promise<T
   }));
 }
 
+export interface TeacherTimetableSlot {
+  id: string;
+  class_id: string | null;
+  section_id: string | null;
+  subject_id: string | null;
+  teacher_id: string | null;
+  academic_year_id: string | null;
+  day: string;
+  period_number: number | null;
+  start_time: string;
+  end_time: string;
+  class_name: string | null;
+  section_name: string | null;
+  subject_name: string | null;
+  subject_code: string | null;
+}
+
 export async function fetchTimetable(input: {
   academic_year_id: string;
   class_id?: string | null;
   section_id?: string | null;
+  teacher_id?: string | null;
 }): Promise<TimetableSlot[]> {
   let query = supabase
     .from('timetable')
@@ -738,8 +756,52 @@ export async function fetchTimetable(input: {
   if (input.section_id) {
     query = query.or(`section_id.eq.${input.section_id},section_id.is.null`);
   }
+  if (input.teacher_id) {
+    query = query.eq('teacher_id', input.teacher_id);
+  }
 
   return unwrap(await query);
+}
+
+export async function fetchTeacherWeeklySchedule(
+  teacherId: string,
+  academicYearId?: string
+): Promise<TeacherTimetableSlot[]> {
+  let query = supabase
+    .from('timetable')
+    .select(`
+      id, class_id, section_id, subject_id, teacher_id, academic_year_id, day, period_number, start_time, end_time,
+      classes (class_name),
+      sections (section_name),
+      subjects (subject_name, subject_code)
+    `)
+    .eq('teacher_id', teacherId)
+    .order('day')
+    .order('period_number');
+
+  if (academicYearId) {
+    query = query.eq('academic_year_id', academicYearId);
+  }
+
+  const { data, error } = await query;
+  if (error) throw new Error(describe(error));
+
+  return (data || []).map((r: any) => ({
+    id: r.id,
+    class_id: r.class_id,
+    section_id: r.section_id,
+    subject_id: r.subject_id,
+    teacher_id: r.teacher_id,
+    academic_year_id: r.academic_year_id,
+    day: r.day,
+    period_number: r.period_number,
+    start_time: r.start_time ? r.start_time.slice(0, 5) : '08:00',
+    end_time: r.end_time ? r.end_time.slice(0, 5) : '08:45',
+    class_name: r.classes?.class_name || null,
+    section_name: r.sections?.section_name || null,
+    subject_name: r.subjects?.subject_name || null,
+    subject_code: r.subjects?.subject_code || null,
+  }));
 }
 
 export async function saveTimetableSlot(input: {

@@ -48,10 +48,15 @@ export default function FeesPortal() {
 
   const isStudentOrParent = role === 'student' || role === 'parent';
 
+  // Defense-in-depth: Redirect students/parents to their personal fee ledger
+  useEffect(() => {
+    if (isStudentOrParent) {
+      navigate('/dashboard/portal?tab=fees', { replace: true });
+    }
+  }, [isStudentOrParent, navigate]);
+
   // Navigation Sub-workspaces
-  const [activeTab, setActiveTab] = useState<'portal' | 'student_fees' | 'fee_structure' | 'recent_payments' | 'fee_reports'>(
-    isStudentOrParent ? 'student_fees' : 'portal'
-  );
+  const [activeTab, setActiveTab] = useState<'portal' | 'student_fees' | 'fee_structure' | 'recent_payments' | 'fee_reports'>('portal');
 
   // Master Data State
   const [fees, setFees] = useState<StudentFeeLedger[]>([]);

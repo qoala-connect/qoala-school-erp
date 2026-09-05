@@ -1097,198 +1097,425 @@ export default function Analytics() {
   );
 
   // ==========================================
+  // TEACHER DASHBOARD STATE & DATA LOADER
+  // ==========================================
+  const [teacherData, setTeacherData] = useState<{
+    teacher: any;
+    todaySlots: any[];
+    weeklySlots: any[];
+    assignedClasses: any[];
+    totalStudents: number;
+    weeklyLecturesCount: number;
+    todayAttendanceRate: number | null;
+    isSunday: boolean;
+  }>({
+    teacher: null,
+    todaySlots: [],
+    weeklySlots: [],
+    assignedClasses: [],
+    totalStudents: 0,
+    weeklyLecturesCount: 0,
+    todayAttendanceRate: null,
+    isSunday: false,
+  });
+
+  const fetchTeacherData = useCallback(async () => {
+    try {
+      let tProfile: any = null;
+      if (user?.id) {
+        const { data } = await supabase.from('teachers').select('*').eq('user_id', user.id).maybeSingle();
+        tProfile = data;
+      }
+      if (!tProfile && user?.email) {
+        const { data } = await supabase.from('teachers').select('*').ilike('email', user.email).maybeSingle();
+        tProfile = data;
+      }
+      if (!tProfile) {
+        // Fallback to active teacher for demo/admin preview
+        const { data } = await supabase.from('teachers').select('*').eq('is_active', true).order('created_at').limit(1).maybeSingle();
+        tProfile = data;
+      }
+
+      if (!tProfile) return;
+
+      // 1. Fetch all timetable slots for this teacher
+      const { data: allSlots } = await supabase
+        .from('timetable')
+        .select(`
+          id, period_number, start_time, end_time, class_id, section_id, subject_id, day,
+          classes (class_name),
+          sections (section_name),
+          subjects (subject_name, subject_code)
+        `)
+        .eq('teacher_id', tProfile.id)
+        .order('period_number');
+
+      const mappedSlots = (allSlots || []).map((s: any) => ({
+        id: s.id,
+        period_number: s.period_number,
+        start_time: s.start_time ? s.start_time.slice(0, 5) : '08:00',
+        end_time: s.end_time ? s.end_time.slice(0, 5) : '08:45',
+        class_id: s.class_id,
+        section_id: s.section_id,
+        class_name: s.classes?.class_name || 'Class',
+        section_name: s.sections?.section_name || 'A',
+        subject_name: s.subjects?.subject_name || 'Subject',
+        subject_code: s.subjects?.subject_code || '',
+        day: s.day,
+      }));
+
+      const dayKeys = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+      const rawDay = dayKeys[new Date().getDay()];
+      const isSunday = rawDay === 'sun';
+      const effectiveDay = isSunday ? 'mon' : rawDay;
+
+      const todaySlots = mappedSlots
+        .filter((s: any) => s.day === effectiveDay)
+        .sort((a: any, b: any) => (a.period_number || 0) - (b.period_number || 0));
+
+      // 2. Fetch distinct classes and student counts
+      const classMap = new Map<string, { class_name: string; section_name: string; subjects: Set<string> }>();
+      mappedSlots.forEach((s: any) => {
+        const key = `${s.class_name}_${s.section_name}`;
+        if (!classMap.has(key)) {
+          classMap.set(key, {
+            class_name: s.class_name,
+            section_name: s.section_name,
+            subjects: new Set(),
+          });
+        }
+        if (s.subject_name) {
+          classMap.get(key)!.subjects.add(s.subject_name);
+        }
+      });
+
+      // 3. Active students in those classes
+      const { data: stdData } = await supabase
+        .from('students')
+        .select('id, class, section')
+        .eq('status', 'active');
+
+      const activeStudents = stdData || [];
+      let totalAssignedStudents = 0;
+
+      const assignedClassesList = Array.from(classMap.values()).map(c => {
+        const count = activeStudents.filter(
+          s => String(s.class).trim() === String(c.class_name).trim() &&
+               String(s.section).trim().toUpperCase() === String(c.section_name).trim().toUpperCase()
+        ).length;
+        totalAssignedStudents += count;
+        return {
+          class_name: c.class_name,
+          section_name: c.section_name,
+          subject_name: Array.from(c.subjects).join(', '),
+          student_count: count,
+        };
+      });
+
+      // 4. Today's attendance rate for assigned classes
+      const todayIso = new Date().toISOString().split('T')[0];
+      const { data: attData } = await supabase
+        .from('attendance')
+        .select('status, class, section')
+        .eq('attendance_date', todayIso);
+
+      let todayAttendanceRate: number | null = null;
+      if (attData && attData.length > 0) {
+        const relevantAtt = attData.filter(a =>
+          assignedClassesList.some(
+            c => String(c.class_name).trim() === String(a.class).trim() &&
+                 String(c.section_name).trim().toUpperCase() === String(a.section).trim().toUpperCase()
+          )
+        );
+        if (relevantAtt.length > 0) {
+          const presentCount = relevantAtt.filter(a => a.status === 'present' || a.status === 'late' || a.status === 'half_day').length;
+          todayAttendanceRate = Math.round((presentCount / relevantAtt.length) * 100);
+        }
+      }
+
+      setTeacherData({
+        teacher: tProfile,
+        todaySlots,
+        weeklySlots: mappedSlots,
+        assignedClasses: assignedClassesList,
+        totalStudents: totalAssignedStudents,
+        weeklyLecturesCount: mappedSlots.length,
+        todayAttendanceRate,
+        isSunday,
+      });
+    } catch (err) {
+      console.error('Failed to fetch teacher dashboard data:', err);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (role === 'teacher' || role === 'class_teacher') {
+      fetchTeacherData();
+    }
+  }, [role, fetchTeacherData]);
+
+  // ==========================================
   // RENDER: TEACHER DASHBOARD
   // ==========================================
-  const renderTeacherDashboard = () => (
-    <div className="space-y-4 sm:space-y-5 animate-fade-in">
-      {/* Welcome Banner */}
-      <div className="bg-gradient-to-r from-[#061f3d] via-[#10345e] to-[#1a73e8] border border-blue-900/30 text-white p-4 sm:p-5 rounded-xl shadow-xs relative overflow-hidden">
-        <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
-          <School className="w-32 h-32" />
-        </div>
-        <div className="relative z-10 max-w-xl">
-          <span className="bg-white/10 text-white px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider">Faculty Command</span>
-          <h2 className="text-lg sm:text-xl font-display font-black tracking-tight mt-2">Welcome Back, Instructor! 👋</h2>
-          <p className="text-white/70 text-xs mt-1 font-semibold">Monitor classroom metrics, record student milestones, and configure grades effortlessly.</p>
-        </div>
-      </div>
+  const renderTeacherDashboard = () => {
+    const { teacher, todaySlots, weeklySlots, assignedClasses, totalStudents, weeklyLecturesCount, todayAttendanceRate, isSunday } = teacherData;
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
-        <PremiumStatCard 
-          label="Today's Lectures" 
-          value="4 Periods" 
-          trend="up" 
-          trendValue="Normal" 
-          icon={Calendar} 
-          gradient="bg-gradient-to-tr from-blue-600 to-indigo-700" 
-          sparkColor="#1a73e8" 
-          sparkData={[2, 3, 4, 4, 3, 4, 4]} 
-          onClick={() => navigate('/dashboard/attendance')}
-        />
-        <PremiumStatCard 
-          label="Students Present" 
-          value="94.6%" 
-          trend="up" 
-          trendValue="+1.2%" 
-          icon={CheckCircle} 
-          gradient="bg-gradient-to-tr from-sky-600 to-blue-600" 
-          sparkColor="#1a73e8" 
-          sparkData={[92, 93, 91, 95, 94, 94, 95]} 
-          onClick={() => navigate('/dashboard/attendance')}
-        />
-        <PremiumStatCard 
-          label="Assignments Pending" 
-          value="18 Submissions" 
-          trend="down" 
-          trendValue="-6" 
-          icon={FileText} 
-          gradient="bg-gradient-to-tr from-amber-500 to-orange-500" 
-          sparkColor="#F59E0B" 
-          sparkData={[28, 24, 22, 21, 18, 18, 18]} 
-          onClick={() => navigate('/dashboard/students')}
-        />
-        <PremiumStatCard 
-          label="Lesson Goals" 
-          value="82%" 
-          trend="up" 
-          trendValue="+5%" 
-          icon={TrendingUp} 
-          gradient="bg-gradient-to-tr from-emerald-500 to-teal-500" 
-          sparkColor="#10B981" 
-          sparkData={[75, 78, 80, 80, 81, 82, 82]} 
-          onClick={() => {
-            navigate('/dashboard/students');
-            toast.success('Viewing syllabus and class lesson goals...');
-          }}
-        />
-      </div>
-
-      {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-4">
-        <div className="lg:col-span-8 bg-white p-3.5 sm:p-4 rounded-xl border border-slate-100/80 shadow-2xs flex flex-col justify-between">
-          <div>
-            <h3 className="text-base font-display font-black text-slate-900 leading-none">Classroom Assignment Metrics</h3>
-            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-1">Weekly Homework Submission Index</p>
+    return (
+      <div className="space-y-4 sm:space-y-5 animate-fade-in">
+        {/* Welcome Banner */}
+        <div className="bg-gradient-to-r from-[#061f3d] via-[#10345e] to-[#1a73e8] border border-blue-900/30 text-white p-4 sm:p-5 rounded-xl shadow-xs relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
+            <School className="w-32 h-32" />
           </div>
-          <div className="h-[180px] w-full mt-3.5">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={[
-                { day: 'Mon', count: 42 },
-                { day: 'Tue', count: 35 },
-                { day: 'Wed', count: 50 },
-                { day: 'Thu', count: 68 },
-                { day: 'Fri', count: 72 },
-              ]}>
-                <defs>
-                  <linearGradient id="teacherGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#1a73e8" stopOpacity={0.2}/>
-                    <stop offset="95%" stopColor="#1a73e8" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.03)" />
-                <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: '#94A3B8', fontSize: 10 }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94A3B8', fontSize: 10 }} />
-                <Tooltip />
-                <Area type="monotone" dataKey="count" stroke="#1a73e8" strokeWidth={2.5} fillOpacity={1} fill="url(#teacherGradient)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div className="lg:col-span-4 bg-white p-3.5 sm:p-4 rounded-xl border border-slate-100/80 shadow-2xs flex flex-col justify-between">
-          <div className="text-center">
-            <h3 className="text-base font-display font-black text-slate-900 leading-none">Syllabus Progress</h3>
-            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-1">Quarterly Syllabus Completed</p>
-          </div>
-          <div className="flex-1 min-h-[130px] flex items-center justify-center relative mt-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={[{ name: 'Done', value: 82, color: '#1a73e8' }, { name: 'Remaining', value: 18, color: '#F1F5F9' }]} innerRadius={45} outerRadius={60} paddingAngle={4} dataKey="value">
-                  {[{ name: 'Done', value: 82, color: '#1a73e8' }, { name: 'Remaining', value: 18, color: '#E2E8F0' }].map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} strokeWidth={0} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mt-1">
-              <span className="text-2xl font-black text-slate-900 leading-none">82%</span>
-              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Achieved</span>
+          <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="max-w-xl">
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="bg-white/10 text-white px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider">
+                  Faculty Command
+                </span>
+                {teacher?.employee_id && (
+                  <span className="bg-blue-400/20 text-blue-200 px-2 py-0.5 rounded-md text-[9px] font-mono font-semibold">
+                    {teacher.employee_id}
+                  </span>
+                )}
+                {teacher?.department && (
+                  <span className="bg-emerald-400/20 text-emerald-200 px-2 py-0.5 rounded-md text-[9px] font-semibold">
+                    {teacher.department}
+                  </span>
+                )}
+              </div>
+              <h2 className="text-lg sm:text-xl font-display font-black tracking-tight">
+                Welcome Back, {teacher?.name || 'Faculty Member'}! 👋
+              </h2>
+              <p className="text-white/70 text-xs mt-1 font-semibold">
+                {teacher?.designation || 'Academic Instructor'} • Manage your daily lecture schedule, mark classroom attendance, and enter CBSE marks.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 self-start sm:self-auto">
+              <button
+                onClick={() => navigate('/dashboard/academics/timetable')}
+                className="px-3.5 py-1.5 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                <span>My Weekly Matrix</span>
+              </button>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Classroom Quick Utilities */}
-      <div>
-        <h3 className="text-base font-display font-black text-slate-900 mb-2.5">Classroom Utilities</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 sm:gap-4">
-          {[
-            { label: 'Register Attendance', icon: CheckCircle, color: 'text-violet-600 bg-violet-50 hover:bg-violet-100', path: '/dashboard/attendance' },
-            { label: 'Upload Homework', icon: BookOpen, color: 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100', path: '/dashboard/students' },
-            { label: 'Record Exam Marks', icon: Award, color: 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100', path: '/dashboard/students' },
-            { label: 'Download Roster', icon: FileText, color: 'text-blue-600 bg-blue-50 hover:bg-blue-100', path: '/dashboard/students' }
-          ].map((act) => (
-            <button 
-              key={act.label}
-              onClick={() => {
-                navigate(act.path);
-                toast.success(`Opening faculty portal for ${act.label}`);
-              }}
-              className={cn("p-3.5 rounded-xl border border-slate-100/85 shadow-2xs transition-all text-center flex flex-col items-center justify-center gap-2 active:scale-95 group hover:shadow-xs", act.color)}
-            >
-              <act.icon className="w-4.5 h-4.5 transition-transform group-hover:scale-105" />
-              <span className="text-[11px] font-semibold text-slate-700 tracking-tight leading-none">{act.label}</span>
-            </button>
-          ))}
+        {/* Dynamic KPI Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+          <PremiumStatCard 
+            label="Today's Lectures" 
+            value={`${todaySlots.length} Periods`} 
+            trend={todaySlots.length > 0 ? "up" : "down"} 
+            trendValue={isSunday ? "Monday Preview" : "Scheduled"} 
+            icon={Calendar} 
+            gradient="bg-gradient-to-tr from-blue-600 to-indigo-700" 
+            sparkColor="#1a73e8" 
+            sparkData={[2, 3, 4, Math.max(1, todaySlots.length), 3, todaySlots.length]} 
+            onClick={() => navigate('/dashboard/academics/timetable')}
+          />
+          <PremiumStatCard 
+            label="Assigned Classes" 
+            value={`${assignedClasses.length} Sections`} 
+            trend="up" 
+            trendValue="Active" 
+            icon={BookOpen} 
+            gradient="bg-gradient-to-tr from-sky-600 to-blue-600" 
+            sparkColor="#0284c7" 
+            sparkData={[assignedClasses.length, assignedClasses.length, assignedClasses.length]} 
+            onClick={() => navigate('/dashboard/students')}
+          />
+          <PremiumStatCard 
+            label="My Enrolled Students" 
+            value={`${totalStudents} Pupils`} 
+            trend="up" 
+            trendValue="Total SIS" 
+            icon={Users} 
+            gradient="bg-gradient-to-tr from-emerald-500 to-teal-600" 
+            sparkColor="#10B981" 
+            sparkData={[totalStudents, totalStudents, totalStudents]} 
+            onClick={() => navigate('/dashboard/students')}
+          />
+          <PremiumStatCard 
+            label="Today's Attendance" 
+            value={todayAttendanceRate !== null ? `${todayAttendanceRate}%` : "Pending Entry"} 
+            trend={todayAttendanceRate !== null && todayAttendanceRate >= 75 ? "up" : "down"} 
+            trendValue={todayAttendanceRate !== null ? "Marked" : "Needs Action"} 
+            icon={CheckCircle} 
+            gradient="bg-gradient-to-tr from-amber-500 to-orange-500" 
+            sparkColor="#F59E0B" 
+            sparkData={[88, 90, 92, todayAttendanceRate || 85]} 
+            onClick={() => navigate('/dashboard/attendance')}
+          />
         </div>
-      </div>
 
-      {/* Timetable, Assignments and Exams Lists */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5 sm:gap-4">
-        <div className="bg-white p-3.5 rounded-xl border border-slate-100/80 shadow-2xs">
-          <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider mb-3">Today's Class Schedule</h4>
-          <div className="space-y-2">
+        {/* Quick Classroom Utilities */}
+        <div>
+          <h3 className="text-base font-display font-black text-slate-900 mb-2.5">Academic Shortcuts</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 sm:gap-4">
             {[
-              { subject: 'Grade 8 — Mathematics', time: '09:00 AM - 09:45 AM', room: 'Room 102' },
-              { subject: 'Grade 10 — Physics', time: '10:00 AM - 10:45 AM', room: 'Science Lab 2' },
-              { subject: 'Grade 9 — Algebra', time: '11:15 AM - 12:00 PM', room: 'Room 105' },
-              { subject: 'Grade 12 — Calculus', time: '01:30 PM - 02:15 PM', room: 'Main Lecture Hall' }
-            ].map((period, idx) => (
-              <div key={idx} className="p-2 bg-slate-50 rounded-lg flex justify-between items-center text-xs">
-                <div>
-                  <div className="font-bold text-slate-800">{period.subject}</div>
-                  <div className="text-[10px] text-slate-400 font-bold mt-0.5">{period.time}</div>
-                </div>
-                <div className="text-[9px] bg-indigo-50 text-indigo-600 font-bold px-1.5 py-0.5 rounded-md shrink-0">{period.room}</div>
-              </div>
+              { label: 'My Weekly Timetable', icon: Calendar, color: 'text-blue-600 bg-blue-50 hover:bg-blue-100', path: '/dashboard/academics/timetable' },
+              { label: 'Register Daily Attendance', icon: CheckCircle, color: 'text-violet-600 bg-violet-50 hover:bg-violet-100', path: '/dashboard/attendance' },
+              { label: 'CBSE Marks Entry', icon: Award, color: 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100', path: '/dashboard/examination?tab=marks' },
+              { label: 'Student SIS Directory', icon: Users, color: 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100', path: '/dashboard/students' }
+            ].map((act) => (
+              <button 
+                key={act.label}
+                onClick={() => {
+                  navigate(act.path);
+                  toast.success(`Opening ${act.label}`);
+                }}
+                className={cn("p-3.5 rounded-xl border border-slate-100/85 shadow-2xs transition-all text-center flex flex-col items-center justify-center gap-2 active:scale-95 group hover:shadow-xs cursor-pointer", act.color)}
+              >
+                <act.icon className="w-4.5 h-4.5 transition-transform group-hover:scale-105" />
+                <span className="text-[11px] font-semibold text-slate-700 tracking-tight leading-none">{act.label}</span>
+              </button>
             ))}
           </div>
         </div>
 
-        <div className="bg-white p-3.5 rounded-xl border border-slate-100/80 shadow-2xs">
-          <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider mb-3">Pending Tasks & Messages</h4>
-          <div className="space-y-2">
-            <div className="p-2 bg-rose-50 border border-rose-100/80 rounded-lg flex items-start gap-2.5">
-              <ShieldAlert className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-              <div>
-                <div className="text-xs font-black text-rose-900">Grade 10 Physics papers pending audit</div>
-                <p className="text-[10px] text-rose-600 font-semibold mt-0.5">Please finalize marks before the portal freezes tonight.</p>
+        {/* Schedule & Assigned Classes Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-4">
+          {/* Today's Teaching Schedule */}
+          <div className="lg:col-span-7 bg-white p-3.5 sm:p-4 rounded-xl border border-slate-100/80 shadow-2xs flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                    {isSunday ? "Monday's Upcoming Schedule" : "Today's Teaching Schedule"}
+                  </h4>
+                  <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                    {todaySlots.length} lecture{todaySlots.length === 1 ? '' : 's'} assigned for today
+                  </p>
+                </div>
+                <button
+                  onClick={() => navigate('/dashboard/academics/timetable')}
+                  className="text-[11px] font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer"
+                >
+                  <span>Full Week ({weeklyLecturesCount} slots)</span>
+                  <ChevronRight size={13} />
+                </button>
               </div>
+
+              {todaySlots.length === 0 ? (
+                <div className="py-8 text-center text-slate-400 border border-dashed border-slate-200 rounded-lg">
+                  <Clock className="w-8 h-8 mx-auto mb-2 text-slate-300 stroke-[1.5]" />
+                  <div className="text-xs font-bold text-slate-600">No Teaching Lectures Today</div>
+                  <p className="text-[10px] text-slate-400 mt-0.5">You have no periods scheduled for today. Check your weekly timetable.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {todaySlots.map((slot: any, idx: number) => (
+                    <div 
+                      key={slot.id || idx} 
+                      className="p-2.5 bg-slate-50 hover:bg-slate-100/80 transition-colors border border-slate-200/60 rounded-lg flex items-center justify-between text-xs"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-blue-600 text-white font-black text-xs flex flex-col items-center justify-center shrink-0 shadow-2xs">
+                          <span className="text-[8px] font-semibold opacity-75 leading-none">P</span>
+                          <span className="leading-none">{slot.period_number}</span>
+                        </div>
+                        <div>
+                          <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                            <span>{slot.subject_name}</span>
+                            {slot.subject_code && (
+                              <span className="text-[9px] font-mono px-1.5 py-0.2 bg-slate-200 text-slate-700 rounded font-medium">
+                                {slot.subject_code}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[10px] text-slate-500 font-semibold mt-0.5 flex items-center gap-2">
+                            <span className="text-blue-600 font-bold">Class {slot.class_name} - Sec {slot.section_name}</span>
+                            <span>•</span>
+                            <span className="flex items-center gap-1 text-slate-400">
+                              <Clock size={10} />
+                              {slot.start_time} - {slot.end_time}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          onClick={() => navigate('/dashboard/attendance', { state: { selectedClass: slot.class_name, selectedSection: slot.section_name } })}
+                          className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-md text-[10px] font-bold transition-all cursor-pointer"
+                          title="Take attendance for this class"
+                        >
+                          Attendance
+                        </button>
+                        <button
+                          onClick={() => navigate('/dashboard/examination?tab=marks')}
+                          className="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-md text-[10px] font-bold transition-all cursor-pointer"
+                          title="Enter marks for this subject"
+                        >
+                          Marks
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-            <div className="p-2 bg-indigo-50 border border-indigo-100/80 rounded-lg flex items-start gap-2.5">
-              <MessageSquare className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
-              <div>
-                <div className="text-xs font-black text-indigo-900">Message from Principal's Desk</div>
-                <p className="text-[10px] text-indigo-600 font-semibold mt-0.5">Draft the questions portfolio for Q1 Term examinations early.</p>
+          </div>
+
+          {/* Assigned Classes & Subjects Overview */}
+          <div className="lg:col-span-5 bg-white p-3.5 sm:p-4 rounded-xl border border-slate-100/80 shadow-2xs flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">My Assigned Classes</h4>
+                <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-bold">
+                  {assignedClasses.length} Section{assignedClasses.length === 1 ? '' : 's'}
+                </span>
+              </div>
+
+              {assignedClasses.length === 0 ? (
+                <div className="py-8 text-center text-slate-400 border border-dashed border-slate-200 rounded-lg">
+                  <BookOpen className="w-8 h-8 mx-auto mb-2 text-slate-300 stroke-[1.5]" />
+                  <div className="text-xs font-bold text-slate-600">No Assigned Classes</div>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Classes and subjects will appear here once allocated by Academics.</p>
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-[280px] overflow-y-auto pr-0.5">
+                  {assignedClasses.map((cls: any, idx: number) => (
+                    <div 
+                      key={idx} 
+                      className="p-2.5 bg-slate-50 border border-slate-200/60 rounded-lg flex items-center justify-between text-xs"
+                    >
+                      <div>
+                        <div className="font-bold text-slate-900">
+                          Class {cls.class_name} — Section {cls.section_name}
+                        </div>
+                        <div className="text-[10px] text-slate-500 font-semibold mt-0.5">
+                          Subject: <span className="text-slate-800 font-bold">{cls.subject_name || 'All Core'}</span>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="text-xs font-black text-blue-600">{cls.student_count} Students</div>
+                        <button
+                          onClick={() => navigate('/dashboard/students')}
+                          className="text-[9px] text-slate-400 hover:text-blue-600 font-bold transition-colors cursor-pointer mt-0.5 block"
+                        >
+                          View Roster →
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-slate-100">
+              <div className="flex items-center justify-between text-[11px] font-semibold text-slate-500">
+                <span>Total Workload:</span>
+                <span className="text-slate-900 font-bold">{weeklyLecturesCount} Periods / Week</span>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   // ==========================================
   // RENDER: STUDENT / PARENT DASHBOARD
