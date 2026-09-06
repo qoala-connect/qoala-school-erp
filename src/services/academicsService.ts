@@ -155,6 +155,7 @@ export interface TimetableSlot {
   period_number: number | null;
   start_time: string;
   end_time: string;
+  room_no: string | null;
 }
 
 // ---------------------------------------------------------------------
@@ -170,6 +171,19 @@ export interface TimetableSlot {
  */
 function describe(error: { code?: string; message: string; details?: string }): string {
   const raw = error.message || '';
+
+  // The request never reached the database. "Failed to fetch" on its own tells
+  // the user nothing, so say what it actually means and what to try.
+  if (/Failed to fetch|NetworkError|Load failed|Cannot reach the server/i.test(raw)) {
+    // supabase-js stringifies the thrown error, so our own diagnosed message
+    // arrives prefixed with "TypeError: ". Keep it -- it names the actual cause
+    // and the fix -- rather than falling back to the generic wording.
+    const i = raw.indexOf('Cannot reach the server');
+    if (i >= 0) return raw.slice(i);
+    return 'Cannot reach the server, so the change was not saved. Check your internet '
+      + 'connection, and if you use a VPN, proxy, ad-blocker or other browser '
+      + 'extension, disable it for this site and retry.';
+  }
 
   if (raw.includes('Deactivate it instead') || raw.includes('Remove them from') ||
       raw.includes('Remove those mappings') || raw.includes('Archive it instead') ||
@@ -688,6 +702,7 @@ export interface TimetableIndexRow {
   period_number: number | null;
   start_time?: string | null;
   end_time?: string | null;
+  room_no?: string | null;
   class_name?: string | null;
   section_name?: string | null;
   subject_name?: string | null;
@@ -697,7 +712,7 @@ export interface TimetableIndexRow {
 export async function fetchYearTimetableIndex(academicYearId: string): Promise<TimetableIndexRow[]> {
   const { data, error } = await supabase.from('timetable')
     .select(`
-      id, class_id, section_id, subject_id, teacher_id, day, period_number, start_time, end_time,
+      id, class_id, section_id, subject_id, teacher_id, day, period_number, start_time, end_time, room_no,
       classes (class_name),
       sections (section_name),
       subjects (subject_name, subject_code)
@@ -715,6 +730,7 @@ export async function fetchYearTimetableIndex(academicYearId: string): Promise<T
     period_number: r.period_number,
     start_time: r.start_time ? r.start_time.slice(0, 5) : null,
     end_time: r.end_time ? r.end_time.slice(0, 5) : null,
+    room_no: r.room_no ?? null,
     class_name: r.classes?.class_name || null,
     section_name: r.sections?.section_name || null,
     subject_name: r.subjects?.subject_name || null,
@@ -737,6 +753,7 @@ export interface TeacherTimetableSlot {
   section_name: string | null;
   subject_name: string | null;
   subject_code: string | null;
+  room_no: string | null;
 }
 
 export async function fetchTimetable(input: {
@@ -747,7 +764,7 @@ export async function fetchTimetable(input: {
 }): Promise<TimetableSlot[]> {
   let query = supabase
     .from('timetable')
-    .select('id, class_id, section_id, subject_id, teacher_id, academic_year_id, day, period_number, start_time, end_time')
+    .select('id, class_id, section_id, subject_id, teacher_id, academic_year_id, day, period_number, start_time, end_time, room_no')
     .eq('academic_year_id', input.academic_year_id)
     .order('day')
     .order('period_number');
@@ -770,7 +787,7 @@ export async function fetchTeacherWeeklySchedule(
   let query = supabase
     .from('timetable')
     .select(`
-      id, class_id, section_id, subject_id, teacher_id, academic_year_id, day, period_number, start_time, end_time,
+      id, class_id, section_id, subject_id, teacher_id, academic_year_id, day, period_number, start_time, end_time, room_no,
       classes (class_name),
       sections (section_name),
       subjects (subject_name, subject_code)
@@ -801,6 +818,7 @@ export async function fetchTeacherWeeklySchedule(
     section_name: r.sections?.section_name || null,
     subject_name: r.subjects?.subject_name || null,
     subject_code: r.subjects?.subject_code || null,
+    room_no: r.room_no ?? null,
   }));
 }
 
@@ -815,6 +833,7 @@ export async function saveTimetableSlot(input: {
   period_number: number;
   start_time: string;
   end_time: string;
+  room_no?: string | null;
 }): Promise<void> {
   const { data: clsData } = await supabase.from('classes').select('class_name').eq('id', input.class_id).maybeSingle();
   const className = clsData?.class_name || 'Class';
@@ -860,6 +879,7 @@ export async function saveTimetableSlot(input: {
     period_number: input.period_number,
     start_time: cleanStartTime,
     end_time: cleanEndTime,
+    room_no: input.room_no?.trim() || null,
   };
 
   // 1. Direct Supabase write attempt
@@ -961,4 +981,112 @@ export async function fetchTeacherOptions(academicYearId?: string): Promise<Teac
       subject_codes: codes.length > 0 ? (codes as string[]).join(', ') : null,
     };
   });
+}
+
+// ---------------------------------------------------------------------
+// Admin academic monitor
+// ---------------------------------------------------------------------
+
+export interface AcademicMonitor {
+  total_classes: number;
+  total_sections: number;
+  total_subjects: number;
+  total_teachers: number;
+  classes_scheduled_today: number;
+  attendance_completed: number;
+  attendance_pending: number;
+  lesson_plans_planned: number;
+  lesson_plans_completed: number;
+  homework_created_today: number;
+  assignments_active: number;
+  syllabus_percent_overall: number | null;
+}
+
+/**
+ * The admin's daily academic activity snapshot for a year and date.
+ * Every figure is a live count from academics_* / attendance / timetable —
+ * never a stored or estimated number.
+ */
+export async function fetchAcademicMonitor(
+  academicYearId: string,
+  onDate: string
+): Promise<AcademicMonitor | null> {
+  const { data, error } = await supabase.rpc('admin_academic_monitor', {
+    _academic_year_id: academicYearId,
+    _on_date: onDate,
+  });
+  if (error) throw new Error(describe(error));
+  const row = (data as any[])?.[0];
+  if (!row) return null;
+  return {
+    total_classes: Number(row.total_classes ?? 0),
+    total_sections: Number(row.total_sections ?? 0),
+    total_subjects: Number(row.total_subjects ?? 0),
+    total_teachers: Number(row.total_teachers ?? 0),
+    classes_scheduled_today: Number(row.classes_scheduled_today ?? 0),
+    attendance_completed: Number(row.attendance_completed ?? 0),
+    attendance_pending: Number(row.attendance_pending ?? 0),
+    lesson_plans_planned: Number(row.lesson_plans_planned ?? 0),
+    lesson_plans_completed: Number(row.lesson_plans_completed ?? 0),
+    homework_created_today: Number(row.homework_created_today ?? 0),
+    assignments_active: Number(row.assignments_active ?? 0),
+    syllabus_percent_overall: row.syllabus_percent_overall == null ? null : Number(row.syllabus_percent_overall),
+  };
+}
+
+// ---------------------------------------------------------------------
+// Student / parent academic dashboard
+// ---------------------------------------------------------------------
+
+export interface StudentTimetableEntry {
+  period_number: number | null;
+  start_time: string | null;
+  end_time: string | null;
+  subject_name: string | null;
+  teacher_name: string | null;
+  room: string | null;
+}
+
+export interface StudentSyllabusEntry {
+  subject_name: string;
+  percent: number | null;
+}
+
+export interface StudentAcademicDashboard {
+  student_id: string;
+  class_id: string | null;
+  section_id: string | null;
+  academic_year_id: string | null;
+  today_timetable: StudentTimetableEntry[];
+  pending_homework: number;
+  pending_assignments: number;
+  attendance_percent: number | null;
+  syllabus: StudentSyllabusEntry[];
+}
+
+/**
+ * The academic snapshot for one student: today's periods, pending work,
+ * attendance and per-subject syllabus progress. The database function
+ * refuses unless the caller is that student, a linked parent, or staff,
+ * so a parent switching children or a student changing the id gets
+ * nothing back.
+ */
+export async function fetchStudentAcademicDashboard(
+  studentId: string
+): Promise<StudentAcademicDashboard | null> {
+  const { data, error } = await supabase.rpc('student_academic_dashboard', { _student_id: studentId });
+  if (error) throw new Error(describe(error));
+  const row = (data as any[])?.[0];
+  if (!row) return null;
+  return {
+    student_id: row.student_id,
+    class_id: row.class_id,
+    section_id: row.section_id,
+    academic_year_id: row.academic_year_id,
+    today_timetable: (row.today_timetable ?? []) as StudentTimetableEntry[],
+    pending_homework: Number(row.pending_homework ?? 0),
+    pending_assignments: Number(row.pending_assignments ?? 0),
+    attendance_percent: row.attendance_percent == null ? null : Number(row.attendance_percent),
+    syllabus: (row.syllabus ?? []) as StudentSyllabusEntry[],
+  };
 }

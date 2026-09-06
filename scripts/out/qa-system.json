@@ -1,0 +1,159 @@
+{
+  "generatedAt": "2026-09-06T00:43:19.379Z",
+  "pass": 19,
+  "fail": 0,
+  "results": [
+    {
+      "module": "System",
+      "page": "System/Overview",
+      "action": "Load overview (rpc system_overview)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 151
+    },
+    {
+      "module": "System",
+      "page": "System/Users",
+      "action": "Load user directory (rpc admin_user_directory)",
+      "status": "PASS",
+      "detail": "9 users",
+      "ms": 152
+    },
+    {
+      "module": "System",
+      "page": "System/Users",
+      "action": "Search + filter directory (rpc admin_user_directory)",
+      "status": "PASS",
+      "detail": "1 matches",
+      "ms": 164
+    },
+    {
+      "module": "System",
+      "page": "System/Users",
+      "action": "Change user role (rpc set_user_role)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 554
+    },
+    {
+      "module": "System",
+      "page": "System/Users",
+      "action": "Change user status (rpc set_user_status)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 553
+    },
+    {
+      "module": "System",
+      "page": "System/Users",
+      "action": "Self-suspension is blocked (rpc set_user_status)",
+      "status": "PASS",
+      "detail": "guard raised: 42501",
+      "ms": 275
+    },
+    {
+      "module": "System",
+      "page": "System/Users",
+      "action": "Load linkable entities (rpc linkable_entities)",
+      "status": "PASS",
+      "detail": "3 entity types",
+      "ms": 417
+    },
+    {
+      "module": "System",
+      "page": "System/Users",
+      "action": "Link + unlink user to entity (rpc link/unlink_user_to_entity)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 870
+    },
+    {
+      "module": "System",
+      "page": "System/Roles",
+      "action": "Load role permissions (select role_permissions)",
+      "status": "PASS",
+      "detail": "124 grants",
+      "ms": 138
+    },
+    {
+      "module": "System",
+      "page": "System/Roles",
+      "action": "Grant + revoke a permission (rpc set_role_permission)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 551
+    },
+    {
+      "module": "System",
+      "page": "System/Roles",
+      "action": "Own permissions resolve (rpc my_permissions)",
+      "status": "PASS",
+      "detail": "32 permissions",
+      "ms": 141
+    },
+    {
+      "module": "System",
+      "page": "System/Settings",
+      "action": "Load settings (select system_settings)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 136
+    },
+    {
+      "module": "System",
+      "page": "System/Settings",
+      "action": "Save settings (rpc update_system_settings)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 487
+    },
+    {
+      "module": "System",
+      "page": "System/Audit",
+      "action": "Search audit logs (rpc audit_log_search)",
+      "status": "PASS",
+      "detail": "50 entries",
+      "ms": 255
+    },
+    {
+      "module": "System",
+      "page": "System/Audit",
+      "action": "Load audit facets (rpc audit_log_facets)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 122
+    },
+    {
+      "module": "System",
+      "page": "System/Audit",
+      "action": "Audit log is append-only (update rejected)",
+      "status": "PASS",
+      "detail": "guard raised: 42501",
+      "ms": 244
+    },
+    {
+      "module": "System",
+      "page": "System/Security",
+      "action": "Load governance panels (audit_logs + role_permissions)",
+      "status": "PASS",
+      "detail": "50 audit / 124 grants",
+      "ms": 122
+    },
+    {
+      "module": "System",
+      "page": "Reports",
+      "action": "Load report datasets (select x4)",
+      "status": "PASS",
+      "detail": "500/500/500/500 rows",
+      "ms": 301
+    },
+    {
+      "module": "System",
+      "page": "Analytics",
+      "action": "Load analytics aggregates (select/rpc)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 148
+    }
+  ]
+}

@@ -25,6 +25,7 @@ import {
   ExternalLink,
   BookMarked,
   Layers,
+  PencilRuler,
   HelpCircle,
   TrendingUp,
   Check,
@@ -43,11 +44,13 @@ import FeeReceiptModal from '@/components/fees/FeeReceiptModal';
 import StudentAdmitCardModal from '@/components/results/StudentAdmitCardModal';
 import StudentMarksheetModal from '@/components/results/StudentMarksheetModal';
 import OfficialTimetableModal from '@/components/academics/OfficialTimetableModal';
+import StudentSyllabusTab from '@/components/portal/StudentSyllabusTab';
+import StudentHomeworkTab from '@/components/portal/StudentHomeworkTab';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
-type PortalTab = 'overview' | 'assignments' | 'attendance' | 'fees' | 'examination' | 'timetable' | 'transport' | 'personal';
+type PortalTab = 'overview' | 'homework' | 'assignments' | 'syllabus' | 'attendance' | 'fees' | 'examination' | 'timetable' | 'transport' | 'personal';
 
 interface RealAssignment {
   id: string;
@@ -55,6 +58,7 @@ interface RealAssignment {
   description: string;
   class: string;
   section: string;
+  kind?: string;
   due_date: string;
   max_marks: number;
   attachment_url?: string;
@@ -90,7 +94,7 @@ interface RealFeeItem {
 }
 
 export default function StudentPortal() {
-  const { user, roleLabel } = useAuth();
+  const { user, roleLabel, role } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -98,6 +102,7 @@ export default function StudentPortal() {
   const [activeTab, setActiveTab] = useState<PortalTab>(tabParam);
 
   const [student, setStudent] = useState<Student | null>(null);
+  const [visibleStudents, setVisibleStudents] = useState<Student[]>([]);
   const [medical, setMedical] = useState<StudentMedicalRecord | null>(null);
   const [transport, setTransport] = useState<StudentTransportInfo | null>(null);
 
@@ -134,7 +139,10 @@ export default function StudentPortal() {
 
   const handleTabChange = (tab: PortalTab) => {
     setActiveTab(tab);
-    setSearchParams({ tab });
+    const next: Record<string, string> = { tab };
+    const child = searchParams.get('student');
+    if (child) next.student = child;
+    setSearchParams(next);
   };
 
   // Load live database data for this specific authenticated student
@@ -142,25 +150,29 @@ export default function StudentPortal() {
     if (!user) return;
     setIsLoading(true);
     try {
-      // 1. Fetch Student Record
+      // 1. Resolve the student record.
+      // RLS on `students` (students_owner_select) already scopes this query to
+      // the caller: a student sees only their own row; a parent sees the
+      // children sharing their family_id. So a plain select returns exactly the
+      // right rows — no name/email guessing, no "first student" leak.
       let studentRecord: Student | null = null;
-      const { data: byUserId } = await supabase.from('students').select('*').eq('user_id', user.id).maybeSingle();
-      studentRecord = byUserId;
+      const { data: scoped } = await supabase.from('students').select('*').order('name');
 
-      if (!studentRecord && user.email) {
-        const { data: byEmail } = await supabase.from('students').select('*').ilike('email', user.email).maybeSingle();
+      if (scoped && scoped.length > 0) {
+        const rows = scoped as Student[];
+        setVisibleStudents(rows);
+        const wantedId = searchParams.get('student');
+        studentRecord =
+          // an explicitly requested child (parents with more than one), then the
+          // row actually owned by this login, then the only/first visible row
+          (wantedId ? rows.find(s => s.id === wantedId) : undefined) ||
+          rows.find(s => (s as any).user_id === user.id) ||
+          rows[0];
+      } else if (user.email) {
+        // Legacy fallback for an unlinked login: exact email match only.
+        const { data: byEmail } = await supabase
+          .from('students').select('*').ilike('email', user.email).maybeSingle();
         studentRecord = byEmail;
-      }
-
-      if (!studentRecord && user.email) {
-        const emailPrefix = user.email.split('@')[0];
-        const { data: byName } = await supabase.from('students').select('*').ilike('name', emailPrefix).limit(1).maybeSingle();
-        studentRecord = byName;
-      }
-
-      if (!studentRecord) {
-        const { data: fallbackList } = await supabase.from('students').select('*').limit(1).maybeSingle();
-        studentRecord = fallbackList;
       }
 
       if (!studentRecord) {
@@ -189,14 +201,21 @@ export default function StudentPortal() {
         supabase.from('student_transport').select('*, transport_routes(route_name), vehicles(vehicle_number)').eq('student_id', studentRecord.id).maybeSingle(),
         supabase.from('attendance').select('*').eq('student_id', studentRecord.id).order('attendance_date', { ascending: false }),
         supabase.from('student_fees').select('*, fee_categories(category_name), fee_payments(*)').eq('student_id', studentRecord.id).order('created_at', { ascending: false }),
-        supabase.from('exam_results').select('*, exams(exam_name, academic_year)').eq('student_id', studentRecord.id),
-        supabase.from('marks').select('*, exams(exam_name), subjects(subject_name, subject_code)').eq('student_id', studentRecord.id),
-        supabase.from('timetable').select('*, classes(class_name), sections(section_name), subjects(subject_name, subject_code), teachers(name)').order('period_number', { ascending: true }),
+        supabase.from('exam_results').select('*, exams(id, exam_name, short_name, academic_year, is_published, status)').eq('student_id', studentRecord.id).eq('published', true),
+        supabase.from('marks').select('*, exams!inner(id, exam_name, short_name, is_published, status), subjects(subject_name, subject_code)').eq('student_id', studentRecord.id).or('is_published.eq.true,status.eq.published', { referencedTable: 'exams' }),
+        // Scope the timetable to this student's own class + section server-side
+        // (the whole grid is ~800 rows x 4 joins otherwise). A slot with a
+        // null section_id applies to every section of the class.
+        supabase.from('timetable')
+          .select('*, classes(class_name), sections(section_name), subjects(subject_name, subject_code), teachers(name)')
+          .eq('class_id', (studentRecord as any).class_id)
+          .or(`section_id.eq.${(studentRecord as any).section_id},section_id.is.null`)
+          .order('period_number', { ascending: true }),
         supabase.from('class_subjects').select('*, subjects(subject_name, subject_code)').eq('class', studentRecord.class),
         supabase.from('assignments').select('*, subjects(subject_name, subject_code), teachers(name)').eq('class', studentRecord.class).order('due_date', { ascending: true }),
         supabase.from('student_assignment_submissions').select('*').eq('student_id', studentRecord.id),
         supabase.from('notices').select('*').order('created_at', { ascending: false }).limit(6),
-        supabase.from('exam_subjects').select('*, subjects(subject_name)')
+        supabase.from('exam_subjects').select('exam_id, subject_id, subject_name, exam_date, start_time, duration, room, subjects(subject_name)')
       ]);
 
       if (medicalRes.data) setMedical(medicalRes.data);
@@ -252,6 +271,7 @@ export default function StudentPortal() {
           description: a.description,
           class: a.class,
           section: a.section,
+          kind: (a as any).kind,
           due_date: a.due_date,
           max_marks: a.max_marks || 100,
           attachment_url: a.attachment_url,
@@ -270,9 +290,11 @@ export default function StudentPortal() {
     }
   }, [user]);
 
+  // Reload when a parent switches which child they are viewing.
+  const childParam = searchParams.get('student');
   useEffect(() => {
     loadStudentData();
-  }, [loadStudentData]);
+  }, [loadStudentData, childParam]);
 
   // Handle Assignment Submission
   const handleSaveSubmission = async () => {
@@ -507,12 +529,33 @@ export default function StudentPortal() {
 
       </div>
 
+      {/* Child switcher — only for a parent linked to more than one student */}
+      {role === 'parent' && visibleStudents.length > 1 && (
+        <div className="flex flex-wrap items-center gap-2 bg-white border border-slate-200/80 rounded-xl p-2 shadow-2xs">
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1.5">Viewing</span>
+          {visibleStudents.map(c => (
+            <button
+              key={c.id}
+              onClick={() => setSearchParams({ tab: activeTab, student: c.id })}
+              className={cn(
+                'px-3 py-1.5 rounded-lg text-xs font-bold transition-all',
+                student?.id === c.id ? 'bg-[#1a73e8] text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100',
+              )}
+            >
+              {c.name} · {c.class}-{c.section}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* 3. PORTAL NAVIGATION TABS */}
       <div className="bg-white border border-slate-200/80 rounded-xl p-1 shadow-2xs overflow-x-auto bg-slate-100">
         <div className="flex items-center gap-1 min-w-max">
           {[
             { id: 'overview', label: 'My Overview', icon: GraduationCap },
-            { id: 'assignments', label: `Assignments (${assignments.length})`, icon: BookMarked },
+            { id: 'homework', label: `Homework (${assignments.filter(a => a.kind === 'homework' && !a.submission).length})`, icon: PencilRuler },
+            { id: 'assignments', label: `Assignments (${assignments.filter(a => a.kind !== 'homework').length})`, icon: BookMarked },
+            { id: 'syllabus', label: 'Syllabus & Progress', icon: Layers },
             { id: 'attendance', label: 'Attendance Ledger', icon: Calendar },
             { id: 'fees', label: 'Fee Invoices & Receipts', icon: Wallet },
             { id: 'examination', label: 'Report Cards & Marks', icon: ClipboardList },
@@ -786,20 +829,52 @@ export default function StudentPortal() {
         )}
 
         {/* TAB 2: ASSIGNMENTS & HOMEWORK */}
+        {activeTab === 'homework' && (
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900">Homework</h3>
+              <p className="text-xs text-slate-500">
+                Daily homework set for Class {student.class}-{student.section}.
+                {role === 'parent' && ' You are viewing your child\'s homework.'}
+              </p>
+            </div>
+            <StudentHomeworkTab studentId={student.id} canSubmit={role !== 'parent'} kind="homework" />
+          </div>
+        )}
+
+        {activeTab === 'syllabus' && (
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900">Syllabus &amp; Progress</h3>
+              <p className="text-xs text-slate-500">
+                How far your class has covered each subject this year.
+              </p>
+            </div>
+            <StudentSyllabusTab studentId={student.id} />
+          </div>
+        )}
+
         {activeTab === 'assignments' && (
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h3 className="text-sm font-bold text-slate-900">Class Assignments &amp; Homework Tasks</h3>
-                <p className="text-xs text-slate-500">Teacher-assigned homework for Class {student.class}-{student.section}.</p>
+                <h3 className="text-sm font-bold text-slate-900">Assignments</h3>
+                <p className="text-xs text-slate-500">Graded assignment tasks for Class {student.class}-{student.section}.</p>
               </div>
               <span className="text-xs font-bold px-3 py-1.5 bg-violet-50 text-violet-700 border border-violet-200 rounded-xl self-start">
-                Total Assigned: {assignments.length}
+                Total: {assignments.filter(a => a.kind !== 'homework').length}
               </span>
             </div>
 
+            {assignments.filter(a => a.kind !== 'homework').length === 0 && (
+              <div className="py-14 text-center">
+                <BookMarked size={22} className="mx-auto text-slate-300" />
+                <p className="text-sm font-bold text-slate-700 mt-2">No assignments</p>
+                <p className="text-xs text-slate-500">Graded assignments set for your class will appear here.</p>
+              </div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {assignments.map(asg => {
+              {assignments.filter(a => a.kind !== 'homework').map(asg => {
                 const isDone = Boolean(asg.submission);
                 return (
                   <div key={asg.id} className="p-5 bg-slate-50 border border-slate-200/80 rounded-2xl flex flex-col justify-between space-y-4">
@@ -832,6 +907,10 @@ export default function StudentPortal() {
                             </span>
                           )}
                         </div>
+                      ) : role === 'parent' ? (
+                        <span className="px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg font-black text-[10px] uppercase">
+                          Not submitted
+                        </span>
                       ) : (
                         <button
                           onClick={() => { setSubmittingAssignment(asg); setSubmissionText(''); setSubmissionUrl(''); }}
@@ -980,9 +1059,10 @@ export default function StudentPortal() {
                                 onClick={() => setSelectedReceiptFee({
                                   id: fee.id,
                                   receipt_number: p.receipt_number,
-                                  total_amount: fee.total_amount,
+                                  total_amount: p.amount_paid,
                                   paid_amount: p.amount_paid,
-                                  remaining_amount: Math.max(0, fee.total_amount - fee.amount_paid),
+                                  amount_paid: p.amount_paid,
+                                  remaining_amount: Math.max(0, (Number((fee as any).net_amount ?? fee.total_amount ?? 0)) - Number(fee.amount_paid || 0)),
                                   category_name: fee.category_name,
                                   payment_mode: p.payment_mode,
                                   payment_date: p.payment_date,
@@ -1094,7 +1174,11 @@ export default function StudentPortal() {
                     })
                   ) : (
                     <tr>
-                      <td colSpan={5} className="py-6 text-center text-slate-400">No published marks found yet.</td>
+                      <td colSpan={5} className="py-8 text-center text-slate-400">
+                        <Award size={24} className="mx-auto mb-1.5 text-slate-300" />
+                        <span className="font-bold text-slate-600 block text-xs">No Published Examination Records</span>
+                        <span className="text-[11px] text-slate-400 block mt-0.5">Results and scorecards will be available immediately after official administrator publication.</span>
+                      </td>
                     </tr>
                   )}
                 </tbody>

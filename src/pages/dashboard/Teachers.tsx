@@ -187,7 +187,14 @@ export default function Teachers() {
 
   // Academic Matrix group
   const assignmentMatrix = useMemo(() => {
-    const matrix: Record<string, { class_name: string; section_name: string; class_teacher?: string; subjects: Array<{ subject_name: string; teacher_name: string }> }> = {};
+    // The ids travel with each card so "Modify" can tell the modal which
+    // class-section it was opened for. Without them the modal opened blank
+    // and kept whichever section was chosen the previous time it was used.
+    const matrix: Record<string, {
+      class_name: string; section_name: string;
+      class_id?: string; section_id?: string; academic_year_id?: string;
+      class_teacher?: string; subjects: Array<{ subject_name: string; teacher_name: string }>;
+    }> = {};
 
     assignments.forEach(a => {
       const key = `${a.class_name}-${a.section_name}`;
@@ -195,6 +202,9 @@ export default function Teachers() {
         matrix[key] = {
           class_name: a.class_name,
           section_name: a.section_name,
+          class_id: a.class_id,
+          section_id: a.section_id,
+          academic_year_id: a.academic_year_id,
           subjects: []
         };
       }
@@ -239,6 +249,24 @@ export default function Teachers() {
   const handleOpenBlankAssign = () => {
     setSelectedTeacher(null);
     setAssignPrefill(null);
+    setIsAssignOpen(true);
+  };
+
+  /**
+   * "Modify" on one class-section card. It has to name that class and section,
+   * or the modal falls back to whatever was selected last time it was open --
+   * which is how clicking Modify on 1-B opened on 1-C.
+   */
+  const handleModifyClassSection = (item: {
+    class_id?: string; section_id?: string; academic_year_id?: string;
+  }) => {
+    setSelectedTeacher(null);
+    setAssignPrefill({
+      academicYearId: item.academic_year_id ?? null,
+      classId: item.class_id ?? null,
+      sectionId: item.section_id ?? null,
+      assignmentType: 'class_teacher',
+    });
     setIsAssignOpen(true);
   };
 
@@ -338,8 +366,8 @@ export default function Teachers() {
       </div>
 
       {/* 3. Navigation Modes Tab Bar */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-1.5 shadow-2xs flex items-center justify-between gap-2 overflow-x-auto">
-        <div className="flex items-center gap-1 min-w-max">
+      <div className="bg-slate-100/90 backdrop-blur-md rounded-2xl p-1.5 border border-slate-200/80 shadow-2xs flex items-center justify-between gap-2 overflow-x-auto">
+        <div className="flex items-center gap-1.5 min-w-max">
           {[
             { id: 'directory', label: 'Faculty Directory', icon: Users, count: filteredTeachers.length },
             { id: 'assignments', label: 'Academic Assignments Hub', icon: GraduationCap, count: assignments.length },
@@ -352,18 +380,18 @@ export default function Teachers() {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as ViewMode)}
                 className={cn(
-                  "py-2 px-3.5 rounded-xl flex items-center gap-2 text-xs font-bold transition-all cursor-pointer whitespace-nowrap",
+                  "py-2 px-4 rounded-xl flex items-center gap-2 text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap",
                   isActive 
-                    ? "bg-slate-900 text-white shadow-xs" 
-                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                    ? "bg-slate-900 text-white shadow-xs scale-[1.01]" 
+                    : "text-slate-600 hover:text-slate-900 hover:bg-white/70"
                 )}
               >
-                <Icon size={14} className={isActive ? "text-violet-400" : "text-slate-400"} />
+                <Icon size={14} className={isActive ? "text-indigo-400" : "text-slate-400"} />
                 <span>{tab.label}</span>
                 {tab.count !== undefined && (
                   <span className={cn(
-                    "px-1.5 py-0.2 rounded-full text-[10px] font-black",
-                    isActive ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+                    "px-2 py-0.5 rounded-full text-[10px] font-black tracking-tight",
+                    isActive ? "bg-white/20 text-white" : "bg-slate-200/80 text-slate-700"
                   )}>
                     {tab.count}
                   </span>
@@ -378,13 +406,13 @@ export default function Teachers() {
       {activeTab === 'directory' && (
         <div className="space-y-4">
           {selectedTeacherFilter && (
-            <div className="bg-violet-50 border border-violet-200 rounded-xl p-3 flex items-center justify-between text-xs text-violet-800 animate-fadeIn">
-              <span className="font-semibold">
-                Filtered to selected teacher from search.
+            <div className="bg-indigo-50/80 border border-indigo-200/80 rounded-2xl p-3 px-4 flex items-center justify-between text-xs text-indigo-900 animate-fadeIn shadow-2xs">
+              <span className="font-semibold flex items-center gap-2">
+                <Sparkles size={14} className="text-indigo-600" /> Filtered view for selected faculty record
               </span>
               <button 
                 onClick={() => setSelectedTeacherFilter(null)} 
-                className="font-bold underline text-violet-700 hover:text-violet-900 cursor-pointer"
+                className="font-bold text-indigo-700 hover:text-indigo-900 underline cursor-pointer text-xs"
               >
                 Show All Teachers
               </button>
@@ -392,23 +420,32 @@ export default function Teachers() {
           )}
 
           {/* Search & Filters */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs flex flex-wrap items-center justify-between gap-3">
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-3.5 shadow-2xs flex flex-wrap items-center justify-between gap-3">
             <div className="flex-1 min-w-[240px] relative">
-              <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input 
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search faculty by name, employee ID, department, class, or subject..."
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-violet-500 transition-all"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-8 py-2 text-xs font-semibold text-slate-800 placeholder:text-slate-400 outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all"
               />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded text-[11px] font-bold"
+                >
+                  ✕
+                </button>
+              )}
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs font-bold text-slate-700 outline-none cursor-pointer focus:border-violet-500"
+                className="bg-slate-50 border border-slate-200/80 rounded-xl py-2 px-3 text-xs font-semibold text-slate-700 outline-none cursor-pointer focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all"
               >
                 <option value="all">All Statuses</option>
                 <option value="Active">Active</option>
@@ -421,7 +458,7 @@ export default function Teachers() {
               <select
                 value={departmentFilter}
                 onChange={(e) => setDepartmentFilter(e.target.value)}
-                className="bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs font-bold text-slate-700 outline-none cursor-pointer focus:border-violet-500"
+                className="bg-slate-50 border border-slate-200/80 rounded-xl py-2 px-3 text-xs font-semibold text-slate-700 outline-none cursor-pointer focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all"
               >
                 <option value="all">All Departments</option>
                 {departmentOptions.map(d => (
@@ -432,7 +469,7 @@ export default function Teachers() {
               <select
                 value={levelFilter}
                 onChange={(e) => setLevelFilter(e.target.value)}
-                className="bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs font-bold text-slate-700 outline-none cursor-pointer focus:border-violet-500"
+                className="bg-slate-50 border border-slate-200/80 rounded-xl py-2 px-3 text-xs font-semibold text-slate-700 outline-none cursor-pointer focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all"
               >
                 <option value="all">All CBSE Levels</option>
                 <option value="PRT">PRT (Primary)</option>
@@ -445,7 +482,7 @@ export default function Teachers() {
           {/* Directory Data Table */}
           <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 border-b border-slate-200 text-slate-400 uppercase text-[10px] font-black tracking-wider">
+              <thead className="bg-slate-50/90 border-b border-slate-200 text-slate-500 uppercase text-[10px] font-black tracking-wider">
                 <tr>
                   <th className="px-4 py-3.5">Faculty Member</th>
                   <th className="px-4 py-3.5">Employee ID & Contacts</th>
@@ -459,8 +496,12 @@ export default function Teachers() {
               <tbody className="divide-y divide-slate-100">
                 {filteredTeachers.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-12 text-center text-slate-400">
-                      No faculty records match the selected filters.
+                    <td colSpan={7} className="px-4 py-16 text-center text-slate-400">
+                      <div className="max-w-xs mx-auto text-center space-y-2">
+                        <Users size={32} className="mx-auto text-slate-300 stroke-[1.5]" />
+                        <p className="font-semibold text-slate-600 text-xs">No faculty records found</p>
+                        <p className="text-[11px] text-slate-400">Try adjusting your search terms or filter selection</p>
+                      </div>
                     </td>
                   </tr>
                 ) : (
@@ -468,64 +509,64 @@ export default function Teachers() {
                     const initials = t.name.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase();
                     const isSelected = selectedTeacherFilter === t.id || selectedTeacherFilter === t.employee_id;
                     return (
-                      <tr key={t.id} className={cn("hover:bg-slate-50/80 transition-all group", isSelected && "bg-violet-50/60 ring-1 ring-violet-200")}>
-                        <td className="px-4 py-3">
+                      <tr key={t.id} className={cn("hover:bg-slate-50/90 transition-colors group", isSelected && "bg-indigo-50/50 ring-1 ring-indigo-200")}>
+                        <td className="px-4 py-3.5">
                           <div className="flex items-center gap-3">
                             {t.photo_url ? (
                               <img src={t.photo_url} alt={t.name} className="w-9 h-9 rounded-xl object-cover border border-slate-200 shrink-0" />
                             ) : (
-                              <div className="w-9 h-9 rounded-xl bg-violet-100 text-violet-700 border border-violet-200 flex items-center justify-center font-black text-xs shrink-0">
+                              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-50 to-indigo-100 text-indigo-700 border border-indigo-200 flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
                                 {initials}
                               </div>
                             )}
                             <div>
                               <span 
                                 onClick={() => handleOpen360(t)}
-                                className="font-extrabold text-slate-900 hover:text-violet-600 cursor-pointer block text-xs"
+                                className="font-bold text-slate-900 hover:text-indigo-600 cursor-pointer block text-xs tracking-tight"
                               >
                                 {t.name}
                               </span>
-                              <span className="text-[10px] text-slate-400 font-semibold block">
+                              <span className="text-[11px] text-slate-400 font-medium block">
                                 {t.highest_qualification || t.qualification || 'Educator'}
                               </span>
                             </div>
                           </div>
                         </td>
 
-                        <td className="px-4 py-3 font-mono text-[11px] text-slate-600">
-                          <span className="font-bold text-slate-800 block">{t.employee_id}</span>
-                          <span className="text-[10px] text-slate-400 block font-sans">{t.phone || t.email || 'N/A'}</span>
+                        <td className="px-4 py-3.5 font-mono text-[11px] text-slate-600">
+                          <span className="font-bold text-slate-800 block tracking-tight">{t.employee_id}</span>
+                          <span className="text-[10px] text-slate-400 block font-sans">{t.phone || t.email || '—'}</span>
                         </td>
 
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3.5">
                           <span className="font-bold text-slate-800 block text-xs">{t.department}</span>
                           <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className="text-[10px] text-slate-500 font-medium">{t.designation}</span>
+                            <span className="text-[11px] text-slate-500 font-medium">{t.designation}</span>
                             {t.cbse_teaching_level && (
-                              <span className="px-1.5 py-0.2 bg-slate-100 text-slate-600 rounded text-[9px] font-mono font-bold">
+                              <span className="px-1.5 py-0.5 bg-slate-100 border border-slate-200/60 text-slate-600 rounded-md text-[9px] font-mono font-bold">
                                 {t.cbse_teaching_level}
                               </span>
                             )}
                           </div>
                         </td>
 
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3.5">
                           {t.classes_covered && t.classes_covered.length > 0 ? (
                             <div className="flex flex-wrap gap-1">
                               {t.classes_covered.map(c => (
-                                <span key={c} className="px-2 py-0.5 bg-violet-50 border border-violet-100 text-violet-700 rounded-md text-[10px] font-bold">
+                                <span key={c} className="px-2 py-0.5 bg-indigo-50 border border-indigo-100/80 text-indigo-700 rounded-md text-[10px] font-bold">
                                   {c}
                                 </span>
                               ))}
                             </div>
                           ) : (
-                            <span className="text-[11px] text-amber-600 font-semibold flex items-center gap-1">
+                            <span className="text-[11px] text-amber-600 font-medium flex items-center gap-1">
                               <AlertTriangle size={11} /> Unassigned
                             </span>
                           )}
                         </td>
 
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3.5">
                           {t.subjects_taught && t.subjects_taught.length > 0 ? (
                             <span className="font-semibold text-slate-700 text-xs">
                               {t.subjects_taught.join(', ')}
@@ -535,23 +576,24 @@ export default function Teachers() {
                           )}
                         </td>
 
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3.5">
                           <span className={cn(
-                            "px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border",
-                            t.status === 'Active' ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
-                            t.status === 'On Leave' ? "bg-amber-50 text-amber-700 border-amber-200" :
+                            "px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border inline-flex items-center gap-1",
+                            t.status === 'Active' ? "bg-emerald-50 text-emerald-700 border-emerald-200/80" :
+                            t.status === 'On Leave' ? "bg-amber-50 text-amber-700 border-amber-200/80" :
                             "bg-slate-100 text-slate-600 border-slate-200"
                           )}>
+                            <span className={cn("w-1.5 h-1.5 rounded-full", t.status === 'Active' ? "bg-emerald-500" : t.status === 'On Leave' ? "bg-amber-500" : "bg-slate-400")} />
                             {t.status}
                           </span>
                         </td>
 
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-4 py-3.5 text-right">
                           <div className="flex items-center justify-end gap-1">
                             <button
                               onClick={() => handleOpen360(t)}
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-violet-600 hover:bg-violet-50 transition-all cursor-pointer"
-                              title="View Teacher 360 Workspace"
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all cursor-pointer"
+                              title="View Teacher 360 Profile"
                             >
                               <Eye size={14} />
                             </button>
@@ -596,7 +638,7 @@ export default function Teachers() {
 
             <button
               onClick={handleOpenBlankAssign}
-              className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
             >
               <Plus size={14} /> New Assignment
             </button>
@@ -604,27 +646,27 @@ export default function Teachers() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {assignmentMatrix.map(item => (
-              <div key={`${item.class_name}-${item.section_name}`} className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs flex flex-col justify-between space-y-4">
+              <div key={`${item.class_name}-${item.section_name}`} className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs flex flex-col justify-between space-y-4 hover:border-slate-300 transition-all">
                 <div>
                   <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                    <span className="text-base font-display font-black text-slate-900">
+                    <span className="text-base font-bold text-slate-900">
                       Class {item.class_name}-{item.section_name}
                     </span>
-                    <span className="text-[10px] font-mono text-slate-400">Academic Session 2026-27</span>
+                    <span className="text-[10px] font-mono text-slate-400 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-100">Session 2026-27</span>
                   </div>
 
                   {/* Class Teacher Badge */}
-                  <div className="mt-3 p-3 bg-slate-50 border border-slate-100 rounded-xl">
-                    <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider block mb-0.5">
+                  <div className="mt-3 p-3 bg-slate-50/80 border border-slate-100 rounded-xl">
+                    <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider block mb-1">
                       Designated Class Teacher
                     </span>
                     {item.class_teacher ? (
-                      <span className="text-xs font-extrabold text-emerald-700 flex items-center gap-1">
-                        <GraduationCap size={13} /> {item.class_teacher}
+                      <span className="text-xs font-bold text-emerald-700 flex items-center gap-1.5">
+                        <GraduationCap size={14} className="text-emerald-600" /> {item.class_teacher}
                       </span>
                     ) : (
-                      <span className="text-xs font-bold text-amber-600 flex items-center gap-1">
-                        <AlertTriangle size={12} /> Class Teacher Unassigned
+                      <span className="text-xs font-semibold text-amber-600 flex items-center gap-1.5">
+                        <AlertTriangle size={13} className="text-amber-500" /> Class Teacher Unassigned
                       </span>
                     )}
                   </div>
@@ -635,11 +677,11 @@ export default function Teachers() {
                       Subject Evaluators & Teachers ({item.subjects.length})
                     </span>
                     {item.subjects.length === 0 ? (
-                      <span className="text-xs text-slate-400 block italic">No subject faculty mapped</span>
+                      <span className="text-xs text-slate-400 block italic py-1">No subject faculty mapped</span>
                     ) : (
                       item.subjects.map(s => (
                         <div key={s.subject_name} className="flex items-center justify-between text-xs py-1 border-b border-slate-50 last:border-0">
-                          <span className="font-semibold text-slate-700">{s.subject_name}:</span>
+                          <span className="font-semibold text-slate-600">{s.subject_name}:</span>
                           <span className="font-bold text-slate-900">{s.teacher_name}</span>
                         </div>
                       ))
@@ -650,8 +692,8 @@ export default function Teachers() {
                 <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
                   <span className="text-[10px] text-slate-400 font-medium">Canonical ERP Alignment</span>
                   <button
-                    onClick={handleOpenBlankAssign}
-                    className="text-xs font-bold text-violet-600 hover:text-violet-700 flex items-center gap-1 cursor-pointer"
+                    onClick={() => handleModifyClassSection(item)}
+                    className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 cursor-pointer"
                   >
                     Modify <ChevronRight size={13} />
                   </button>
@@ -664,7 +706,7 @@ export default function Teachers() {
 
       {/* 6. TAB 3: WORKLOAD MATRIX */}
       {activeTab === 'workload' && (
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs space-y-4">
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs space-y-4">
           <div>
             <h3 className="text-xs font-black uppercase text-slate-800 tracking-wider">
               Faculty Workload & Allocation Distribution
@@ -674,47 +716,51 @@ export default function Teachers() {
             </p>
           </div>
 
-          <div className="overflow-hidden border border-slate-200 rounded-xl">
+          <div className="overflow-hidden border border-slate-200/80 rounded-2xl shadow-2xs">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 border-b border-slate-200 text-slate-400 uppercase text-[10px] font-black tracking-wider">
+              <thead className="bg-slate-50/90 border-b border-slate-200 text-slate-500 uppercase text-[10px] font-black tracking-wider">
                 <tr>
-                  <th className="px-4 py-3">Teacher</th>
-                  <th className="px-4 py-3">Department</th>
-                  <th className="px-4 py-3">Classes Taught</th>
-                  <th className="px-4 py-3">Subjects</th>
-                  <th className="px-4 py-3">Class Teacher Role</th>
-                  <th className="px-4 py-3 text-right">Workload Compliance</th>
+                  <th className="px-4 py-3.5">Teacher</th>
+                  <th className="px-4 py-3.5">Department</th>
+                  <th className="px-4 py-3.5">Classes Taught</th>
+                  <th className="px-4 py-3.5">Subjects</th>
+                  <th className="px-4 py-3.5">Class Teacher Role</th>
+                  <th className="px-4 py-3.5 text-right">Workload Compliance</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {teachers.map(t => (
-                  <tr key={t.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3 font-extrabold text-slate-900">
-                      {t.name} ({t.employee_id})
+                  <tr key={t.id} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="px-4 py-3.5">
+                      <div className="font-bold text-slate-900 tracking-tight">{t.name}</div>
+                      <div className="text-[10px] font-mono text-slate-400">{t.employee_id}</div>
                     </td>
-                    <td className="px-4 py-3 text-slate-600 font-medium">
+                    <td className="px-4 py-3.5 text-slate-600 font-medium">
                       {t.department}
                     </td>
-                    <td className="px-4 py-3 font-bold text-slate-800">
-                      {t.classes_covered?.join(', ') || 'None'}
+                    <td className="px-4 py-3.5 font-bold text-slate-800">
+                      {t.classes_covered?.join(', ') || '—'}
                     </td>
-                    <td className="px-4 py-3 text-slate-700 font-semibold">
-                      {t.subjects_taught?.join(', ') || 'None'}
+                    <td className="px-4 py-3.5 text-slate-700 font-semibold">
+                      {t.subjects_taught?.join(', ') || '—'}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3.5">
                       {t.is_class_teacher_of ? (
-                        <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md text-[10px] font-black uppercase">
-                          Class {t.is_class_teacher_of}
+                        <span className="px-2.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200/80 rounded-md text-[10px] font-bold uppercase tracking-tight inline-flex items-center gap-1">
+                          <GraduationCap size={12} className="text-emerald-600" /> Class {t.is_class_teacher_of}
                         </span>
                       ) : (
                         <span className="text-slate-400 text-xs">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-4 py-3.5 text-right">
                       <span className={cn(
-                        "px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase",
-                        (t.assignments_count || 0) > 0 ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+                        "px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border inline-flex items-center gap-1",
+                        (t.assignments_count || 0) > 0 
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-200/80" 
+                          : "bg-amber-50 text-amber-700 border-amber-200/80"
                       )}>
+                        <span className={cn("w-1.5 h-1.5 rounded-full", (t.assignments_count || 0) > 0 ? "bg-emerald-500" : "bg-amber-500")} />
                         {(t.assignments_count || 0) > 0 ? 'Allocated' : 'Pending Allocation'}
                       </span>
                     </td>

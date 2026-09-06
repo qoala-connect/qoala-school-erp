@@ -71,9 +71,12 @@ for (const file of files) {
   process.stdout.write(`applying ${file} ... `);
   const sql = fs.readFileSync(file, 'utf8');
   try {
-    if (token) await applyViaManagementApi(token, sql, file);
+    let out;
+    if (token) out = await applyViaManagementApi(token, sql, file);
     else await applyViaPostgres(sql);
     console.log('ok');
+    // Print any rows the statement returned, so this doubles as a query tool.
+    if (out && out !== '[]') console.log(out.slice(0, 4000));
   } catch (err) {
     console.log('FAILED');
     console.error(`   ${err.message}`);

@@ -740,14 +740,14 @@ export default function AttendanceEntry() {
   };
 
   return (
-    <div className="space-y-5 max-w-7xl mx-auto pb-16 text-slate-700">
+    <div className="space-y-6 max-w-7xl mx-auto pb-16 text-slate-700">
       {/* 1. Header Banner & Institution Context */}
       <AdminHeader
-        title="Attendance Management System"
-        subtitle="Authoritative register for student roll-call, leave synchronization, and CBSE audit compliance."
+        title="Attendance Management"
+        subtitle="Student roll-call register, leave synchronization, and CBSE audit compliance."
         badge={{
           icon: CalendarCheck,
-          text: 'CBSE Attendance Register',
+          text: 'Attendance Register',
           variant: 'primary'
         }}
         sessionBadge="Session: 2026-27"
@@ -755,7 +755,7 @@ export default function AttendanceEntry() {
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => navigate('/dashboard/students')}
-              className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-bold transition-all border border-slate-200/80 flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              className="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-semibold transition-all border border-slate-200/80 flex items-center gap-1.5 cursor-pointer shadow-2xs"
               title="Go to Students SIS Directory"
             >
               <Users size={14} className="text-blue-600" />
@@ -763,7 +763,7 @@ export default function AttendanceEntry() {
             </button>
             <button
               onClick={() => navigate('/dashboard/academics', { state: { activeTab: 'classes' } })}
-              className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-bold transition-all border border-slate-200/80 flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              className="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-semibold transition-all border border-slate-200/80 flex items-center gap-1.5 cursor-pointer shadow-2xs"
               title="Manage Classes & Sections in Academics"
             >
               <GraduationCap size={14} className="text-indigo-600" />
@@ -771,7 +771,7 @@ export default function AttendanceEntry() {
             </button>
             <button
               onClick={() => navigate('/dashboard/communication')}
-              className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-bold transition-all border border-slate-200/80 flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              className="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-semibold transition-all border border-slate-200/80 flex items-center gap-1.5 cursor-pointer shadow-2xs"
               title="Send Absence Alerts via Communication Hub"
             >
               <Send size={14} className="text-emerald-600" />
@@ -781,8 +781,8 @@ export default function AttendanceEntry() {
         }
       />
 
-      {/* 2. Top-Level Tab Navigation */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-1.5 shadow-2xs overflow-x-auto">
+      {/* 2. Top-Level Tab Navigation (Enterprise Segmented Dock) */}
+      <div className="bg-slate-100/90 rounded-2xl border border-slate-200/80 p-1.5 shadow-2xs overflow-x-auto no-scrollbar">
         <div className="flex items-center gap-1 min-w-max">
           {[
             { id: 'register', label: 'Daily Register', icon: CalendarCheck },
@@ -799,11 +799,11 @@ export default function AttendanceEntry() {
                 className={cn(
                   "flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer",
                   isActive
-                    ? "bg-slate-900 text-white shadow-xs"
-                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                    ? "bg-white text-slate-900 shadow-xs border border-slate-200/80"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
                 )}
               >
-                <Icon size={14} className={isActive ? "text-violet-400" : "text-slate-400"} />
+                <Icon size={14} className={isActive ? "text-indigo-600" : "text-slate-400"} />
                 <span>{tab.label}</span>
               </button>
             );
@@ -815,14 +815,14 @@ export default function AttendanceEntry() {
       {/* TAB 1: DAILY ATTENDANCE REGISTER */}
       {/* ========================================================================= */}
       {activeTab === 'register' && (
-        <div className="space-y-4">
+        <div className="space-y-5">
           {/* Teacher Assigned Classes Quick Switch Strip */}
           {isTeacher && teacherAssignedClasses.length > 0 && (
-            <div className="bg-blue-50/80 border border-blue-200 rounded-2xl p-3 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
+            <div className="bg-indigo-50/70 border border-indigo-100 rounded-2xl p-3.5 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
               <div className="flex items-center gap-2">
-                <GraduationCap className="w-4 h-4 text-blue-700" />
-                <span className="text-xs font-bold text-blue-950">
-                  Your Assigned Classes ({teacherProfile?.name || 'Faculty'}):
+                <GraduationCap className="w-4 h-4 text-indigo-700" />
+                <span className="text-xs font-bold text-indigo-950">
+                  Assigned Classes ({teacherProfile?.name || 'Faculty'}):
                 </span>
               </div>
               <div className="flex flex-wrap items-center gap-1.5">
@@ -838,12 +838,12 @@ export default function AttendanceEntry() {
                       className={cn(
                         "px-3 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer",
                         isSelected
-                          ? "bg-blue-600 text-white shadow-xs"
-                          : "bg-white text-blue-700 border border-blue-200 hover:bg-blue-100/50"
+                          ? "bg-indigo-600 text-white shadow-xs"
+                          : "bg-white text-indigo-700 border border-indigo-200 hover:bg-indigo-100/50"
                       )}
                     >
                       <span>Class {ac.class_name} - Sec {ac.section_name}</span>
-                      {isSelected && <CheckCircle2 size={12} className="text-blue-100" />}
+                      {isSelected && <CheckCircle2 size={12} className="text-indigo-100" />}
                     </button>
                   );
                 })}
@@ -853,18 +853,18 @@ export default function AttendanceEntry() {
 
           {/* Holiday Alert Banner (if date coincides with school holiday) */}
           {activeHoliday && (
-            <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-3 text-amber-900 shadow-2xs">
+            <div className="p-4 bg-amber-50 border border-amber-200/80 rounded-2xl flex items-start gap-3 text-amber-900 shadow-2xs">
               <CalendarX className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
               <div className="flex-1 text-xs">
-                <div className="font-extrabold text-sm text-amber-900 flex items-center gap-2">
+                <div className="font-bold text-sm text-amber-950 flex items-center gap-2">
                   Official School Holiday: {activeHoliday.title}
                   {activeHoliday.is_national && (
-                    <span className="px-2 py-0.5 bg-amber-200 text-amber-900 rounded text-[9px] font-black uppercase">
+                    <span className="px-2 py-0.5 bg-amber-200/80 text-amber-900 rounded-md text-[10px] font-bold uppercase tracking-wider">
                       National
                     </span>
                   )}
                 </div>
-                <p className="text-amber-700 mt-0.5">
+                <p className="text-amber-800/80 mt-0.5 font-medium">
                   {activeHoliday.description || 'This date is declared a non-instructional holiday in the School Calendar.'}
                 </p>
               </div>
@@ -872,11 +872,11 @@ export default function AttendanceEntry() {
           )}
 
           {/* Filter Bar */}
-          <div className="bg-white rounded-[24px] border border-slate-200/70 p-4 sm:p-5 shadow-xs flex flex-wrap items-center justify-between gap-4">
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 shadow-xs flex flex-wrap items-center justify-between gap-4">
             <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
               {/* Date Input */}
               <div className="flex flex-col min-w-[150px]">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1">
+                <span className="text-[11px] font-semibold text-slate-500 pl-1 mb-1.5">
                   Attendance Date
                 </span>
                 <div className="relative">
@@ -886,20 +886,20 @@ export default function AttendanceEntry() {
                     value={selectedDate}
                     max={new Date().toISOString().split('T')[0]} // CBSE constraint: cannot mark future attendance
                     onChange={(e) => setSelectedDate(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 pl-9 pr-3 text-xs sm:text-sm font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-600 transition-all"
+                    className="w-full bg-slate-50/80 hover:bg-slate-50 border border-slate-200/90 rounded-xl py-2 pl-9 pr-3 text-xs sm:text-sm font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all"
                   />
                 </div>
               </div>
 
               {/* Class Selector */}
               <div className="flex flex-col min-w-[130px]">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1">
-                  Enrolled Class
+                <span className="text-[11px] font-semibold text-slate-500 pl-1 mb-1.5">
+                  Class
                 </span>
                 <select 
                   value={selectedClass} 
                   onChange={(e) => setSelectedClass(e.target.value)}
-                  className="bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs sm:text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-600 cursor-pointer"
+                  className="bg-slate-50/80 hover:bg-slate-50 border border-slate-200/90 rounded-xl py-2 px-3 text-xs sm:text-sm font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 cursor-pointer transition-all"
                 >
                   {classOptions.length === 0 && <option value="">No classes found</option>}
                   {classOptions.map(c => (
@@ -910,13 +910,13 @@ export default function AttendanceEntry() {
 
               {/* Section Selector */}
               <div className="flex flex-col min-w-[110px]">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1">
+                <span className="text-[11px] font-semibold text-slate-500 pl-1 mb-1.5">
                   Section
                 </span>
                 <select 
                   value={selectedSection} 
                   onChange={(e) => setSelectedSection(e.target.value)}
-                  className="bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs sm:text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-600 cursor-pointer"
+                  className="bg-slate-50/80 hover:bg-slate-50 border border-slate-200/90 rounded-xl py-2 px-3 text-xs sm:text-sm font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 cursor-pointer transition-all"
                 >
                   {sectionOptions.length === 0 && <option value="">No sections</option>}
                   {sectionOptions.map(sec => (
@@ -927,14 +927,14 @@ export default function AttendanceEntry() {
 
               {/* Designated Class Teacher Display */}
               <div className="flex flex-col min-w-[140px]">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1">
+                <span className="text-[11px] font-semibold text-slate-500 pl-1 mb-1.5">
                   Class Teacher
                 </span>
                 <div className={cn(
-                  "flex items-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold border transition-all h-[38px]",
+                  "flex items-center gap-1.5 py-2 px-3 rounded-xl text-xs font-semibold border transition-all h-[38px]",
                   classTeacherName 
-                    ? "bg-emerald-50 text-emerald-800 border-emerald-200" 
-                    : "bg-slate-50 text-slate-400 border-slate-200"
+                    ? "bg-emerald-50/70 text-emerald-800 border-emerald-200" 
+                    : "bg-slate-50 text-slate-400 border-slate-200/80"
                 )}>
                   <GraduationCap size={14} className={classTeacherName ? "text-emerald-600 shrink-0" : "text-slate-400 shrink-0"} />
                   <span className="truncate">{classTeacherName || 'Not Assigned'}</span>
@@ -942,8 +942,8 @@ export default function AttendanceEntry() {
               </div>
 
               {/* Student Search */}
-              <div className="flex flex-col min-w-[200px] flex-1 sm:flex-initial">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1">
+              <div className="flex flex-col min-w-[220px] flex-1 sm:flex-initial">
+                <span className="text-[11px] font-semibold text-slate-500 pl-1 mb-1.5">
                   Filter Roster
                 </span>
                 <div className="relative">
@@ -953,12 +953,12 @@ export default function AttendanceEntry() {
                     placeholder="Search name, roll, admission..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 pl-9 pr-3 text-xs sm:text-sm text-slate-800 outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-600 transition-all placeholder:text-slate-400 font-medium"
+                    className="w-full bg-slate-50/80 hover:bg-slate-50 border border-slate-200/90 rounded-xl py-2 pl-9 pr-8 text-xs sm:text-sm text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all placeholder:text-slate-400 font-medium"
                   />
                   {searchQuery && (
                     <button 
                       onClick={() => setSearchQuery('')}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
                     >
                       <X size={14} />
                     </button>
@@ -971,26 +971,26 @@ export default function AttendanceEntry() {
             <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto justify-end pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-100">
               <button 
                 onClick={() => handleBulkStatusChange('present')}
-                className="px-3.5 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200/80 hover:bg-emerald-100 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-1.5"
+                className="px-3.5 py-2 bg-emerald-50/80 text-emerald-700 border border-emerald-200/80 hover:bg-emerald-100/70 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
                 title="Mark all students as Present"
               >
-                <CheckCircle2 size={14} />
+                <CheckCircle2 size={14} className="text-emerald-600" />
                 All Present
               </button>
 
               <button 
                 onClick={() => handleBulkStatusChange('absent')}
-                className="px-3.5 py-2 bg-rose-50 text-rose-700 border border-rose-200/80 hover:bg-rose-100 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-1.5"
+                className="px-3.5 py-2 bg-rose-50/80 text-rose-700 border border-rose-200/80 hover:bg-rose-100/70 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
                 title="Mark all students as Absent"
               >
-                <XCircle size={14} />
+                <XCircle size={14} className="text-rose-600" />
                 All Absent
               </button>
 
               <button 
                 onClick={handleSaveAttendance}
                 disabled={isSaving || students.length === 0}
-                className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white rounded-xl text-xs font-extrabold transition-all shadow-md shadow-violet-600/20 disabled:opacity-50 cursor-pointer"
+                className="flex items-center gap-2 px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs disabled:opacity-50 cursor-pointer"
               >
                 {isSaving ? <RefreshCcw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 Save Register
@@ -999,52 +999,58 @@ export default function AttendanceEntry() {
           </div>
 
           {/* Real-time Register Status Strip */}
-          <div className="grid grid-cols-2 sm:grid-cols-6 gap-2.5">
-            <div className="bg-white border border-slate-200/60 rounded-2xl p-3 shadow-2xs">
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Enrolled</span>
-              <span className="text-xl font-black text-slate-800">{registerStats.total}</span>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className="bg-white border border-slate-200/80 rounded-2xl p-3.5 shadow-2xs relative overflow-hidden">
+              <div className="w-1 absolute top-0 bottom-0 left-0 bg-slate-300" />
+              <span className="text-[11px] font-semibold text-slate-500 block">Enrolled</span>
+              <span className="text-2xl font-bold tracking-tight text-slate-900 tabular-nums">{registerStats.total}</span>
             </div>
-            <div className="bg-emerald-50/70 border border-emerald-200/60 rounded-2xl p-3 shadow-2xs">
-              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700 block">Present</span>
-              <span className="text-xl font-black text-emerald-800">{registerStats.present}</span>
+            <div className="bg-white border border-slate-200/80 rounded-2xl p-3.5 shadow-2xs relative overflow-hidden">
+              <div className="w-1 absolute top-0 bottom-0 left-0 bg-emerald-500" />
+              <span className="text-[11px] font-semibold text-emerald-700 block">Present</span>
+              <span className="text-2xl font-bold tracking-tight text-emerald-800 tabular-nums">{registerStats.present}</span>
             </div>
-            <div className="bg-rose-50/70 border border-rose-200/60 rounded-2xl p-3 shadow-2xs">
-              <span className="text-[10px] font-black uppercase tracking-wider text-rose-700 block">Absent</span>
-              <span className="text-xl font-black text-rose-800">{registerStats.absent}</span>
+            <div className="bg-white border border-slate-200/80 rounded-2xl p-3.5 shadow-2xs relative overflow-hidden">
+              <div className="w-1 absolute top-0 bottom-0 left-0 bg-rose-500" />
+              <span className="text-[11px] font-semibold text-rose-700 block">Absent</span>
+              <span className="text-2xl font-bold tracking-tight text-rose-800 tabular-nums">{registerStats.absent}</span>
             </div>
-            <div className="bg-amber-50/70 border border-amber-200/60 rounded-2xl p-3 shadow-2xs">
-              <span className="text-[10px] font-black uppercase tracking-wider text-amber-700 block">Late</span>
-              <span className="text-xl font-black text-amber-800">{registerStats.late}</span>
+            <div className="bg-white border border-slate-200/80 rounded-2xl p-3.5 shadow-2xs relative overflow-hidden">
+              <div className="w-1 absolute top-0 bottom-0 left-0 bg-amber-500" />
+              <span className="text-[11px] font-semibold text-amber-700 block">Late</span>
+              <span className="text-2xl font-bold tracking-tight text-amber-800 tabular-nums">{registerStats.late}</span>
             </div>
-            <div className="bg-indigo-50/70 border border-indigo-200/60 rounded-2xl p-3 shadow-2xs">
-              <span className="text-[10px] font-black uppercase tracking-wider text-indigo-700 block">Leave</span>
-              <span className="text-xl font-black text-indigo-800">{registerStats.leave}</span>
+            <div className="bg-white border border-slate-200/80 rounded-2xl p-3.5 shadow-2xs relative overflow-hidden">
+              <div className="w-1 absolute top-0 bottom-0 left-0 bg-indigo-500" />
+              <span className="text-[11px] font-semibold text-indigo-700 block">Leave</span>
+              <span className="text-2xl font-bold tracking-tight text-indigo-800 tabular-nums">{registerStats.leave}</span>
             </div>
-            <div className="bg-violet-50/70 border border-violet-200/60 rounded-2xl p-3 shadow-2xs">
-              <span className="text-[10px] font-black uppercase tracking-wider text-violet-700 block">Attendance %</span>
-              <span className="text-xl font-black text-violet-800">{registerStats.attendanceRate}%</span>
+            <div className="bg-white border border-slate-200/80 rounded-2xl p-3.5 shadow-2xs relative overflow-hidden">
+              <div className="w-1 absolute top-0 bottom-0 left-0 bg-violet-500" />
+              <span className="text-[11px] font-semibold text-violet-700 block">Attendance Rate</span>
+              <span className="text-2xl font-bold tracking-tight text-violet-900 tabular-nums">{registerStats.attendanceRate}%</span>
             </div>
           </div>
 
           {/* Student Register Table Card */}
-          <div className="bg-white border border-slate-200/70 shadow-xs rounded-[24px] overflow-hidden">
+          <div className="bg-white border border-slate-200/80 shadow-xs rounded-2xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full min-w-[850px] text-left border-collapse">
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50/70">
-                    <th className="py-3.5 px-5 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[70px] text-center">Roll</th>
-                    <th className="py-3.5 px-5 text-[10px] font-black text-slate-400 uppercase tracking-wider">Student Profile</th>
-                    <th className="py-3.5 px-4 text-[10px] font-black text-slate-400 uppercase tracking-wider text-center w-[130px]">Adm No</th>
-                    <th className="py-3.5 px-4 text-[10px] font-black text-slate-400 uppercase tracking-wider text-center w-[110px]">CBSE Overall</th>
-                    <th className="py-3.5 px-6 text-[10px] font-black text-slate-400 uppercase tracking-wider text-center w-[340px]">Mark Status</th>
-                    <th className="py-3.5 px-4 text-[10px] font-black text-slate-400 uppercase tracking-wider text-center w-[110px]">Remarks</th>
+                    <th className="py-3 px-5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider w-[70px] text-center">Roll</th>
+                    <th className="py-3 px-5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Student Profile</th>
+                    <th className="py-3 px-4 text-[11px] font-semibold text-slate-500 uppercase tracking-wider text-center w-[130px]">Adm No</th>
+                    <th className="py-3 px-4 text-[11px] font-semibold text-slate-500 uppercase tracking-wider text-center w-[110px]">CBSE Overall</th>
+                    <th className="py-3 px-6 text-[11px] font-semibold text-slate-500 uppercase tracking-wider text-center w-[340px]">Mark Status</th>
+                    <th className="py-3 px-4 text-[11px] font-semibold text-slate-500 uppercase tracking-wider text-center w-[110px]">Remarks</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {isLoading ? (
                     <tr>
                       <td colSpan={6} className="py-16 text-center text-slate-500 font-medium text-sm">
-                        <RefreshCcw className="w-6 h-6 animate-spin mx-auto mb-2 text-violet-600" />
+                        <RefreshCcw className="w-6 h-6 animate-spin mx-auto mb-2 text-indigo-600" />
                         Loading student register from database...
                       </td>
                     </tr>
@@ -1088,13 +1094,13 @@ export default function AttendanceEntry() {
                           {/* Student Details & SIS Link */}
                           <td className="py-3.5 px-5">
                             <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full bg-violet-50 text-violet-700 font-bold flex items-center justify-center text-xs border border-violet-100 shrink-0">
+                              <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-700 font-bold flex items-center justify-center text-xs border border-indigo-100 shrink-0">
                                 {s.name.charAt(0)}
                               </div>
                               <div className="min-w-0">
                                 <button
                                   onClick={() => navigate('/dashboard/students', { state: { selectedStudentId: s.id } })}
-                                  className="font-bold text-slate-900 hover:text-violet-600 transition-colors text-xs text-left truncate flex items-center gap-1 cursor-pointer"
+                                  className="font-bold text-slate-900 hover:text-indigo-600 transition-colors text-xs text-left truncate flex items-center gap-1 cursor-pointer"
                                   title="View full Student 360 profile"
                                 >
                                   {s.name}
@@ -1117,13 +1123,13 @@ export default function AttendanceEntry() {
                             {typeof cbsePct === 'number' ? (
                               <div className="inline-flex flex-col items-center">
                                 <span className={cn(
-                                  "text-xs font-black font-mono",
+                                  "text-xs font-bold font-mono",
                                   hasCbseWarning ? "text-rose-600" : "text-emerald-700"
-                                )}>
+                                  )}>
                                   {cbsePct.toFixed(0)}%
                                 </span>
                                 {hasCbseWarning && (
-                                  <span className="text-[8px] font-black uppercase text-rose-600 bg-rose-50 border border-rose-200 px-1 rounded mt-0.5">
+                                  <span className="text-[9px] font-bold uppercase tracking-wider text-rose-600 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded-md mt-0.5">
                                     Defaulter
                                   </span>
                                 )}
@@ -1135,7 +1141,7 @@ export default function AttendanceEntry() {
 
                           {/* Status Marking Buttons */}
                           <td className="py-3.5 px-6">
-                            <div className="flex items-center justify-center gap-1">
+                            <div className="flex items-center justify-center gap-1.5">
                               {ATTENDANCE_STATUSES.map((btn) => {
                                 const isSelected = currentStatus === btn.id;
                                 return (
@@ -1143,10 +1149,10 @@ export default function AttendanceEntry() {
                                     key={btn.id}
                                     onClick={() => handleToggleStatus(s.id, btn.id)}
                                     className={cn(
-                                      "px-2.5 py-1.5 rounded-lg text-[10px] font-extrabold uppercase tracking-wider transition-all cursor-pointer select-none",
+                                      "px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer select-none",
                                       isSelected 
                                         ? btn.activeBg 
-                                        : "bg-slate-100 hover:bg-slate-200 text-slate-600"
+                                        : "bg-slate-100 hover:bg-slate-200/80 text-slate-600"
                                     )}
                                     title={`Mark as ${btn.label}`}
                                   >
@@ -1156,7 +1162,7 @@ export default function AttendanceEntry() {
                               })}
                             </div>
                             {hasApprovedLeave && currentStatus === 'leave' && (
-                              <span className="text-[9px] text-indigo-600 font-bold block text-center mt-1">
+                              <span className="text-[10px] text-indigo-600 font-semibold block text-center mt-1">
                                 ✓ Approved School Leave
                               </span>
                             )}
@@ -1167,14 +1173,14 @@ export default function AttendanceEntry() {
                             <button
                               onClick={() => openRemarksModal(s)}
                               className={cn(
-                                "p-1.5 rounded-lg text-xs transition-all cursor-pointer",
+                                "p-2 rounded-xl text-xs transition-all cursor-pointer",
                                 currentRemark 
-                                  ? "bg-violet-50 text-violet-700 border border-violet-200 font-bold" 
+                                  ? "bg-indigo-50 text-indigo-700 border border-indigo-200 font-bold" 
                                   : "text-slate-400 hover:text-slate-700 hover:bg-slate-100"
                               )}
                               title={currentRemark ? `Remark: ${currentRemark}` : 'Add note/reason'}
                             >
-                              <FileText size={14} />
+                              <FileText size={15} />
                             </button>
                           </td>
                         </tr>
@@ -1191,20 +1197,23 @@ export default function AttendanceEntry() {
       {/* ========================================================================= */}
       {/* TAB 2: ATTENDANCE HISTORY & AUDIT LOGS */}
       {/* ========================================================================= */}
+      {/* ========================================================================= */}
+      {/* TAB 2: ATTENDANCE HISTORY & AUDIT LOGS */}
+      {/* ========================================================================= */}
       {activeTab === 'history' && (
-        <div className="space-y-4">
+        <div className="space-y-5">
           {/* History Filters & Actions */}
-          <div className="bg-white rounded-[24px] border border-slate-200/70 p-4 sm:p-5 shadow-xs flex flex-wrap items-center justify-between gap-4">
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 shadow-xs flex flex-wrap items-center justify-between gap-4">
             <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
               {/* Date Range Filter */}
               <div className="flex flex-col min-w-[130px]">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1">
+                <span className="text-[11px] font-semibold text-slate-500 pl-1 mb-1.5">
                   Timeframe
                 </span>
                 <select 
                   value={historyDateRange} 
                   onChange={(e: any) => setHistoryDateRange(e.target.value)}
-                  className="bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs sm:text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-violet-500/20 cursor-pointer"
+                  className="bg-slate-50/80 hover:bg-slate-50 border border-slate-200/90 rounded-xl py-2 px-3 text-xs sm:text-sm font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer transition-all"
                 >
                   <option value="today">Today Only</option>
                   <option value="week">Last 7 Days</option>
@@ -1215,13 +1224,13 @@ export default function AttendanceEntry() {
 
               {/* Status Filter */}
               <div className="flex flex-col min-w-[120px]">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1">
+                <span className="text-[11px] font-semibold text-slate-500 pl-1 mb-1.5">
                   Status
                 </span>
                 <select 
                   value={historyStatusFilter} 
                   onChange={(e) => setHistoryStatusFilter(e.target.value)}
-                  className="bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs sm:text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-violet-500/20 cursor-pointer"
+                  className="bg-slate-50/80 hover:bg-slate-50 border border-slate-200/90 rounded-xl py-2 px-3 text-xs sm:text-sm font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer transition-all"
                 >
                   <option value="all">All Statuses</option>
                   <option value="present">Present Only</option>
@@ -1233,13 +1242,13 @@ export default function AttendanceEntry() {
 
               {/* Class Filter */}
               <div className="flex flex-col min-w-[120px]">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1">
+                <span className="text-[11px] font-semibold text-slate-500 pl-1 mb-1.5">
                   Class
                 </span>
                 <select 
                   value={selectedClass} 
                   onChange={(e) => setSelectedClass(e.target.value)}
-                  className="bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs sm:text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-violet-500/20 cursor-pointer"
+                  className="bg-slate-50/80 hover:bg-slate-50 border border-slate-200/90 rounded-xl py-2 px-3 text-xs sm:text-sm font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer transition-all"
                 >
                   <option value="">All Classes</option>
                   {classOptions.map(c => (
@@ -1249,8 +1258,8 @@ export default function AttendanceEntry() {
               </div>
 
               {/* Search History */}
-              <div className="flex flex-col min-w-[200px]">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1">
+              <div className="flex flex-col min-w-[220px]">
+                <span className="text-[11px] font-semibold text-slate-500 pl-1 mb-1.5">
                   Search Log
                 </span>
                 <div className="relative">
@@ -1260,7 +1269,7 @@ export default function AttendanceEntry() {
                     placeholder="Search student or roll..."
                     value={historySearchQuery}
                     onChange={(e) => setHistorySearchQuery(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 pl-9 pr-3 text-xs sm:text-sm text-slate-800 outline-none focus:ring-2 focus:ring-violet-500/20 font-medium"
+                    className="w-full bg-slate-50/80 hover:bg-slate-50 border border-slate-200/90 rounded-xl py-2 pl-9 pr-3 text-xs sm:text-sm text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500/20 font-medium transition-all"
                   />
                 </div>
               </div>
@@ -1270,40 +1279,40 @@ export default function AttendanceEntry() {
             <div className="flex items-center gap-2">
               <button 
                 onClick={fetchHistoryLogs}
-                className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl transition-all cursor-pointer"
+                className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/90 rounded-xl transition-all cursor-pointer"
                 title="Refresh audit log"
               >
                 <RefreshCcw size={15} />
               </button>
               <button 
                 onClick={exportHistoryToCSV}
-                className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center gap-2 cursor-pointer"
+                className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-800 border border-slate-200/80 rounded-xl text-xs font-semibold transition-all shadow-2xs flex items-center gap-2 cursor-pointer"
               >
-                <Download size={14} className="text-violet-600" />
+                <Download size={14} className="text-indigo-600" />
                 Export CSV
               </button>
             </div>
           </div>
 
           {/* History Records Table */}
-          <div className="bg-white border border-slate-200/70 shadow-xs rounded-[24px] overflow-hidden">
+          <div className="bg-white border border-slate-200/80 shadow-xs rounded-2xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full min-w-[850px] text-left border-collapse">
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50/70">
-                    <th className="py-3.5 px-5 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[120px]">Date</th>
-                    <th className="py-3.5 px-5 text-[10px] font-black text-slate-400 uppercase tracking-wider">Student Details</th>
-                    <th className="py-3.5 px-4 text-[10px] font-black text-slate-400 uppercase tracking-wider text-center w-[120px]">Class & Sec</th>
-                    <th className="py-3.5 px-4 text-[10px] font-black text-slate-400 uppercase tracking-wider text-center w-[130px]">Status</th>
-                    <th className="py-3.5 px-5 text-[10px] font-black text-slate-400 uppercase tracking-wider">Remarks / Reason</th>
-                    <th className="py-3.5 px-4 text-[10px] font-black text-slate-400 uppercase tracking-wider text-right w-[150px]">Recorded At</th>
+                    <th className="py-3 px-5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider w-[120px]">Date</th>
+                    <th className="py-3 px-5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Student Details</th>
+                    <th className="py-3 px-4 text-[11px] font-semibold text-slate-500 uppercase tracking-wider text-center w-[120px]">Class & Sec</th>
+                    <th className="py-3 px-4 text-[11px] font-semibold text-slate-500 uppercase tracking-wider text-center w-[130px]">Status</th>
+                    <th className="py-3 px-5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Remarks / Reason</th>
+                    <th className="py-3 px-4 text-[11px] font-semibold text-slate-500 uppercase tracking-wider text-right w-[150px]">Recorded At</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {historyLoading ? (
                     <tr>
                       <td colSpan={6} className="py-16 text-center text-slate-500 font-medium text-sm">
-                        <RefreshCcw className="w-6 h-6 animate-spin mx-auto mb-2 text-violet-600" />
+                        <RefreshCcw className="w-6 h-6 animate-spin mx-auto mb-2 text-indigo-600" />
                         Loading attendance history logs...
                       </td>
                     </tr>
@@ -1333,17 +1342,17 @@ export default function AttendanceEntry() {
                           </td>
                           <td className="py-3.5 px-4 text-center">
                             <span className={cn(
-                              "inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border",
+                              "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border",
                               statusConfig.badgeBg
                             )}>
-                              <StatusIcon size={11} />
+                              <StatusIcon size={12} />
                               {statusConfig.label}
                             </span>
                           </td>
-                          <td className="py-3.5 px-5 text-xs text-slate-600">
+                          <td className="py-3.5 px-5 text-xs text-slate-600 font-medium">
                             {rec.remarks || '—'}
                           </td>
-                          <td className="py-3.5 px-4 text-right font-mono text-[10px] text-slate-400">
+                          <td className="py-3.5 px-4 text-right font-mono text-[11px] text-slate-400">
                             {rec.updated_at ? new Date(rec.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
                           </td>
                         </tr>
@@ -1364,30 +1373,33 @@ export default function AttendanceEntry() {
         <div className="space-y-5">
           {/* Top KPI row */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-white border border-slate-200/70 rounded-2xl p-5 shadow-xs space-y-1">
-              <div className="flex items-center justify-between text-slate-400 text-xs font-bold">
+            <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs space-y-1 relative overflow-hidden">
+              <div className="w-1 absolute top-0 bottom-0 left-0 bg-indigo-500" />
+              <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
                 <span>CBSE Minimum Threshold</span>
-                <ShieldAlert size={16} className="text-violet-600" />
+                <ShieldAlert size={16} className="text-indigo-600" />
               </div>
-              <div className="text-2xl font-black text-slate-900">75.0%</div>
+              <div className="text-2xl font-bold tracking-tight text-slate-900 tabular-nums">75.0%</div>
               <p className="text-[11px] text-slate-500 font-medium">Mandatory requirement for board exam eligibility.</p>
             </div>
 
-            <div className="bg-white border border-slate-200/70 rounded-2xl p-5 shadow-xs space-y-1">
-              <div className="flex items-center justify-between text-slate-400 text-xs font-bold">
+            <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs space-y-1 relative overflow-hidden">
+              <div className="w-1 absolute top-0 bottom-0 left-0 bg-rose-500" />
+              <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
                 <span>Total Defaulters Identified</span>
                 <AlertTriangle size={16} className="text-rose-600" />
               </div>
-              <div className="text-2xl font-black text-rose-600">{cbseDefaulters.length} Students</div>
+              <div className="text-2xl font-bold tracking-tight text-rose-700 tabular-nums">{cbseDefaulters.length} Students</div>
               <p className="text-[11px] text-slate-500 font-medium">Students falling below the 75% attendance threshold.</p>
             </div>
 
-            <div className="bg-white border border-slate-200/70 rounded-2xl p-5 shadow-xs space-y-1">
-              <div className="flex items-center justify-between text-slate-400 text-xs font-bold">
+            <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs space-y-1 relative overflow-hidden">
+              <div className="w-1 absolute top-0 bottom-0 left-0 bg-emerald-500" />
+              <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
                 <span>Institution Overall Rate</span>
                 <TrendingUp size={16} className="text-emerald-600" />
               </div>
-              <div className="text-2xl font-black text-emerald-700">
+              <div className="text-2xl font-bold tracking-tight text-emerald-800 tabular-nums">
                 {classSummaries.length > 0
                   ? `${Math.round(classSummaries.reduce((sum, c) => sum + (Number(c.ratio) || 0), 0) / classSummaries.length)}%`
                   : '—'}
@@ -1397,15 +1409,15 @@ export default function AttendanceEntry() {
           </div>
 
           {/* Class-wise Attendance Comparison Matrix */}
-          <div className="bg-white border border-slate-200/70 rounded-[24px] p-5 shadow-xs space-y-4">
+          <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="font-display font-extrabold text-slate-900 text-sm">Class-wise Attendance Ratio Matrix</h3>
+                <h3 className="font-bold text-slate-900 text-sm">Class-wise Attendance Ratio Matrix</h3>
                 <p className="text-[11px] text-slate-500">Attendance percentages aggregated per academic class.</p>
               </div>
               <button 
                 onClick={() => navigate('/dashboard/reports')}
-                className="text-xs font-bold text-violet-600 hover:underline flex items-center gap-1 cursor-pointer"
+                className="text-xs font-semibold text-indigo-600 hover:underline flex items-center gap-1 cursor-pointer"
               >
                 Full Institutional Reports <ChevronRight size={14} />
               </button>
@@ -1415,11 +1427,11 @@ export default function AttendanceEntry() {
               {classSummaries.map((cls) => {
                 const ratio = Number(cls.ratio) || 100;
                 return (
-                  <div key={cls.class} className="p-3.5 bg-slate-50 border border-slate-200/60 rounded-xl space-y-2">
+                  <div key={cls.class} className="p-3.5 bg-slate-50/80 border border-slate-200/70 rounded-xl space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="font-extrabold text-xs text-slate-900">{cls.class}</span>
+                      <span className="font-bold text-xs text-slate-900">{cls.class}</span>
                       <span className={cn(
-                        "text-xs font-black font-mono",
+                        "text-xs font-bold font-mono",
                         ratio < 75 ? "text-rose-600" : "text-emerald-700"
                       )}>
                         {ratio}%
@@ -1435,7 +1447,7 @@ export default function AttendanceEntry() {
                         style={{ width: `${Math.min(100, ratio)}%` }}
                       />
                     </div>
-                    <div className="flex justify-between text-[10px] text-slate-400 font-mono">
+                    <div className="flex justify-between text-[10px] text-slate-500 font-mono">
                       <span>Present: {cls.present}</span>
                       <span>Absent: {cls.absent}</span>
                     </div>
@@ -1446,10 +1458,10 @@ export default function AttendanceEntry() {
           </div>
 
           {/* CBSE Defaulters Warning List */}
-          <div className="bg-white border border-slate-200/70 rounded-[24px] overflow-hidden shadow-xs space-y-0">
+          <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-xs space-y-0">
             <div className="p-5 border-b border-slate-100 flex items-center justify-between">
               <div>
-                <h3 className="font-display font-extrabold text-slate-900 text-sm flex items-center gap-2">
+                <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
                   <ShieldAlert size={16} className="text-rose-600" />
                   CBSE Attendance Defaulters List (&lt;75%)
                 </h3>
@@ -1459,7 +1471,7 @@ export default function AttendanceEntry() {
               </div>
               <button
                 onClick={() => navigate('/dashboard/communication')}
-                className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
               >
                 <Send size={12} />
                 Broadcast Parent Notice
@@ -1469,7 +1481,7 @@ export default function AttendanceEntry() {
             <div className="overflow-x-auto">
               <table className="w-full text-xs text-left">
                 <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50/70 text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                  <tr className="border-b border-slate-100 bg-slate-50/70 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
                     <th className="py-3 px-5">Student Name</th>
                     <th className="py-3 px-4 text-center">Class</th>
                     <th className="py-3 px-4 text-center">Roll No</th>
@@ -1498,14 +1510,14 @@ export default function AttendanceEntry() {
                         <td className="py-3.5 px-4 text-center font-mono">{def.total_working_days}</td>
                         <td className="py-3.5 px-4 text-center font-mono text-emerald-700 font-bold">{def.total_present}</td>
                         <td className="py-3.5 px-4 text-center">
-                          <span className="px-2 py-0.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-md text-xs font-black font-mono">
+                          <span className="px-2 py-0.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-md text-xs font-bold font-mono">
                             {def.attendance_percentage}%
                           </span>
                         </td>
                         <td className="py-3.5 px-5 text-right">
                           <button
                             onClick={() => navigate('/dashboard/students', { state: { selectedStudentId: def.student_id } })}
-                            className="px-2.5 py-1 bg-slate-100 hover:bg-violet-50 text-violet-700 rounded-lg text-[11px] font-bold transition-all cursor-pointer inline-flex items-center gap-1"
+                            className="px-2.5 py-1 bg-slate-100 hover:bg-indigo-50 text-indigo-700 rounded-lg text-[11px] font-semibold transition-all cursor-pointer inline-flex items-center gap-1"
                           >
                             Student 360 <ExternalLink size={10} />
                           </button>
@@ -1524,17 +1536,17 @@ export default function AttendanceEntry() {
       {/* TAB 4: SCHOOL CALENDAR & HOLIDAYS */}
       {/* ========================================================================= */}
       {activeTab === 'calendar' && (
-        <div className="space-y-4">
-          <div className="bg-white rounded-[24px] border border-slate-200/70 p-5 shadow-xs flex items-center justify-between">
+        <div className="space-y-5">
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex items-center justify-between">
             <div>
-              <h3 className="font-display font-extrabold text-slate-900 text-sm">Official Institutional Calendar</h3>
+              <h3 className="font-bold text-slate-900 text-sm">Official Institutional Calendar</h3>
               <p className="text-[11px] text-slate-500">
                 School holidays & non-instructional days recognized by the Attendance System.
               </p>
             </div>
             <button
               onClick={() => navigate('/dashboard/calendar')}
-              className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
             >
               <Calendar size={14} />
               Open School Calendar
@@ -1543,24 +1555,24 @@ export default function AttendanceEntry() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {allHolidays.length === 0 ? (
-              <div className="col-span-full py-12 text-center text-slate-400 text-xs bg-white rounded-2xl border border-slate-200/60 p-6">
+              <div className="col-span-full py-12 text-center text-slate-400 text-xs bg-white rounded-2xl border border-slate-200/80 p-6">
                 No holidays recorded for this session. Use the School Calendar module to schedule terms & holidays.
               </div>
             ) : (
               allHolidays.map(hol => (
-                <div key={hol.id} className="p-4 bg-white border border-slate-200/70 rounded-2xl shadow-2xs space-y-2">
+                <div key={hol.id} className="p-4 bg-white border border-slate-200/80 rounded-2xl shadow-2xs space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="font-extrabold text-xs text-slate-900">{hol.title}</span>
-                    <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-800">
+                    <span className="font-bold text-xs text-slate-900">{hol.title}</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200/80 text-amber-800">
                       {hol.is_national ? 'National' : 'School'}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 text-xs font-mono text-slate-600">
-                    <Calendar size={13} className="text-violet-600" />
+                    <Calendar size={13} className="text-indigo-600" />
                     {hol.start_date} {hol.end_date !== hol.start_date && `to ${hol.end_date}`}
                   </div>
                   {hol.description && (
-                    <p className="text-[11px] text-slate-500 leading-normal">{hol.description}</p>
+                    <p className="text-[11px] text-slate-500 leading-normal font-medium">{hol.description}</p>
                   )}
                 </div>
               ))
@@ -1579,11 +1591,11 @@ export default function AttendanceEntry() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-2xl border border-slate-200 shadow-2xl p-5 max-w-md w-full space-y-4"
+              className="bg-white rounded-2xl border border-slate-200/90 shadow-2xl p-5 max-w-md w-full space-y-4"
             >
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div>
-                  <h4 className="font-extrabold text-slate-900 text-sm">Attendance Remark</h4>
+                  <h4 className="font-bold text-slate-900 text-sm">Attendance Remark</h4>
                   <p className="text-xs text-slate-500 font-medium">
                     {editingRemarksStudent.name} (Roll #{editingRemarksStudent.roll_number})
                   </p>
@@ -1597,7 +1609,7 @@ export default function AttendanceEntry() {
               </div>
 
               <div>
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">
+                <label className="text-[11px] font-semibold text-slate-500 block mb-1.5">
                   Reason / Observation Note
                 </label>
                 <textarea
@@ -1605,20 +1617,20 @@ export default function AttendanceEntry() {
                   placeholder="e.g. Medical leave with doctor slip, Arrived 30 mins late due to transport..."
                   value={currentRemarkText}
                   onChange={(e) => setCurrentRemarkText(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-600 font-medium resize-none"
+                  className="w-full bg-slate-50/80 hover:bg-slate-50 border border-slate-200/90 rounded-xl p-3 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 font-medium resize-none transition-all"
                 />
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-2">
                 <button
                   onClick={() => setEditingRemarksStudent(null)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer transition-colors"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold cursor-pointer transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={saveRemark}
-                  className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-bold cursor-pointer shadow-xs transition-colors"
+                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold cursor-pointer shadow-xs transition-colors"
                 >
                   Save Note
                 </button>
@@ -1641,7 +1653,7 @@ export default function AttendanceEntry() {
         <button
           onClick={handleSaveAttendance}
           disabled={isSaving || students.length === 0}
-          className="px-5 py-2 bg-violet-600 text-white rounded-xl text-xs font-bold shadow-md shadow-violet-600/20 flex items-center gap-2 cursor-pointer"
+          className="px-5 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-2 cursor-pointer"
         >
           {isSaving ? <RefreshCcw size={14} className="animate-spin" /> : <Save size={14} />}
           Save Register

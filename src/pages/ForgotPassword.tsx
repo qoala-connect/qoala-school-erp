@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronLeft, Mail, ArrowRight, ShieldCheck } from 'lucide-react';
-import { toast, Toaster } from 'sonner';
+import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { SchoolCrest } from '@/components/SchoolLogo';
 
@@ -35,9 +35,7 @@ export default function ForgotPassword() {
 
   return (
     <div className="min-h-screen w-full bg-[#f4f7fb] flex flex-col items-center justify-center p-4 font-sans text-slate-800 relative overflow-hidden select-none">
-      <Toaster position="top-right" richColors />
-      
-      {/* Background Ambient Gradients */}
+{/* Background Ambient Gradients */}
       <div className="absolute -top-32 -left-32 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
 

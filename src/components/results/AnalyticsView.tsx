@@ -246,7 +246,7 @@ export default function AnalyticsView() {
           </div>
 
           <div className="h-64 pt-2">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={200}>
               <BarChart data={metrics.subjectData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="subject" stroke="#94a3b8" fontSize={10} tickLine={false} />
@@ -270,7 +270,7 @@ export default function AnalyticsView() {
           </div>
 
           <div className="h-64 pt-2">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={200}>
               <BarChart data={metrics.gradeData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="name" stroke="#94a3b8" fontSize={9} tickLine={false} />

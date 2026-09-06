@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
-import { toast, Toaster } from 'sonner';
+import { toast } from 'sonner';
 import { AdminHeader } from '@/components/common/AdminHeader';
 import { AdminStatCard } from '@/components/common/AdminStatCard';
 
@@ -384,9 +384,7 @@ export default function DisciplineManagement() {
 
   return (
     <div className="space-y-5 max-w-7xl mx-auto pb-16 font-sans antialiased text-slate-800">
-      <Toaster position="top-right" richColors />
-
-      {/* 1. Header Toolbar */}
+{/* 1. Header Toolbar */}
       <AdminHeader
         title="Student Conduct & Discipline Ledger"
         subtitle="Log student code of conduct infractions, demerit points ledger, parent warnings, and rehabilitation statuses."

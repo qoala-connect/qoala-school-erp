@@ -1,0 +1,1375 @@
+{
+  "generatedAt": "2026-09-06T00:51:48.213Z",
+  "pass": 171,
+  "fail": 0,
+  "results": [
+    {
+      "module": "Admissions",
+      "page": "Admissions/NewApplication",
+      "action": "Submit new application (insert)",
+      "status": "PASS",
+      "detail": "id=fde0924c",
+      "ms": 249
+    },
+    {
+      "module": "Admissions",
+      "page": "Admissions/Edit",
+      "action": "Save edits (update)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 138
+    },
+    {
+      "module": "Admissions",
+      "page": "Admissions/DetailsDrawer",
+      "action": "Verify document (rpc verify_admission_document)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 272
+    },
+    {
+      "module": "Admissions",
+      "page": "Admissions/StatusChange",
+      "action": "Every pipeline stage accepted (update status)",
+      "status": "PASS",
+      "detail": "11 stages",
+      "ms": 1460
+    },
+    {
+      "module": "Admissions",
+      "page": "Admissions/Approvals",
+      "action": "Approve application (rpc approve_admission -> student created)",
+      "status": "PASS",
+      "detail": "student=909dc614",
+      "ms": 326
+    },
+    {
+      "module": "Admissions",
+      "page": "Admissions/RejectModal",
+      "action": "Reject application (rpc reject_admission)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 416
+    },
+    {
+      "module": "Admissions",
+      "page": "Admissions/Delete",
+      "action": "Delete application (delete)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 240
+    },
+    {
+      "module": "Admissions",
+      "page": "Admissions/Reports",
+      "action": "Load report data (select)",
+      "status": "PASS",
+      "detail": "89 rows",
+      "ms": 133
+    },
+    {
+      "module": "Admissions",
+      "page": "Admissions/NewApplication",
+      "action": "Reference dropdowns load (classes/sections/years)",
+      "status": "PASS",
+      "detail": "13 classes / 3 sections / 2 years",
+      "ms": 138
+    },
+    {
+      "module": "Admissions",
+      "page": "FrontOffice",
+      "action": "Log visitor entry (insert front_office_logs)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 249
+    },
+    {
+      "module": "Students",
+      "page": "Students/Directory",
+      "action": "Load directory (select selective columns)",
+      "status": "PASS",
+      "detail": "100 rows",
+      "ms": 186
+    },
+    {
+      "module": "Students",
+      "page": "Students/AddStudent",
+      "action": "Submit new student (rpc create_student)",
+      "status": "PASS",
+      "detail": "id=5419be8b",
+      "ms": 155
+    },
+    {
+      "module": "Students",
+      "page": "Students/AddStudent",
+      "action": "Post-save CBSE/extended fields (update students)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 247
+    },
+    {
+      "module": "Students",
+      "page": "Students/EditStudent",
+      "action": "Save edits (rpc update_student)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 251
+    },
+    {
+      "module": "Students",
+      "page": "Students/StatusChange",
+      "action": "Change status inactive/active (rpc set_student_status)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 368
+    },
+    {
+      "module": "Students",
+      "page": "Students/Student360",
+      "action": "Add internal note (insert student_notes)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 128
+    },
+    {
+      "module": "Students",
+      "page": "Students/Student360",
+      "action": "Link document — every dropdown option (insert student_documents)",
+      "status": "PASS",
+      "detail": "6 types",
+      "ms": 811
+    },
+    {
+      "module": "Students",
+      "page": "Students/Student360",
+      "action": "Set photo_url (update students)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 253
+    },
+    {
+      "module": "Students",
+      "page": "Students/Student360",
+      "action": "Load all 360 tabs (select x11)",
+      "status": "PASS",
+      "detail": "11 tabs ok",
+      "ms": 646
+    },
+    {
+      "module": "Students",
+      "page": "Students/Promotion",
+      "action": "Promote student (promotions + history + students + activity)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 754
+    },
+    {
+      "module": "Students",
+      "page": "Medical",
+      "action": "Register health card (insert student_medical)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 127
+    },
+    {
+      "module": "Students",
+      "page": "Medical",
+      "action": "Update health card (update student_medical)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 258
+    },
+    {
+      "module": "Students",
+      "page": "Discipline",
+      "action": "Log incident (insert disciplinary_records)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 262
+    },
+    {
+      "module": "Students",
+      "page": "Discipline",
+      "action": "Update incident (update disciplinary_records)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 241
+    },
+    {
+      "module": "Students",
+      "page": "Students/IDCards",
+      "action": "Generate ID card (insert student_id_cards)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 134
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Overview",
+      "action": "Load overview (rpc academics_overview)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 147
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Years",
+      "action": "Create academic year (insert academic_years)",
+      "status": "PASS",
+      "detail": "id=6bdd3a1b",
+      "ms": 134
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Years",
+      "action": "Edit academic year (update academic_years)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 137
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Years",
+      "action": "Set current year (rpc set_current_academic_year)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 384
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Years",
+      "action": "Delete academic year (delete academic_years)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 273
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Classes",
+      "action": "Create class (insert classes)",
+      "status": "PASS",
+      "detail": "id=d4bca329",
+      "ms": 122
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Classes",
+      "action": "Edit class (update classes)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 126
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Classes",
+      "action": "Toggle class active (update classes.is_active)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 361
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Classes",
+      "action": "Attach section to class (insert sections + class_sections)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 377
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Classes",
+      "action": "Edit section allocation (update class_sections)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 236
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Classes",
+      "action": "Assign class teacher (update class_sections.class_teacher_id)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 235
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Classes",
+      "action": "Load section directory (rpc academics_section_directory)",
+      "status": "PASS",
+      "detail": "0 rows",
+      "ms": 144
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Classes",
+      "action": "Load class directory (rpc academics_class_directory)",
+      "status": "PASS",
+      "detail": "14 rows",
+      "ms": 127
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Subjects",
+      "action": "Create subject (insert subjects)",
+      "status": "PASS",
+      "detail": "id=c6a6af00",
+      "ms": 136
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Subjects",
+      "action": "Edit subject (update subjects)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 136
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Subjects",
+      "action": "Toggle subject active (update subjects.is_active)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 359
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Subjects",
+      "action": "Load subject directory (rpc academics_subject_directory)",
+      "status": "PASS",
+      "detail": "18 rows",
+      "ms": 160
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/ClassSubjects",
+      "action": "Map subjects to class (upsert class_subjects)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 142
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/ClassSubjects",
+      "action": "Edit mapping (update class_subjects)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 236
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/ClassSubjects",
+      "action": "Load mappings (rpc academics_class_subjects)",
+      "status": "PASS",
+      "detail": "76 rows",
+      "ms": 137
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Curriculum",
+      "action": "Create unit (insert syllabus_units)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 142
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Curriculum",
+      "action": "Create chapter (insert syllabus_chapters)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 137
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Curriculum",
+      "action": "Create topic (insert syllabus_topics)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 146
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Curriculum",
+      "action": "Edit unit/chapter/topic (update x3)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 379
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Curriculum",
+      "action": "Update chapter progress (upsert syllabus_progress)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 259
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Curriculum",
+      "action": "Load syllabus tree/coverage (rpc x3)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 444
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Curriculum",
+      "action": "Delete topic/chapter/unit (delete x3)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 481
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Timetable",
+      "action": "Save timetable slot (insert timetable)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 254
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Timetable",
+      "action": "Edit timetable slot (update timetable)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 121
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Timetable",
+      "action": "Load timetable grid (select timetable)",
+      "status": "PASS",
+      "detail": "200 slots",
+      "ms": 143
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Timetable",
+      "action": "Delete timetable slot (delete timetable)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 249
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Monitor",
+      "action": "Load monitor (rpc admin_academic_monitor)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 168
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Structure",
+      "action": "Assign teacher to class-subject (insert teacher_assignments)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 135
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Structure",
+      "action": "Remove assignment (delete teacher_assignments)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 250
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/ClassSubjects",
+      "action": "Remove mapping (delete class_subjects)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 245
+    },
+    {
+      "module": "Academics",
+      "page": "Calendar",
+      "action": "Add holiday/event (insert holidays)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 249
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/ExamTypes",
+      "action": "Load exam types (select assessment_types)",
+      "status": "PASS",
+      "detail": "19 types",
+      "ms": 122
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/ExamTypes",
+      "action": "Create exam type (insert assessment_types)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 124
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/ExamTypes",
+      "action": "Edit exam type (update assessment_types)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 138
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/GradeRules",
+      "action": "Load grading rules (select grading_rules)",
+      "status": "PASS",
+      "detail": "8 rules",
+      "ms": 123
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/GradeRules",
+      "action": "Save grade rule (insert grading_rules)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 245
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/Exams",
+      "action": "Create exam (insert exams)",
+      "status": "PASS",
+      "detail": "id=db8c1ef5",
+      "ms": 127
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/Exams",
+      "action": "Auto-seed subjects from Class Subjects (upsert exam_subjects)",
+      "status": "PASS",
+      "detail": "4 subjects",
+      "ms": 374
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/Exams",
+      "action": "Edit exam (update exams)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 125
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/Exams",
+      "action": "Exam status lifecycle (update exams.status)",
+      "status": "PASS",
+      "detail": "scheduled -> marks_entry_open -> review -> locked -> result_processed",
+      "ms": 637
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/Schedule",
+      "action": "Set datesheet slot (update exam_subjects date/time/room)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 121
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/Schedule",
+      "action": "Assign invigilator (update exam_subjects.invigilator_id)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 130
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/SubjectMapping",
+      "action": "Configure subject marks + teacher (update exam_subjects)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 128
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/MarksEntry",
+      "action": "Load student roster (select students)",
+      "status": "PASS",
+      "detail": "44 students",
+      "ms": 117
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/MarksEntry",
+      "action": "Save marks draft (upsert marks)",
+      "status": "PASS",
+      "detail": "10 marks",
+      "ms": 278
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/MarksEntry",
+      "action": "Absent / medical / exempted rows (upsert marks)",
+      "status": "PASS",
+      "detail": "3 variants",
+      "ms": 129
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/MarksEntry",
+      "action": "Draft flips review_status to in_progress (update exam_subjects)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 118
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/MarksVerification",
+      "action": "Submit for review (update exam_subjects + marks)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 367
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/MarksVerification",
+      "action": "Return for correction (update exam_subjects + marks)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 249
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/MarksVerification",
+      "action": "Re-submit then approve (update exam_subjects + marks)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 499
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/MarksVerification",
+      "action": "Lock marks (update exam_subjects.locked + marks.status)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 353
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/MarksVerification",
+      "action": "Locked marks reject further edits (guard enforced)",
+      "status": "PASS",
+      "detail": "no rows changed",
+      "ms": 258
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/MarksVerification",
+      "action": "Unlock marks with reason (update exam_subjects)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 258
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/ResultProcessing",
+      "action": "Write computed results (upsert exam_results)",
+      "status": "PASS",
+      "detail": "10 results",
+      "ms": 141
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/ResultPublication",
+      "action": "Publish results (update exam_results + exams)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 381
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/ReportCards",
+      "action": "Load report card data (select exam_results + marks)",
+      "status": "PASS",
+      "detail": "10 results / 10 marks",
+      "ms": 132
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/MeritRank",
+      "action": "Load merit + rank list (select exam_results ordered)",
+      "status": "PASS",
+      "detail": "10 ranked",
+      "ms": 117
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/Analytics",
+      "action": "Load analytics aggregates (select exam_results/marks)",
+      "status": "PASS",
+      "detail": "500 results / 10 marks",
+      "ms": 146
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/CoScholastic",
+      "action": "Save co-scholastic grades (upsert co_scholastic)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 121
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/Exams",
+      "action": "Delete exam cascade (delete marks/results/subjects/exam)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 719
+    },
+    {
+      "module": "Examination",
+      "page": "Attendance/Entry",
+      "action": "Save attendance (rpc save_attendance)",
+      "status": "PASS",
+      "detail": "5 rows",
+      "ms": 266
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Structure",
+      "action": "Load fee categories (select fee_categories)",
+      "status": "PASS",
+      "detail": "7 categories",
+      "ms": 132
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Structure",
+      "action": "Create fee category (insert fee_categories)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 126
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Structure",
+      "action": "Edit fee category — every frequency option (update fee_categories)",
+      "status": "PASS",
+      "detail": "5 frequencies",
+      "ms": 744
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Structure",
+      "action": "Set class fee amount (upsert fee_structure)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 245
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Structure",
+      "action": "Batch save class fees (upsert fee_structure x N)",
+      "status": "PASS",
+      "detail": "3 rows",
+      "ms": 255
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Ledgers",
+      "action": "Assign fee to student (insert student_fees)",
+      "status": "PASS",
+      "detail": "net=1900",
+      "ms": 122
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Ledgers",
+      "action": "Load ledger rows (select student_fees join)",
+      "status": "PASS",
+      "detail": "100 rows",
+      "ms": 147
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Collection",
+      "action": "Collect payment — every payment mode (rpc collect_fee)",
+      "status": "PASS",
+      "detail": "4 modes, 4 unique receipts",
+      "ms": 511
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Transactions",
+      "action": "Load transactions (select fee_payments join)",
+      "status": "PASS",
+      "detail": "100 rows",
+      "ms": 129
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Transactions",
+      "action": "Void payment (rpc void_fee_payment)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 238
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Transactions",
+      "action": "Void rolls the ledger back by exactly the voided amount",
+      "status": "PASS",
+      "detail": "amount_paid=300 matches 3 live payments",
+      "ms": 239
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Reports",
+      "action": "Load collection summary (select student_fees aggregate)",
+      "status": "PASS",
+      "detail": "billed=12497625 collected=9870871 over 507 ledgers",
+      "ms": 143
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Reports",
+      "action": "Load overdue report (select student_fees filtered)",
+      "status": "PASS",
+      "detail": "142 overdue",
+      "ms": 135
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Discounts",
+      "action": "Create discount (insert discounts)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 248
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Scholarships",
+      "action": "Create scholarship (insert scholarships)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 245
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Structure",
+      "action": "Delete fee structure item (delete fee_structure)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 242
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Structure",
+      "action": "Deactivate category in use (update fee_categories.is_active)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 252
+    },
+    {
+      "module": "Staff",
+      "page": "Teachers/Directory",
+      "action": "Load teacher directory (select teachers)",
+      "status": "PASS",
+      "detail": "25 teachers",
+      "ms": 117
+    },
+    {
+      "module": "Staff",
+      "page": "Teachers/Form",
+      "action": "Reference dropdowns load (departments/profiles)",
+      "status": "PASS",
+      "detail": "6 departments / 3 linkable profiles",
+      "ms": 121
+    },
+    {
+      "module": "Staff",
+      "page": "Teachers/Form",
+      "action": "Submit new teacher (insert teachers)",
+      "status": "PASS",
+      "detail": "id=5fad0288",
+      "ms": 135
+    },
+    {
+      "module": "Staff",
+      "page": "Teachers/Form",
+      "action": "Save teacher edits (update teachers)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 125
+    },
+    {
+      "module": "Staff",
+      "page": "Teachers/Directory",
+      "action": "Every lifecycle status accepted (update teachers.status)",
+      "status": "PASS",
+      "detail": "8 statuses",
+      "ms": 1167
+    },
+    {
+      "module": "Staff",
+      "page": "Teachers/Assignments",
+      "action": "Create assignment (insert teacher_assignments)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 120
+    },
+    {
+      "module": "Staff",
+      "page": "Teachers/Assignments",
+      "action": "Every assignment type accepted (update teacher_assignments)",
+      "status": "PASS",
+      "detail": "3 types",
+      "ms": 373
+    },
+    {
+      "module": "Staff",
+      "page": "Teachers/Assignments",
+      "action": "Duplicate class teacher is rejected (uq_single_active_class_teacher)",
+      "status": "PASS",
+      "detail": "guard enforced",
+      "ms": 258
+    },
+    {
+      "module": "Staff",
+      "page": "Teachers/Assignments",
+      "action": "Load assignments with joins (select teacher_assignments)",
+      "status": "PASS",
+      "detail": "200 assignments",
+      "ms": 152
+    },
+    {
+      "module": "Staff",
+      "page": "Teachers/Assignments",
+      "action": "Deactivate + delete assignment",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 350
+    },
+    {
+      "module": "Staff",
+      "page": "Teachers/Teacher360",
+      "action": "Load 360 panels (workload/timetable/exams)",
+      "status": "PASS",
+      "detail": "4 panels ok",
+      "ms": 521
+    },
+    {
+      "module": "Staff",
+      "page": "Teachers/Teacher360",
+      "action": "Teacher summary (rpc teacher_academic_summary)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 168
+    },
+    {
+      "module": "Staff",
+      "page": "Staff/Departments",
+      "action": "Create department (insert departments)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 245
+    },
+    {
+      "module": "Staff",
+      "page": "Employees",
+      "action": "Submit new employee (insert staff)",
+      "status": "PASS",
+      "detail": "id=af99655a",
+      "ms": 147
+    },
+    {
+      "module": "Staff",
+      "page": "Employees",
+      "action": "Save employee edits (update staff)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 119
+    },
+    {
+      "module": "Staff",
+      "page": "Employees",
+      "action": "Every employee status accepted (rpc set_staff_status)",
+      "status": "PASS",
+      "detail": "7 statuses",
+      "ms": 1053
+    },
+    {
+      "module": "Staff",
+      "page": "Employees",
+      "action": "Load staff directory (select staff)",
+      "status": "PASS",
+      "detail": "9 staff",
+      "ms": 135
+    },
+    {
+      "module": "Staff",
+      "page": "Staff/Leave",
+      "action": "Create + approve leave request (insert/update leave_requests)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 289
+    },
+    {
+      "module": "Attendance",
+      "page": "Attendance/Entry",
+      "action": "Load class roster (select students)",
+      "status": "PASS",
+      "detail": "1-A: 17 students",
+      "ms": 186
+    },
+    {
+      "module": "Attendance",
+      "page": "Attendance/Entry",
+      "action": "Load teacher scope (select teacher_assignments)",
+      "status": "PASS",
+      "detail": "23 class-teacher scopes",
+      "ms": 204
+    },
+    {
+      "module": "Attendance",
+      "page": "Attendance/Entry",
+      "action": "Load approved student leaves (select leave_requests)",
+      "status": "PASS",
+      "detail": "0 on leave",
+      "ms": 200
+    },
+    {
+      "module": "Attendance",
+      "page": "Attendance/Entry",
+      "action": "Save attendance — every status (rpc save_attendance)",
+      "status": "PASS",
+      "detail": "5 rows, 5 statuses",
+      "ms": 491
+    },
+    {
+      "module": "Attendance",
+      "page": "Attendance/Entry",
+      "action": "Re-save same day is idempotent (rpc save_attendance)",
+      "status": "PASS",
+      "detail": "no duplicates, values overwritten",
+      "ms": 402
+    },
+    {
+      "module": "Attendance",
+      "page": "Attendance/Entry",
+      "action": "Future date is rejected (rpc save_attendance)",
+      "status": "PASS",
+      "detail": "guard raised: 23514",
+      "ms": 162
+    },
+    {
+      "module": "Attendance",
+      "page": "Attendance/Entry",
+      "action": "Attendance edit trail recorded (select attendance_logs)",
+      "status": "PASS",
+      "detail": "0 log entries",
+      "ms": 164
+    },
+    {
+      "module": "Attendance",
+      "page": "Attendance/Reports",
+      "action": "Attendance summary query (select attendance)",
+      "status": "PASS",
+      "detail": "1000 records, 879 present",
+      "ms": 240
+    },
+    {
+      "module": "Operations",
+      "page": "Library/Books",
+      "action": "Add book (insert library_books)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 151
+    },
+    {
+      "module": "Operations",
+      "page": "Library/Issues",
+      "action": "Issue book (insert book_issues)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 175
+    },
+    {
+      "module": "Operations",
+      "page": "Library/Books",
+      "action": "Edit + delete book (update/delete library_books)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 158
+    },
+    {
+      "module": "Operations",
+      "page": "Transport/Routes",
+      "action": "Add route (insert transport_routes)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 171
+    },
+    {
+      "module": "Operations",
+      "page": "Transport/Vehicles",
+      "action": "Add vehicle (insert vehicles)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 152
+    },
+    {
+      "module": "Operations",
+      "page": "Transport/Drivers",
+      "action": "Add driver (insert drivers)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 164
+    },
+    {
+      "module": "Operations",
+      "page": "Transport/Allotments",
+      "action": "Allot transport to student (insert student_transport)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 336
+    },
+    {
+      "module": "Operations",
+      "page": "Inventory/Assets",
+      "action": "Add asset (insert assets)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 145
+    },
+    {
+      "module": "Operations",
+      "page": "Inventory/Stock",
+      "action": "Add stock item (insert inventory)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 130
+    },
+    {
+      "module": "Operations",
+      "page": "Hostel/Hostels",
+      "action": "Add hostel (insert hostels)",
+      "status": "PASS",
+      "detail": "4 hostel types",
+      "ms": 712
+    },
+    {
+      "module": "Operations",
+      "page": "Hostel/Rooms",
+      "action": "Add room (insert rooms)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 143
+    },
+    {
+      "module": "Operations",
+      "page": "Communication/Notices",
+      "action": "Publish notice (insert notices)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 143
+    },
+    {
+      "module": "Operations",
+      "page": "Communication/SMS",
+      "action": "Send SMS campaign (insert sms_logs)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 135
+    },
+    {
+      "module": "Operations",
+      "page": "Communication/Email",
+      "action": "Send email broadcast (insert email_logs)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 150
+    },
+    {
+      "module": "Operations",
+      "page": "OnlineClasses",
+      "action": "Schedule online class (insert online_classes)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 151
+    },
+    {
+      "module": "Operations",
+      "page": "SchoolCalendar",
+      "action": "Add calendar event (insert holidays)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 145
+    },
+    {
+      "module": "Operations",
+      "page": "Certificates",
+      "action": "Issue certificate (insert certificates)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 157
+    },
+    {
+      "module": "Operations",
+      "page": "FrontOffice",
+      "action": "Update visitor log status (update front_office_logs)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 267
+    },
+    {
+      "module": "System",
+      "page": "System/Overview",
+      "action": "Load overview (rpc system_overview)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 298
+    },
+    {
+      "module": "System",
+      "page": "System/Users",
+      "action": "Load user directory (rpc admin_user_directory)",
+      "status": "PASS",
+      "detail": "9 users",
+      "ms": 207
+    },
+    {
+      "module": "System",
+      "page": "System/Users",
+      "action": "Search + filter directory (rpc admin_user_directory)",
+      "status": "PASS",
+      "detail": "1 matches",
+      "ms": 230
+    },
+    {
+      "module": "System",
+      "page": "System/Users",
+      "action": "Change user role (rpc set_user_role)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 607
+    },
+    {
+      "module": "System",
+      "page": "System/Users",
+      "action": "Change user status (rpc set_user_status)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 522
+    },
+    {
+      "module": "System",
+      "page": "System/Users",
+      "action": "Self-suspension is blocked (rpc set_user_status)",
+      "status": "PASS",
+      "detail": "guard raised: 42501",
+      "ms": 245
+    },
+    {
+      "module": "System",
+      "page": "System/Users",
+      "action": "Load linkable entities (rpc linkable_entities)",
+      "status": "PASS",
+      "detail": "3 entity types",
+      "ms": 411
+    },
+    {
+      "module": "System",
+      "page": "System/Users",
+      "action": "Link + unlink user to entity (rpc link/unlink_user_to_entity)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 657
+    },
+    {
+      "module": "System",
+      "page": "System/Roles",
+      "action": "Load role permissions (select role_permissions)",
+      "status": "PASS",
+      "detail": "124 grants",
+      "ms": 149
+    },
+    {
+      "module": "System",
+      "page": "System/Roles",
+      "action": "Grant + revoke a permission (rpc set_role_permission)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 521
+    },
+    {
+      "module": "System",
+      "page": "System/Roles",
+      "action": "Own permissions resolve (rpc my_permissions)",
+      "status": "PASS",
+      "detail": "32 permissions",
+      "ms": 121
+    },
+    {
+      "module": "System",
+      "page": "System/Settings",
+      "action": "Load settings (select system_settings)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 139
+    },
+    {
+      "module": "System",
+      "page": "System/Settings",
+      "action": "Save settings (rpc update_system_settings)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 595
+    },
+    {
+      "module": "System",
+      "page": "System/Audit",
+      "action": "Search audit logs (rpc audit_log_search)",
+      "status": "PASS",
+      "detail": "50 entries",
+      "ms": 182
+    },
+    {
+      "module": "System",
+      "page": "System/Audit",
+      "action": "Load audit facets (rpc audit_log_facets)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 156
+    },
+    {
+      "module": "System",
+      "page": "System/Audit",
+      "action": "Audit log is append-only (update rejected)",
+      "status": "PASS",
+      "detail": "guard raised: 42501",
+      "ms": 258
+    },
+    {
+      "module": "System",
+      "page": "System/Security",
+      "action": "Load governance panels (audit_logs + role_permissions)",
+      "status": "PASS",
+      "detail": "50 audit / 124 grants",
+      "ms": 125
+    },
+    {
+      "module": "System",
+      "page": "Reports",
+      "action": "Load report datasets (select x4)",
+      "status": "PASS",
+      "detail": "500/500/500/500 rows",
+      "ms": 330
+    },
+    {
+      "module": "System",
+      "page": "Analytics",
+      "action": "Load analytics aggregates (select/rpc)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 313
+    }
+  ]
+}

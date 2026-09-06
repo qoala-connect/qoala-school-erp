@@ -207,7 +207,12 @@ export default function StudentFormModal({ open, initial, onClose, onSaved }: Pr
       return;
     }
 
-    const studentId = isEdit ? initial!.id : (res.data as any)?.[0]?.id;
+    // create_student returns TABLE(student_id uuid, admission_number text, roll_number text) —
+    // the new row's key is `student_id`, not `id`. Reading `.id` here silently skipped the
+    // extended-field update below, so photo, Aadhaar, CWSN, CBSE reg. no. and house were
+    // discarded on every new admission.
+    const created = (res.data as any)?.[0];
+    const studentId = isEdit ? initial!.id : (created?.student_id ?? created?.id);
     if (studentId) {
       await supabase.from('students').update({
         photo_url: values.photo_url || null,

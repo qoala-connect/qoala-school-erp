@@ -146,6 +146,9 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       permission: null,
       items: [
         { label: 'My Dashboard & Profile', path: '/dashboard', permission: null },
+        { label: 'Homework', path: '/dashboard/portal?tab=homework', permission: null },
+        { label: 'Assignments', path: '/dashboard/portal?tab=assignments', permission: null },
+        { label: 'Syllabus & Progress', path: '/dashboard/portal?tab=syllabus', permission: null },
         { label: 'My Attendance', path: '/dashboard/portal', state: { tab: 'attendance' }, permission: null },
         { label: 'Fee Invoices & Receipts', path: '/dashboard/portal', state: { tab: 'fees' }, permission: null },
         { label: 'Report Cards & Results', path: '/dashboard/portal', state: { tab: 'examination' }, permission: null },
@@ -197,6 +200,22 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       ]
     },
     {
+      // The teacher's own workspace. Every entry is gated on
+      // academics.teach, so the whole group is hidden from roles that
+      // do not run a classroom. The database scopes every read and write
+      // inside it to the signed-in teacher.
+      title: 'My Teaching',
+      icon: GraduationCap,
+      permission: 'academics.teach',
+      items: [
+        { label: "Today's Classes", path: '/dashboard/teaching/today', permission: 'academics.teach' },
+        { label: 'My Classes', path: '/dashboard/teaching/classes', permission: 'academics.teach' },
+        { label: 'Lesson Plans', path: '/dashboard/teaching/lessons', permission: 'academics.teach' },
+        { label: 'Homework & Assignments', path: '/dashboard/teaching/work', permission: 'academics.teach' },
+        { label: 'Syllabus Progress', path: '/dashboard/teaching/syllabus', permission: 'academics.teach' },
+      ]
+    },
+    {
       // Academics owns the academic structure, so every part of it is a
       // view inside this one module rather than a sidebar entry of its
       // own. Reading is open to any signed-in user; the write controls
@@ -211,7 +230,9 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
         { label: 'Classes & Sections', path: '/dashboard/academics/classes', permission: null },
         { label: 'Subjects', path: '/dashboard/academics/subjects', permission: null },
         { label: 'Class Subjects', path: '/dashboard/academics/class-subjects', permission: null },
+        { label: 'Curriculum & Syllabus', path: '/dashboard/academics/curriculum', permission: null },
         { label: 'Timetable', path: '/dashboard/academics/timetable', permission: null },
+        { label: 'Academic Monitor', path: '/dashboard/academics/monitor', permission: null },
         { label: 'Academic Structure', path: '/dashboard/academics/structure', permission: null },
         { label: 'School Calendar', path: '/dashboard/calendar', permission: null }
       ]
@@ -404,11 +425,17 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       try {
         const { data: noticesData } = await supabase
           .from('notices')
-          .select('id, title, content, publish_date')
-          .order('publish_date', { ascending: false })
+          .select('id, title, description, created_at')
+          .order('created_at', { ascending: false })
           .limit(6);
         if (noticesData && noticesData.length > 0) {
-          setNotifications(noticesData.map(n => ({ ...n, is_read: false })));
+          setNotifications(noticesData.map((n: any) => ({
+            id: n.id,
+            title: n.title,
+            content: n.description || n.content || '',
+            publish_date: n.created_at || n.publish_date || '',
+            is_read: false
+          })));
           setUnreadCount(noticesData.length);
         }
       } catch (err) {

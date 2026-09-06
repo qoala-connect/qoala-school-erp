@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
-import { toast, Toaster } from 'sonner';
+import { toast } from 'sonner';
 import { AdminHeader } from '@/components/common/AdminHeader';
 import { AdminStatCard } from '@/components/common/AdminStatCard';
 
@@ -77,7 +77,7 @@ export default function MedicalManagement() {
         class_name: m.students?.class ? `Class ${m.students.class}` : 'General',
         blood_group: m.blood_group || 'O+',
         allergies: m.allergies || 'None',
-        vaccinations: 'Complete',
+        vaccinations: m.vaccination_status || 'Complete',
         height_cm: Number(m.height_cm || 160),
         weight_kg: Number(m.weight_kg || 50),
         emergency_contact: m.emergency_contact || 'Campus Clinic',
@@ -170,6 +170,8 @@ export default function MedicalManagement() {
         height_cm: Number(formData.height_cm || 160),
         weight_kg: Number(formData.weight_kg || 55),
         emergency_contact: formData.emergency_contact || 'Campus Clinic',
+        // The form collects a vaccination summary; persist it instead of dropping it.
+        vaccination_status: formData.vaccinations || null,
         medical_conditions: formData.status === 'Under-Medical-Care' ? 'Requires monitoring' : null,
         remarks: 'Health record verified'
       };
@@ -360,9 +362,7 @@ export default function MedicalManagement() {
 
   return (
     <div className="space-y-5 max-w-7xl mx-auto pb-16 font-sans antialiased text-slate-800">
-      <Toaster position="top-right" richColors />
-
-      {/* 1. Header Toolbar */}
+{/* 1. Header Toolbar */}
       <AdminHeader
         title="Student Health & Medical Care"
         subtitle="Track student wellness cards, allergies database, required vaccinations checklist, and clinical infirmary logs."

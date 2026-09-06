@@ -22,16 +22,22 @@ export interface PageParams {
   pageSize?: number;
 }
 
-// Hard ceiling applied when no explicit page is requested, so an
-// un-paginated caller still can't pull an unbounded number of rows.
+// Rows pulled per round-trip. Callers that don't ask for a specific page get
+// every row, fetched in chunks of this size -- a single capped request used to
+// silently truncate the fee directory the moment enrolment passed the ceiling,
+// which reads to the user as "my student is missing from Fees".
 const DEFAULT_PAGE_SIZE = 500;
+
+// Safety valve so an un-paginated caller still can't loop forever.
+const MAX_FETCH_ALL_ROWS = 20000;
 
 export const feeService = {
   /**
    * Fetch fee ledgers with relational joins and role filtering
    */
   async fetchFees(filters?: FeeFilters, pagination?: PageParams): Promise<StudentFeeLedger[]> {
-    let query = supabase
+    const buildQuery = () => {
+      let query = supabase
       .from('student_fees')
       .select(`
         id,
@@ -62,27 +68,48 @@ export const feeService = {
           phone
         )
       `)
-      .order('created_at', { ascending: false });
+      // Deterministic, unique ordering: created_at alone collides on bulk
+      // inserts, and a non-unique sort key can drop or repeat rows across pages.
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false });
+
+      if (filters?.academicYearFilter && filters.academicYearFilter !== 'all') {
+        query = query.eq('academic_year_id', filters.academicYearFilter);
+      }
+
+      if (filters?.statusFilter && filters.statusFilter !== 'all') {
+        query = query.eq('status', filters.statusFilter);
+      }
+
+      return query;
+    };
 
     const pageSize = pagination?.pageSize || DEFAULT_PAGE_SIZE;
-    const page = pagination?.page && pagination.page > 0 ? pagination.page : 1;
-    query = query.range((page - 1) * pageSize, page * pageSize - 1);
+    const data: any[] = [];
 
-    if (filters?.academicYearFilter && filters.academicYearFilter !== 'all') {
-      query = query.eq('academic_year_id', filters.academicYearFilter);
+    if (pagination?.page && pagination.page > 0) {
+      // Explicit page requested -- honour it exactly.
+      const from = (pagination.page - 1) * pageSize;
+      const { data: rows, error } = await buildQuery().range(from, from + pageSize - 1);
+      if (error) {
+        console.error('[feeService.fetchFees] Error:', error);
+        throw error;
+      }
+      data.push(...(rows || []));
+    } else {
+      // No page requested -- walk every chunk so the caller sees all ledgers.
+      for (let from = 0; from < MAX_FETCH_ALL_ROWS; from += pageSize) {
+        const { data: rows, error } = await buildQuery().range(from, from + pageSize - 1);
+        if (error) {
+          console.error('[feeService.fetchFees] Error:', error);
+          throw error;
+        }
+        data.push(...(rows || []));
+        if (!rows || rows.length < pageSize) break;
+      }
     }
 
-    if (filters?.statusFilter && filters.statusFilter !== 'all') {
-      query = query.eq('status', filters.statusFilter);
-    }
-
-    const { data, error } = await query;
-    if (error) {
-      console.error('[feeService.fetchFees] Error:', error);
-      throw error;
-    }
-
-    let records: StudentFeeLedger[] = (data || []).map((row: any) => {
+    let records: StudentFeeLedger[] = data.map((row: any) => {
       const categoryName = row.fee_categories?.category_name || 'School Fee';
       const payments: FeePaymentRecord[] = (row.fee_payments || []).filter((p: any) => !p.voided_at);
       const paidAmount = Number(row.amount_paid ?? payments.reduce((sum, p) => sum + Number(p.amount_paid || 0), 0));
@@ -244,6 +271,107 @@ export const feeService = {
   },
 
   /**
+   * Delete or deactivate fee category with safety check on student fee ledgers
+   */
+  async deleteFeeCategory(categoryId: string, forceCascade = false): Promise<{ deleted: boolean; deactivated?: boolean; message: string }> {
+    // 1. Check if student fees are referencing this fee category
+    const { count, error: countErr } = await supabase
+      .from('student_fees')
+      .select('id', { count: 'exact', head: true })
+      .eq('fee_category_id', categoryId);
+
+    if (countErr) {
+      console.warn('[feeService.deleteFeeCategory] Count check warning:', countErr);
+    }
+
+    if (count && count > 0 && !forceCascade) {
+      // If student records exist, deactivate category to protect audit trail
+      const { error: deactErr } = await supabase
+        .from('fee_categories')
+        .update({ is_active: false, updated_at: new Date().toISOString() })
+        .eq('id', categoryId);
+
+      if (deactErr) throw deactErr;
+      return { 
+        deleted: false, 
+        deactivated: true, 
+        message: `Category deactivated. ${count} student fee ledger entries exist so history was preserved.` 
+      };
+    }
+
+    // 2. Remove from fee_structure matrix first
+    const { error: structErr } = await supabase
+      .from('fee_structure')
+      .delete()
+      .eq('fee_category_id', categoryId);
+
+    if (structErr) {
+      console.error('[feeService.deleteFeeCategory] Error deleting fee_structure items:', structErr);
+    }
+
+    // 3. Delete fee category
+    const { error: delErr } = await supabase
+      .from('fee_categories')
+      .delete()
+      .eq('id', categoryId);
+
+    if (delErr) {
+      console.error('[feeService.deleteFeeCategory] Error deleting category:', delErr);
+      throw delErr;
+    }
+
+    return { deleted: true, message: 'Fee category deleted successfully.' };
+  },
+
+  /**
+   * Delete a specific fee structure item rate
+   */
+  async deleteFeeStructureItem(classId: string, feeCategoryId: string, academicYearId: string): Promise<void> {
+    const { error } = await supabase
+      .from('fee_structure')
+      .delete()
+      .eq('class_id', classId)
+      .eq('fee_category_id', feeCategoryId)
+      .eq('academic_year_id', academicYearId);
+
+    if (error) {
+      console.error('[feeService.deleteFeeStructureItem] Error:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Delete / Reset all fee structure rates for a specific class in an academic session
+   */
+  async deleteClassFeeStructure(classId: string, academicYearId: string): Promise<void> {
+    const { error } = await supabase
+      .from('fee_structure')
+      .delete()
+      .eq('class_id', classId)
+      .eq('academic_year_id', academicYearId);
+
+    if (error) {
+      console.error('[feeService.deleteClassFeeStructure] Error:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Delete all fee structure rates for an academic year (reset matrix)
+   */
+  async resetAllFeeStructures(academicYearId: string): Promise<void> {
+    const { error } = await supabase
+      .from('fee_structure')
+      .delete()
+      .eq('academic_year_id', academicYearId);
+
+    if (error) {
+      console.error('[feeService.resetAllFeeStructures] Error:', error);
+      throw error;
+    }
+  },
+
+  /**
    * Upsert a fee structure rate
    */
   async saveFeeStructureItem(item: { classId: string; feeCategoryId: string; academicYearId: string; amount: number }): Promise<void> {
@@ -259,6 +387,29 @@ export const feeService = {
 
     if (error) {
       console.error('[feeService.saveFeeStructureItem] Error:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Bulk upsert multiple fee structure rates efficiently
+   */
+  async saveBatchFeeStructures(items: { classId: string; feeCategoryId: string; academicYearId: string; amount: number }[]): Promise<void> {
+    if (!items || items.length === 0) return;
+    const records = items.map(item => ({
+      class_id: item.classId,
+      fee_category_id: item.feeCategoryId,
+      academic_year_id: item.academicYearId,
+      amount: item.amount,
+      updated_at: new Date().toISOString()
+    }));
+
+    const { error } = await supabase
+      .from('fee_structure')
+      .upsert(records, { onConflict: 'class_id,fee_category_id,academic_year_id' });
+
+    if (error) {
+      console.error('[feeService.saveBatchFeeStructures] Error:', error);
       throw error;
     }
   },
@@ -438,6 +589,7 @@ export const feeService = {
           id,
           total_amount,
           net_amount,
+          amount_paid,
           discount_amount,
           fine_amount,
           due_date,

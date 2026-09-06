@@ -1,0 +1,295 @@
+{
+  "generatedAt": "2026-09-06T00:24:23.312Z",
+  "pass": 36,
+  "fail": 0,
+  "results": [
+    {
+      "module": "Academics",
+      "page": "Academics/Overview",
+      "action": "Load overview (rpc academics_overview)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 553
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Years",
+      "action": "Create academic year (insert academic_years)",
+      "status": "PASS",
+      "detail": "id=c2dd0ab5",
+      "ms": 304
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Years",
+      "action": "Edit academic year (update academic_years)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 235
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Years",
+      "action": "Set current year (rpc set_current_academic_year)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 583
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Years",
+      "action": "Delete academic year (delete academic_years)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 485
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Classes",
+      "action": "Create class (insert classes)",
+      "status": "PASS",
+      "detail": "id=b13ffe13",
+      "ms": 138
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Classes",
+      "action": "Edit class (update classes)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 136
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Classes",
+      "action": "Toggle class active (update classes.is_active)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 456
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Classes",
+      "action": "Attach section to class (insert sections + class_sections)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 445
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Classes",
+      "action": "Edit section allocation (update class_sections)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 248
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Classes",
+      "action": "Assign class teacher (update class_sections.class_teacher_id)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 258
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Classes",
+      "action": "Load section directory (rpc academics_section_directory)",
+      "status": "PASS",
+      "detail": "0 rows",
+      "ms": 171
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Classes",
+      "action": "Load class directory (rpc academics_class_directory)",
+      "status": "PASS",
+      "detail": "14 rows",
+      "ms": 170
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Subjects",
+      "action": "Create subject (insert subjects)",
+      "status": "PASS",
+      "detail": "id=9fcce517",
+      "ms": 129
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Subjects",
+      "action": "Edit subject (update subjects)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 147
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Subjects",
+      "action": "Toggle subject active (update subjects.is_active)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 364
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Subjects",
+      "action": "Load subject directory (rpc academics_subject_directory)",
+      "status": "PASS",
+      "detail": "18 rows",
+      "ms": 227
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/ClassSubjects",
+      "action": "Map subjects to class (upsert class_subjects)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 138
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/ClassSubjects",
+      "action": "Edit mapping (update class_subjects)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 240
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/ClassSubjects",
+      "action": "Load mappings (rpc academics_class_subjects)",
+      "status": "PASS",
+      "detail": "76 rows",
+      "ms": 168
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Curriculum",
+      "action": "Create unit (insert syllabus_units)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 131
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Curriculum",
+      "action": "Create chapter (insert syllabus_chapters)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 153
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Curriculum",
+      "action": "Create topic (insert syllabus_topics)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 138
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Curriculum",
+      "action": "Edit unit/chapter/topic (update x3)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 376
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Curriculum",
+      "action": "Update chapter progress (upsert syllabus_progress)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 285
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Curriculum",
+      "action": "Load syllabus tree/coverage (rpc x3)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 487
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Curriculum",
+      "action": "Delete topic/chapter/unit (delete x3)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 459
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Timetable",
+      "action": "Save timetable slot (insert timetable)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 261
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Timetable",
+      "action": "Edit timetable slot (update timetable)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 135
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Timetable",
+      "action": "Load timetable grid (select timetable)",
+      "status": "PASS",
+      "detail": "200 slots",
+      "ms": 164
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Timetable",
+      "action": "Delete timetable slot (delete timetable)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 229
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Monitor",
+      "action": "Load monitor (rpc admin_academic_monitor)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 170
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Structure",
+      "action": "Assign teacher to class-subject (insert teacher_assignments)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 143
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/Structure",
+      "action": "Remove assignment (delete teacher_assignments)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 239
+    },
+    {
+      "module": "Academics",
+      "page": "Academics/ClassSubjects",
+      "action": "Remove mapping (delete class_subjects)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 239
+    },
+    {
+      "module": "Academics",
+      "page": "Calendar",
+      "action": "Add holiday/event (insert holidays)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 241
+    }
+  ]
+}

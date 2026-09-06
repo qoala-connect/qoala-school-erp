@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
-import { toast, Toaster } from 'sonner';
+import { toast } from 'sonner';
 import { AdminHeader } from '@/components/common/AdminHeader';
 import { AdminStatCard } from '@/components/common/AdminStatCard';
 
@@ -104,8 +104,8 @@ export default function LibraryManagement() {
           category_id: b.category || 'General',
           isbn: b.isbn || 'N/A',
           shelf_location: b.rack_number || 'Shelf A',
-          total_copies: Number(b.total_copies || 1),
-          issued_copies: Number(b.total_copies || 1) - Number(b.available_copies || 1)
+          total_copies: Number(b.copies_total || 1),
+          issued_copies: Number(b.copies_total || 1) - Number(b.copies_available || 1)
         })));
 
         // Extract unique categories
@@ -195,8 +195,8 @@ export default function LibraryManagement() {
           isbn: formData.isbn,
           category: formData.category_id || 'General',
           rack_number: formData.shelf_location,
-          total_copies: Number(formData.total_copies || 1),
-          available_copies: Number(formData.total_copies || 1)
+          copies_total: Number(formData.total_copies || 1),
+          copies_available: Number(formData.total_copies || 1)
         };
         if (editingItem) {
           await supabase.from('library_books').update(payload).eq('id', editingItem.id);
@@ -208,7 +208,10 @@ export default function LibraryManagement() {
           book_id: formData.book_id,
           issue_date: formData.issue_date || new Date().toISOString().substring(0, 10),
           due_date: formData.due_date || new Date(Date.now() + 14 * 86400000).toISOString().substring(0, 10),
-          status: 'Issued'
+          // book_issues.status is a lowercase vocabulary (issued/returned/overdue).
+          // The display status is derived from return_date/due_date below, so the
+          // stored value only needs to satisfy the constraint.
+          status: 'issued'
         };
         if (editingItem) {
           await supabase.from('book_issues').update(payload).eq('id', editingItem.id);
@@ -338,9 +341,7 @@ export default function LibraryManagement() {
 
   return (
     <div className="space-y-5 max-w-7xl mx-auto pb-16 text-slate-700 font-sans antialiased">
-      <Toaster position="top-center" richColors />
-
-      {/* 1. Header Toolbar */}
+{/* 1. Header Toolbar */}
       <AdminHeader
         title="Library Catalog & Issues"
         subtitle="Configure literary works, manage shelf allocation corridors, log student/staff borrowing timelines, and audit overdue late fine receipts."
@@ -728,7 +729,7 @@ export default function LibraryManagement() {
                               onClick={async () => {
                                 const { error } = await supabase
                                   .from('book_issues')
-                                  .update({ status: 'Returned', return_date: new Date().toISOString() })
+                                  .update({ status: 'returned', return_date: new Date().toISOString() })
                                   .eq('id', issue.id);
                                 if (error) {
                                   toast.error('Failed to update return: ' + error.message);

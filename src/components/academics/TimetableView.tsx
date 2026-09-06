@@ -527,6 +527,9 @@ export default function TimetableView({ onNavigateView }: { onNavigateView: (vie
                                         {slot.start_time} - {slot.end_time}
                                       </span>
                                     </div>
+                                    {slot.room_no && (
+                                      <p className="text-[10px] text-slate-500 font-semibold mt-1">Room {slot.room_no}</p>
+                                    )}
 
                                     <div className="flex items-center justify-between pt-1.5 mt-1.5 border-t border-blue-200/50">
                                       <button
@@ -785,11 +788,18 @@ export default function TimetableView({ onNavigateView }: { onNavigateView: (vie
 
                                         <div className="flex items-center justify-between gap-1 mt-1.5 text-[10px] text-slate-500 font-semibold font-mono">
                                           <span>{slot.start_time.slice(0, 5)} &ndash; {slot.end_time.slice(0, 5)}</span>
-                                          {!sectionId && slot.section_id && (
-                                            <span className="px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 font-sans font-bold text-[9px]">
-                                              Sec {sections.find(x => x.section_id === slot.section_id)?.section_name ?? '?'}
-                                            </span>
-                                          )}
+                                          <span className="flex items-center gap-1">
+                                            {(slot.room_no || currentSection?.room_no) && (
+                                              <span className="px-1.5 py-0.2 rounded bg-white border border-slate-200 text-slate-600 font-sans font-bold text-[9px]">
+                                                Rm {slot.room_no || currentSection?.room_no}
+                                              </span>
+                                            )}
+                                            {!sectionId && slot.section_id && (
+                                              <span className="px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 font-sans font-bold text-[9px]">
+                                                Sec {sections.find(x => x.section_id === slot.section_id)?.section_name ?? '?'}
+                                              </span>
+                                            )}
+                                          </span>
                                         </div>
 
                                         <div className={cn(
@@ -937,8 +947,11 @@ function SlotForm({
   const [startTime, setStartTime] = useState((slot?.start_time ?? known?.start ?? '09:00').slice(0, 5));
   const [endTime, setEndTime] = useState((slot?.end_time ?? known?.end ?? '09:40').slice(0, 5));
   const [teacherId, setTeacherId] = useState(slot?.teacher_id ?? '');
+  const [room, setRoom] = useState(slot?.room_no ?? '');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+
+  const sectionDefaultRoom = sections.find(s => s.section_id === sectionId)?.room_no ?? '';
 
   // Sync times when changing period for a new slot
   useEffect(() => {
@@ -1050,6 +1063,7 @@ function SlotForm({
         period_number: Number(period),
         start_time: startTime,
         end_time: endTime,
+        room_no: room.trim() || null,
       });
       toast.success(slot ? 'Period updated successfully.' : 'Period scheduled successfully.');
       await onSaved();
@@ -1125,6 +1139,13 @@ function SlotForm({
             </select>
           </Field>
         )}
+
+        <Field label="Room" htmlFor="tt-room"
+          hint={sectionDefaultRoom ? `Leave blank to use the section room (${sectionDefaultRoom}).` : 'Optional — the room this period is held in.'}>
+          <input id="tt-room" className={inputClass} value={room}
+            onChange={e => setRoom(e.target.value)}
+            placeholder={sectionDefaultRoom || 'e.g. 201, Lab 2'} />
+        </Field>
 
         <Field label="Subject" htmlFor="tt-subject" error={errors.subjectId}>
           <select id="tt-subject" className={selectClass} value={subjectId}

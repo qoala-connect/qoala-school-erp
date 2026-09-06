@@ -209,20 +209,23 @@ export async function fetchTeacherById(id: string): Promise<Teacher | null> {
 }
 
 export async function saveTeacher(teacher: Partial<Teacher>): Promise<Teacher> {
+  const isUuid = (val: any) => typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+
   const payload: any = {
     name: teacher.name?.trim(),
     employee_id: teacher.employee_id?.trim() || null,
-    user_id: teacher.user_id || null,
+    user_id: isUuid(teacher.user_id) ? teacher.user_id : null,
     email: teacher.email?.trim() || null,
     phone: teacher.phone?.trim() || null,
     photo_url: teacher.photo_url || null,
-    gender: teacher.gender || null,
+    gender: teacher.gender || 'Male',
     date_of_birth: teacher.date_of_birth || null,
-    joining_date: teacher.joining_date || null,
+    joining_date: teacher.joining_date || new Date().toISOString().split('T')[0],
     status: teacher.status || 'Active',
     designation: teacher.designation?.trim() || 'Teacher',
     department: teacher.department?.trim() || 'Teaching Faculty',
-    department_id: teacher.department_id || null,
+    department_id: isUuid(teacher.department_id) ? teacher.department_id : null,
+    subject_id: isUuid(teacher.subject_id) ? teacher.subject_id : null,
     qualification: teacher.qualification || null,
     highest_qualification: teacher.highest_qualification || null,
     experience_years: Number(teacher.experience_years) || 0,
@@ -238,19 +241,50 @@ export async function saveTeacher(teacher: Partial<Teacher>): Promise<Teacher> {
   };
 
   if (teacher.id) {
-    const { data, error } = await supabase.from('teachers').update(payload).eq('id', teacher.id).select().single();
+    const { data, error } = await supabase
+      .from('teachers')
+      .update(payload)
+      .eq('id', teacher.id)
+      .select()
+      .single();
     if (error) throw error;
     return data as Teacher;
   } else {
-    // Generate employee_id if absent. Delegated to a DB sequence via RPC so
-    // two admins onboarding staff at the same moment can't both compute the
-    // same ID (the previous in-memory row count was a race condition).
+    // Generate UUID if database default is missing
+    payload.id = crypto.randomUUID();
+
+    // Generate unique employee ID if absent
     if (!payload.employee_id) {
-      const { data: nextId, error: seqError } = await supabase.rpc('next_employee_id');
-      if (seqError) throw seqError;
-      payload.employee_id = nextId as string;
+      try {
+        const { data: latest } = await supabase
+          .from('teachers')
+          .select('employee_id')
+          .order('created_at', { ascending: false })
+          .limit(100);
+
+        let maxNum = 2000;
+        (latest || []).forEach((row: any) => {
+          if (row.employee_id) {
+            const match = row.employee_id.match(/\d+/);
+            if (match) {
+              const num = parseInt(match[0], 10);
+              if (num > maxNum && num < 99999) maxNum = num;
+            }
+          }
+        });
+        payload.employee_id = `SJS-FAC-${maxNum + 1}`;
+      } catch (err) {
+        console.warn('[TeacherService] Error calculating employee sequence:', err);
+        payload.employee_id = `SJS-FAC-${Date.now().toString().slice(-4)}`;
+      }
     }
-    const { data, error } = await supabase.from('teachers').insert([payload]).select().single();
+
+    const { data, error } = await supabase
+      .from('teachers')
+      .insert([payload])
+      .select()
+      .single();
+
     if (error) throw error;
     return data as Teacher;
   }
@@ -411,6 +445,16 @@ export async function checkAssignmentConflicts(params: {
   return { hasConflict: false, message: 'No conflicts detected.' };
 }
 
+/**
+ * Outcome of a save. `replacedTeacher` is set when naming this teacher as
+ * class teacher took the role off someone else, so the caller can say so.
+ */
+export interface SaveAssignmentResult {
+  id: string;
+  replacedTeacher: string | null;
+  replacedAction: string | null;
+}
+
 export async function saveAssignment(assignment: {
   id?: string;
   teacher_id: string;
@@ -419,36 +463,36 @@ export async function saveAssignment(assignment: {
   section_id: string;
   subject_id?: string | null;
   assignment_type: AssignmentType;
-}): Promise<TeacherAssignment> {
-  const payload = {
-    teacher_id: assignment.teacher_id,
-    academic_year_id: assignment.academic_year_id,
-    class_id: assignment.class_id,
-    section_id: assignment.section_id,
-    subject_id: assignment.subject_id || null,
-    assignment_type: assignment.assignment_type,
-    is_active: true,
-    updated_at: new Date().toISOString()
-  };
+}): Promise<SaveAssignmentResult> {
+  // Goes through the database function rather than a direct insert so that
+  // naming a new class teacher hands the role over from the incumbent in one
+  // transaction. A plain insert trips uq_single_active_class_teacher, and
+  // doing the stand-down as a separate client call risks leaving the section
+  // with no class teacher if the second call fails.
+  const { data, error } = await supabase.rpc('save_teacher_assignment', {
+    _teacher_id: assignment.teacher_id,
+    _academic_year_id: assignment.academic_year_id,
+    _class_id: assignment.class_id,
+    _section_id: assignment.section_id,
+    _subject_id: assignment.subject_id || null,
+    _assignment_type: assignment.assignment_type,
+    _assignment_id: assignment.id ?? null,
+  });
+  if (error) throw error;
 
-  if (assignment.id) {
-    const { data, error } = await supabase
-      .from('teacher_assignments')
-      .update(payload)
-      .eq('id', assignment.id)
-      .select()
-      .single();
-    if (error) throw error;
-    return data as TeacherAssignment;
-  } else {
-    const { data, error } = await supabase
-      .from('teacher_assignments')
-      .insert([payload])
-      .select()
-      .single();
-    if (error) throw error;
-    return data as TeacherAssignment;
-  }
+  const row = (Array.isArray(data) ? data[0] : data) as {
+    assignment_id: string;
+    replaced_teacher: string | null;
+    replaced_action: string | null;
+  } | undefined;
+
+  if (!row?.assignment_id) throw new Error('The assignment could not be saved.');
+
+  return {
+    id: row.assignment_id,
+    replacedTeacher: row.replaced_teacher,
+    replacedAction: row.replaced_action,
+  };
 }
 
 export async function deleteAssignment(id: string): Promise<void> {

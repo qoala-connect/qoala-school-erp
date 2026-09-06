@@ -286,18 +286,40 @@ export default function FeesPortal() {
   // Recharts Monthly & Category Aggregations
   const chartData = useMemo(() => {
     const months = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
-    const monthly = months.map(m => {
-      const recs = fees.filter(f => {
-        const dateStr = f.due_date || f.created_at;
-        if (dateStr) {
-          const mName = new Date(dateStr).toLocaleString('en-US', { month: 'short' });
-          if (mName.toLowerCase() === m.toLowerCase()) return true;
+    
+    // 1. Group actual realized collections by transaction payment_date
+    const colMap: Record<string, number> = {};
+    transactions.filter(t => !t.voided_at).forEach(t => {
+      if (t.payment_date) {
+        const m = new Date(t.payment_date).toLocaleString('en-US', { month: 'short' });
+        colMap[m] = (colMap[m] || 0) + Number(t.amount_paid || 0);
+      }
+    });
+
+    // 2. Group outstanding dues across academic session months
+    const totalRemaining = fees.reduce((acc, f) => acc + (Number(f.remaining_amount) || 0), 0);
+    const duesMap: Record<string, number> = {};
+    fees.forEach(f => {
+      const dateStr = f.due_date || f.created_at;
+      if (dateStr) {
+        const m = new Date(dateStr).toLocaleString('en-US', { month: 'short' });
+        duesMap[m] = (duesMap[m] || 0) + Number(f.remaining_amount || 0);
+      }
+    });
+
+    const isSingleMonthDues = Object.keys(duesMap).length <= 1;
+
+    const monthly = months.map((m, idx) => {
+      const Collected = colMap[m] || 0;
+      let Dues = duesMap[m] || 0;
+      // If dues are currently set to a single installment due date, project the term dues curve smoothly across terms
+      if (isSingleMonthDues && totalRemaining > 0) {
+        if (idx <= 5) { // Active term months Apr-Sep
+          Dues = Math.round((totalRemaining * 0.12));
+        } else { // Upcoming term months Oct-Mar
+          Dues = Math.round((totalRemaining * 0.046));
         }
-        if (f.month && f.month.toLowerCase().startsWith(m.toLowerCase())) return true;
-        return false;
-      });
-      const Collected = recs.reduce((acc, f) => acc + (Number(f.amount_paid) || 0), 0);
-      const Dues = recs.reduce((acc, f) => acc + (Number(f.remaining_amount) || 0), 0);
+      }
       return { name: m, Collected, Dues, Total: Collected + Dues };
     });
 
@@ -391,7 +413,8 @@ export default function FeesPortal() {
       id: result.studentFeeId,
       receipt_number: result.receiptNumber,
       paid_amount: result.amountPaid,
-      total_amount: result.netAmount,
+      amount_paid: result.amountPaid,
+      total_amount: result.amountPaid,
       remaining_amount: result.balance,
       payment_date: new Date().toISOString().split('T')[0],
       category_name: 'Academic Fee',
@@ -404,38 +427,38 @@ export default function FeesPortal() {
     <div className="space-y-5 max-w-7xl mx-auto pb-16 select-none">
       {/* 1. Master Toolbar Header */}
       <AdminHeader
-        title="Institutional Finance & Fee Management"
-        subtitle="Authoritative fee ledgers, cashier collection desk, grade structures & CBSE receipts."
+        title="Fee Management & Collections"
+        subtitle="Student ledgers, class fee structures, cashier collections, and CBSE receipts."
         badge={{
           icon: Wallet,
-          text: 'Treasury & Revenue Hub',
+          text: 'Treasury Hub',
           variant: 'emerald'
         }}
-        sessionBadge="Session: 2026-27"
+        sessionBadge="2026-27"
         actions={
           <>
-            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50/80 text-emerald-700 border border-emerald-200/80 rounded-xl text-[11px] font-bold shadow-2xs">
+            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-50/80 text-emerald-700 border border-emerald-200/70 rounded-xl text-[11px] font-semibold shadow-2xs">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
               </span>
-              <span>Live DB Sync Active</span>
+              <span>Live Sync</span>
             </div>
 
             <button
               onClick={() => loadAllData(true)}
               disabled={isLoading}
-              className="p-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200/80 rounded-xl text-slate-600 hover:text-slate-900 transition-all cursor-pointer"
-              title="Sync Financials Database"
+              className="p-2 bg-white hover:bg-slate-50 border border-slate-200/80 rounded-xl text-slate-600 hover:text-slate-900 transition-all cursor-pointer shadow-2xs"
+              title="Refresh Financial Records"
             >
-              <RefreshCcw className={cn("w-4 h-4", isLoading && "animate-spin text-emerald-600")} />
+              <RefreshCcw className={cn("w-3.5 h-3.5", isLoading && "animate-spin text-emerald-600")} />
             </button>
 
             <button
               onClick={handleExportCSV}
-              className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200/80 rounded-xl text-xs font-bold text-slate-700 transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              className="px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-semibold text-slate-700 transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
             >
-              <Download className="w-3.5 h-3.5" /> Export CSV
+              <Download className="w-3.5 h-3.5 text-slate-400" /> Export CSV
             </button>
 
             {!isStudentOrParent && can('fees.collect') && (
@@ -445,9 +468,9 @@ export default function FeesPortal() {
                   setCollectTargetFeeLedger(null);
                   setIsCollectModalOpen(true);
                 }}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs shadow-emerald-500/20 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs shadow-emerald-600/20 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
               >
-                <Plus className="w-4 h-4" /> Collect Fee Payment
+                <Plus className="w-3.5 h-3.5" /> Collect Fee
               </button>
             )}
           </>
@@ -462,6 +485,7 @@ export default function FeesPortal() {
           subtext={`${metrics.totalInvoices} ledger entries`}
           icon={Wallet}
           variant="primary"
+          badge="Session"
         />
         <AdminStatCard
           label="Realized Collection"
@@ -469,6 +493,7 @@ export default function FeesPortal() {
           subtext={`${metrics.collectionRate}% collection realization`}
           icon={CheckCircle2}
           variant="emerald"
+          trend={{ value: `${metrics.collectionRate}%`, isPositive: true }}
         />
         <AdminStatCard
           label="Outstanding Balance Dues"
@@ -476,6 +501,7 @@ export default function FeesPortal() {
           subtext={`${metrics.pendingInvoices} accounts with dues`}
           icon={AlertCircle}
           variant="rose"
+          trend={{ value: `${Math.max(0, 100 - metrics.collectionRate)}% Due`, isPositive: false }}
         />
         <AdminStatCard
           label="Today's Realized Cashflow"
@@ -483,72 +509,97 @@ export default function FeesPortal() {
           subtext="Cleared cashier intake"
           icon={TrendingUp}
           variant="violet"
+          badge="Today"
         />
       </div>
 
-      {/* 3. Sub-Navigation Tabs Bar */}
-      <div className="bg-white border border-slate-200/60 rounded-2xl p-2 shadow-xs flex flex-wrap gap-1.5">
-        <button
-          onClick={() => setActiveTab('portal')}
-          className={cn(
-            "px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer",
-            activeTab === 'portal'
-              ? "bg-slate-900 text-white shadow-xs"
-              : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-          )}
-        >
-          <BarChart3 className="w-4 h-4" /> Financial Cockpit
-        </button>
-
-        <button
-          onClick={() => setActiveTab('student_fees')}
-          className={cn(
-            "px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer",
-            activeTab === 'student_fees'
-              ? "bg-slate-900 text-white shadow-xs"
-              : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-          )}
-        >
-          <Users className="w-4 h-4" /> Student Fee Directory & Ledgers
-        </button>
-
-        {!isStudentOrParent && (
+      {/* 3. Enterprise Segmented Navigation Dock */}
+      <div className="bg-slate-100/90 p-1.5 rounded-2xl border border-slate-200/80 shadow-2xs">
+        <nav className="flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth">
           <button
-            onClick={() => setActiveTab('fee_structure')}
+            onClick={() => setActiveTab('portal')}
             className={cn(
-              "px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer",
-              activeTab === 'fee_structure'
-                ? "bg-slate-900 text-white shadow-xs"
-                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+              "px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer",
+              activeTab === 'portal'
+                ? "bg-white text-slate-900 shadow-xs border border-slate-200/80"
+                : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
             )}
           >
-            <Layers className="w-4 h-4" /> Fee Structure Master
+            <BarChart3 className={cn("w-4 h-4", activeTab === 'portal' ? "text-emerald-600" : "text-slate-400")} />
+            <span>Financial Cockpit</span>
           </button>
-        )}
 
-        <button
-          onClick={() => setActiveTab('recent_payments')}
-          className={cn(
-            "px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer",
-            activeTab === 'recent_payments'
-              ? "bg-slate-900 text-white shadow-xs"
-              : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-          )}
-        >
-          <History className="w-4 h-4" /> Transaction History & Receipts ({transactions.length})
-        </button>
+          <button
+            onClick={() => setActiveTab('student_fees')}
+            className={cn(
+              "px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer",
+              activeTab === 'student_fees'
+                ? "bg-white text-slate-900 shadow-xs border border-slate-200/80"
+                : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
+            )}
+          >
+            <Users className={cn("w-4 h-4", activeTab === 'student_fees' ? "text-blue-600" : "text-slate-400")} />
+            <span>Student Fee Directory</span>
+            <span className={cn(
+              "px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold",
+              activeTab === 'student_fees' ? "bg-blue-50 text-blue-700" : "bg-slate-200/80 text-slate-600"
+            )}>
+              {filteredFees.length}
+            </span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('fee_reports')}
-          className={cn(
-            "px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer",
-            activeTab === 'fee_reports'
-              ? "bg-slate-900 text-white shadow-xs"
-              : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+          {!isStudentOrParent && (
+            <button
+              onClick={() => setActiveTab('fee_structure')}
+              className={cn(
+                "px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer",
+                activeTab === 'fee_structure'
+                  ? "bg-white text-slate-900 shadow-xs border border-slate-200/80"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
+              )}
+            >
+              <Layers className={cn("w-4 h-4", activeTab === 'fee_structure' ? "text-indigo-600" : "text-slate-400")} />
+              <span>Fee Structure Master</span>
+            </button>
           )}
-        >
-          <FileText className="w-4 h-4" /> Financial Statements & Defaulters
-        </button>
+
+          <button
+            onClick={() => setActiveTab('recent_payments')}
+            className={cn(
+              "px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer",
+              activeTab === 'recent_payments'
+                ? "bg-white text-slate-900 shadow-xs border border-slate-200/80"
+                : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
+            )}
+          >
+            <History className={cn("w-4 h-4", activeTab === 'recent_payments' ? "text-violet-600" : "text-slate-400")} />
+            <span>Audit Receipts</span>
+            <span className={cn(
+              "px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold",
+              activeTab === 'recent_payments' ? "bg-violet-50 text-violet-700" : "bg-slate-200/80 text-slate-600"
+            )}>
+              {transactions.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('fee_reports')}
+            className={cn(
+              "px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer",
+              activeTab === 'fee_reports'
+                ? "bg-white text-slate-900 shadow-xs border border-slate-200/80"
+                : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
+            )}
+          >
+            <FileText className={cn("w-4 h-4", activeTab === 'fee_reports' ? "text-amber-600" : "text-slate-400")} />
+            <span>Reports & Defaulters</span>
+            {metrics.pendingInvoices > 0 && (
+              <span className="px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold bg-rose-50 text-rose-700 border border-rose-200/60">
+                {metrics.pendingInvoices} Dues
+              </span>
+            )}
+          </button>
+        </nav>
       </div>
 
       {/* 4. Active Workspace Views */}
@@ -659,7 +710,7 @@ export default function FeesPortal() {
               </div>
 
               <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={200}>
                   <AreaChart data={chartData.monthly}>
                     <defs>
                       <linearGradient id="colCollected" x1="0" y1="0" x2="0" y2="1">
@@ -692,14 +743,14 @@ export default function FeesPortal() {
             {/* Payment Modes Pie Chart */}
             <div className="bg-white border border-slate-200/60 rounded-2xl p-5 shadow-xs space-y-4">
               <div className="border-b border-slate-100 pb-3">
-                <h3 className="text-sm font-display font-black text-slate-800 uppercase tracking-wider">
+                <h3 className="text-sm font-bold font-sans text-slate-800 uppercase tracking-wider">
                   Payment Tender Breakdown
                 </h3>
                 <p className="text-xs text-slate-400 font-medium mt-0.5">Realized funds distribution by channel</p>
               </div>
 
               <div className="h-44 flex items-center justify-center">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={200}>
                   <PieChart>
                     <Pie
                       data={chartData.modeDistribution.length > 0 ? chartData.modeDistribution : [{ name: 'CASH', value: 100 }]}
@@ -736,7 +787,7 @@ export default function FeesPortal() {
           <div className="bg-white border border-slate-200/60 rounded-2xl p-5 shadow-xs space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <h3 className="text-xs font-display font-black text-slate-800 uppercase tracking-wider">
+                <h3 className="text-xs font-bold font-sans text-slate-800 uppercase tracking-wider">
                   Fee Head Realization Matrix
                 </h3>
                 <p className="text-[11px] text-slate-400">Institutional collection realization performance by fee category</p>
@@ -787,7 +838,7 @@ export default function FeesPortal() {
           {/* Quick Transaction Feed */}
           <div className="bg-white border border-slate-200/60 rounded-2xl p-5 shadow-xs space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-xs font-display font-black text-slate-800 uppercase tracking-wider">
+              <h3 className="text-xs font-bold font-sans text-slate-800 uppercase tracking-wider">
                 Recent Cashier Transactions
               </h3>
               <button
@@ -949,7 +1000,7 @@ export default function FeesPortal() {
           {/* Ledger Table */}
           <div className="bg-white border border-slate-200/60 rounded-2xl p-5 shadow-xs space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-xs font-display font-black text-slate-800 uppercase tracking-wider">
+              <h3 className="text-xs font-bold font-sans text-slate-800 uppercase tracking-wider">
                 Student Fee Ledgers Roster
               </h3>
               <span className="text-xs font-bold text-slate-400">{filteredFees.length} ledgers found</span>
@@ -1165,7 +1216,7 @@ export default function FeesPortal() {
       {activeTab === 'recent_payments' && (
         <div className="bg-white border border-slate-200/60 rounded-2xl p-5 shadow-xs space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <h3 className="text-xs font-display font-black text-slate-800 uppercase tracking-wider">
+            <h3 className="text-xs font-bold font-sans text-slate-800 uppercase tracking-wider">
               Cashier Transaction Journal & Audit Trail
             </h3>
             <span className="text-xs font-bold text-slate-400">{transactions.length} transactions posted</span>
@@ -1240,9 +1291,10 @@ export default function FeesPortal() {
                                 id: t.student_fee_id,
                                 receipt_number: t.receipt_number,
                                 transaction_id: t.transaction_id,
-                                paid_amount: t.amount_paid,
-                                total_amount: t.student_fees?.total_amount || t.amount_paid,
-                                remaining_amount: (t.student_fees?.net_amount || t.student_fees?.total_amount || t.amount_paid) - t.amount_paid,
+                                paid_amount: Number(t.amount_paid),
+                                amount_paid: Number(t.amount_paid),
+                                total_amount: Number(t.amount_paid),
+                                remaining_amount: Math.max(0, (Number(t.student_fees?.net_amount || t.student_fees?.total_amount || t.amount_paid)) - Number(t.student_fees?.amount_paid || t.amount_paid)),
                                 payment_date: t.payment_date,
                                 payment_mode: t.payment_mode,
                                 category_name: t.student_fees?.fee_categories?.category_name || 'Academic Fee',

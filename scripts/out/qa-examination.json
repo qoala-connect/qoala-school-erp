@@ -1,0 +1,247 @@
+{
+  "generatedAt": "2026-09-06T00:28:34.824Z",
+  "pass": 30,
+  "fail": 0,
+  "results": [
+    {
+      "module": "Examination",
+      "page": "Exam/ExamTypes",
+      "action": "Load exam types (select assessment_types)",
+      "status": "PASS",
+      "detail": "19 types",
+      "ms": 144
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/ExamTypes",
+      "action": "Create exam type (insert assessment_types)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 158
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/ExamTypes",
+      "action": "Edit exam type (update assessment_types)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 144
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/GradeRules",
+      "action": "Load grading rules (select grading_rules)",
+      "status": "PASS",
+      "detail": "8 rules",
+      "ms": 274
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/GradeRules",
+      "action": "Save grade rule (insert grading_rules)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 287
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/Exams",
+      "action": "Create exam (insert exams)",
+      "status": "PASS",
+      "detail": "id=5a035665",
+      "ms": 133
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/Exams",
+      "action": "Auto-seed subjects from Class Subjects (upsert exam_subjects)",
+      "status": "PASS",
+      "detail": "4 subjects",
+      "ms": 425
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/Exams",
+      "action": "Edit exam (update exams)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 133
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/Exams",
+      "action": "Exam status lifecycle (update exams.status)",
+      "status": "PASS",
+      "detail": "scheduled -> marks_entry_open -> review -> locked -> result_processed",
+      "ms": 744
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/Schedule",
+      "action": "Set datesheet slot (update exam_subjects date/time/room)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 137
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/Schedule",
+      "action": "Assign invigilator (update exam_subjects.invigilator_id)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 125
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/SubjectMapping",
+      "action": "Configure subject marks + teacher (update exam_subjects)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 131
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/MarksEntry",
+      "action": "Load student roster (select students)",
+      "status": "PASS",
+      "detail": "44 students",
+      "ms": 157
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/MarksEntry",
+      "action": "Save marks draft (upsert marks)",
+      "status": "PASS",
+      "detail": "10 marks",
+      "ms": 299
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/MarksEntry",
+      "action": "Absent / medical / exempted rows (upsert marks)",
+      "status": "PASS",
+      "detail": "3 variants",
+      "ms": 141
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/MarksEntry",
+      "action": "Draft flips review_status to in_progress (update exam_subjects)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 124
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/MarksVerification",
+      "action": "Submit for review (update exam_subjects + marks)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 393
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/MarksVerification",
+      "action": "Return for correction (update exam_subjects + marks)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 259
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/MarksVerification",
+      "action": "Re-submit then approve (update exam_subjects + marks)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 494
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/MarksVerification",
+      "action": "Lock marks (update exam_subjects.locked + marks.status)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 371
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/MarksVerification",
+      "action": "Locked marks reject further edits (guard enforced)",
+      "status": "PASS",
+      "detail": "no rows changed",
+      "ms": 292
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/MarksVerification",
+      "action": "Unlock marks with reason (update exam_subjects)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 249
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/ResultProcessing",
+      "action": "Write computed results (upsert exam_results)",
+      "status": "PASS",
+      "detail": "10 results",
+      "ms": 158
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/ResultPublication",
+      "action": "Publish results (update exam_results + exams)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 382
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/ReportCards",
+      "action": "Load report card data (select exam_results + marks)",
+      "status": "PASS",
+      "detail": "10 results / 10 marks",
+      "ms": 144
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/MeritRank",
+      "action": "Load merit + rank list (select exam_results ordered)",
+      "status": "PASS",
+      "detail": "10 ranked",
+      "ms": 121
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/Analytics",
+      "action": "Load analytics aggregates (select exam_results/marks)",
+      "status": "PASS",
+      "detail": "500 results / 10 marks",
+      "ms": 155
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/CoScholastic",
+      "action": "Save co-scholastic grades (upsert co_scholastic)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 128
+    },
+    {
+      "module": "Examination",
+      "page": "Exam/Exams",
+      "action": "Delete exam cascade (delete marks/results/subjects/exam)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 739
+    },
+    {
+      "module": "Examination",
+      "page": "Attendance/Entry",
+      "action": "Save attendance (rpc save_attendance)",
+      "status": "PASS",
+      "detail": "5 rows",
+      "ms": 308
+    }
+  ]
+}

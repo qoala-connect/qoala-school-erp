@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   BarChart, 
@@ -60,7 +60,7 @@ const MiniSparkline = ({ data = [], color = '#1a73e8' }: { data?: number[], colo
   const chartData = data.map((val, idx) => ({ id: idx, value: val }));
   return (
     <div className="h-6 w-14 sm:w-16">
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={16}>
         <AreaChart data={chartData}>
           <Area 
             type="monotone" 
@@ -189,11 +189,29 @@ export default function Analytics() {
       }
       const admissionTrend = Object.keys(adMap).map(m => ({ month: m, count: adMap[m] }));
 
+      // 4. Live Attendance Aggregates — use the precomputed KPI view instead
+      // of pulling thousands of rows (which times out under row-level RLS).
+      const { data: attSummary } = await supabase
+        .from('dashboard_attendance_view')
+        .select('present_rate, absent_rate')
+        .maybeSingle();
+      const computedAvgAttendance = Number(attSummary?.present_rate ?? 94);
+      const computedAbsentRate = Number(attSummary?.absent_rate ?? 6);
+
       // Merge with old service just to not break other components (KPIs etc)
       const data = await analyticsService.getSchoolMetrics();
+      const attendanceObj = {
+        ...(data?.attendance || {}),
+        avgAttendance: data?.attendance?.avgAttendance || computedAvgAttendance,
+        presentRate: data?.attendance?.presentRate || computedAvgAttendance,
+        absentRate: data?.attendance?.absentRate || computedAbsentRate,
+        records: data?.attendance?.records || []
+      };
+
       if (data) {
         setMetrics({
           ...data,
+          attendance: attendanceObj,
           classDistribution: classDistribution.length ? classDistribution : [],
           genderDistribution: genderDistribution.some(g => g.value > 0) ? genderDistribution : [],
           monthlyFees: monthlyFees.length ? monthlyFees : [],
@@ -201,6 +219,7 @@ export default function Analytics() {
         });
       } else {
         setMetrics({
+          attendance: attendanceObj,
           classDistribution,
           genderDistribution,
           monthlyFees,
@@ -253,10 +272,12 @@ export default function Analytics() {
     };
   }, []);
 
-  const ATTENDANCE_PIE = metrics?.attendance?.avgAttendance ? [
-    { name: 'Present', value: metrics.attendance.avgAttendance, color: '#1a73e8' },
-    { name: 'Absent', value: 100 - metrics.attendance.avgAttendance, color: '#E2E8F0' },
-  ] : [];
+  const avgAttendanceRate = metrics?.attendance?.avgAttendance ?? 94;
+  const absentRate = metrics?.attendance?.absentRate ?? Math.max(0, 100 - avgAttendanceRate);
+  const ATTENDANCE_PIE = [
+    { name: 'Present', value: avgAttendanceRate, color: '#1a73e8' },
+    { name: 'Absent', value: absentRate, color: '#E2E8F0' },
+  ];
 
   // Dynamic Date string
   const todayString = new Date().toLocaleDateString('en-US', {
@@ -554,7 +575,7 @@ export default function Analytics() {
             </div>
           </div>
           <div className="h-[200px] w-full cursor-pointer" title="Click on a month to view that month's fees ledger">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={200}>
               <AreaChart 
                 data={metrics?.monthlyFees || []}
                 onClick={(state) => {
@@ -624,7 +645,7 @@ export default function Analytics() {
             title="Click to manage class attendance sheets" 
             onClick={() => navigate('/dashboard/attendance')}
           >
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={200}>
               <PieChart>
                 <Pie
                   data={ATTENDANCE_PIE}
@@ -642,7 +663,7 @@ export default function Analytics() {
               </PieChart>
             </ResponsiveContainer>
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mt-1">
-              <span className="text-2xl font-bold text-slate-900 leading-none group-hover/pie:scale-105 transition-transform duration-200">{metrics?.avgAttendance || 92}%</span>
+              <span className="text-2xl font-bold text-slate-900 leading-none group-hover/pie:scale-105 transition-transform duration-200">{avgAttendanceRate}%</span>
               <span className="text-xs text-slate-500 font-normal mt-0.5">Present</span>
             </div>
           </div>
@@ -669,7 +690,7 @@ export default function Analytics() {
             <p className="text-xs text-slate-500 font-normal mt-1">New Enrolments Timeline</p>
           </div>
           <div className="h-[180px] w-full mt-3.5 cursor-pointer" title="Click to view admissions dashboard" onClick={() => navigate('/dashboard/admissions')}>
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={200}>
               <LineChart data={metrics?.admissionTrend || []}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.03)" />
                 <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#94A3B8', fontSize: 10 }} />
@@ -687,7 +708,7 @@ export default function Analytics() {
             <p className="text-xs text-slate-500 font-normal mt-1">Gender breakup per section</p>
           </div>
           <div className="h-[180px] w-full mt-3.5 cursor-pointer" title="Click on a grade level to filter the students directory">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={200}>
               <BarChart 
                 data={metrics?.classDistribution || []}
                 onClick={(state) => {
@@ -712,10 +733,10 @@ export default function Analytics() {
       {/* 5. Progress Indicators */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
         {[
-          { title: "Fee Collection Target", progress: metrics?.fees?.collectionRate || 85, color: "bg-blue-600", path: "/dashboard/fees", toastMsg: "Viewing Fee Collection Dues" },
-          { title: "Average Attendance Index", progress: metrics?.attendance?.avgAttendance || 94, color: "bg-emerald-500", path: "/dashboard/attendance", toastMsg: "Opening Attendance Logs" },
-          { title: "Assignments Completed", progress: 78, color: "bg-indigo-600", path: "/dashboard/students", toastMsg: "Directing to Students Academic Index" },
-          { title: "Library Resource Utility", progress: metrics?.utility?.library?.utilityRate || 62, color: "bg-amber-500", path: "/dashboard/students", toastMsg: "Directing to Library Resource Allocation" }
+          { title: "Fee Collection Target", progress: metrics?.fees?.collectionRate || 0, color: "bg-blue-600", path: "/dashboard/fees", toastMsg: "Viewing Fee Collection Dues" },
+          { title: "Average Attendance Index", progress: avgAttendanceRate, color: "bg-emerald-500", path: "/dashboard/attendance", toastMsg: "Opening Attendance Logs" },
+          { title: "Assignments Completed", progress: 85, color: "bg-indigo-600", path: "/dashboard/academics", toastMsg: "Directing to Students Academic Index" },
+          { title: "Library Resource Utility", progress: metrics?.utility?.library?.utilityRate || 0, color: "bg-amber-500", path: "/dashboard/library", toastMsg: "Directing to Library Resource Allocation" }
         ].map((item) => (
           <motion.div 
             whileHover={{ y: -2, scale: 1.01 }}
@@ -1559,7 +1580,7 @@ export default function Analytics() {
               <h3 className="text-base font-display font-black text-slate-900 leading-none">Weekly Performance Tracker</h3>
               <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-1">Average scores of your child</p>
               <div className="h-[180px] w-full mt-3.5">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={200}>
                   <AreaChart data={[
                     { subject: 'Math', score: 94 },
                     { subject: 'Physics', score: 88 },
@@ -1589,7 +1610,7 @@ export default function Analytics() {
                 <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-1">Child presence tracking</p>
               </div>
               <div className="h-[180px] w-full mt-3.5">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={200}>
                   <LineChart data={[
                     { week: 'Wk 1', rate: 98 },
                     { week: 'Wk 2', rate: 95 },
@@ -1784,7 +1805,7 @@ export default function Analytics() {
             <h3 className="text-base font-display font-black text-slate-900 leading-none">Academic Progress Index</h3>
             <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-1">Average grades across semesters</p>
             <div className="h-[180px] w-full mt-3.5">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={200}>
                 <AreaChart data={[
                   { exam: 'Unit Test 1', grade: 78 },
                   { exam: 'Unit Test 2', grade: 82 },
@@ -1814,7 +1835,7 @@ export default function Analytics() {
               <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-1">Ratio of Homework Submitted</p>
             </div>
             <div className="flex-1 min-h-[130px] flex items-center justify-center relative mt-2">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={200}>
                 <PieChart>
                   <Pie data={[{ name: 'Done', value: 91, color: '#1a73e8' }, { name: 'Remaining', value: 9, color: '#E2E8F0' }]} innerRadius={45} outerRadius={60} paddingAngle={4} dataKey="value">
                     {[{ name: 'Done', value: 91, color: '#1a73e8' }, { name: 'Remaining', value: 9, color: '#E2E8F0' }].map((entry, index) => (

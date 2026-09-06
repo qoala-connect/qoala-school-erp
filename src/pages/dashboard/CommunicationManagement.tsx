@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
-import { toast, Toaster } from 'sonner';
+import { toast } from 'sonner';
 import { AdminHeader } from '@/components/common/AdminHeader';
 import { AdminStatCard } from '@/components/common/AdminStatCard';
 
@@ -85,9 +85,10 @@ export default function CommunicationManagement() {
     setErrorState(null);
     try {
       const [noticesRes, smsRes, emailRes] = await Promise.all([
-        supabase.from('notices').select('*').order('publish_date', { ascending: false }),
-        supabase.from('sms_logs').select('*').order('created_at', { ascending: false }),
-        supabase.from('email_logs').select('*').order('created_at', { ascending: false })
+        supabase.from('notices').select('*').order('created_at', { ascending: false }),
+        // sms_logs / email_logs timestamp their rows with sent_at, not created_at.
+        supabase.from('sms_logs').select('*').order('sent_at', { ascending: false }),
+        supabase.from('email_logs').select('*').order('sent_at', { ascending: false })
       ]);
 
       if (noticesRes.data) {
@@ -97,7 +98,7 @@ export default function CommunicationManagement() {
           author: n.created_by || 'Admin Office',
           publish_date: n.publish_date || n.created_at || new Date().toISOString().substring(0, 10),
           audience: n.target_audience || 'All',
-          description: n.content || n.description || '',
+          description: n.description || '',
           attachments: []
         })));
       }
@@ -106,9 +107,9 @@ export default function CommunicationManagement() {
         setSmsLogs(smsRes.data.map((s: any) => ({
           id: s.id,
           category: s.type || 'Academic',
-          message: s.message || '',
+          message: s.message_text || '',
           recipient_count: Number(s.recipient_count || 1),
-          dispatch_time: s.created_at || new Date().toISOString(),
+          dispatch_time: s.sent_at || new Date().toISOString(),
           status: s.status || 'Delivered'
         })));
       }
@@ -120,7 +121,7 @@ export default function CommunicationManagement() {
           target_group: em.recipient_email || 'General',
           sender: 'admin@school.com',
           status: em.status || 'Sent',
-          sent_date: em.created_at || new Date().toISOString().substring(0, 10)
+          sent_date: em.sent_at || new Date().toISOString().substring(0, 10)
         })));
       }
 
@@ -145,7 +146,7 @@ export default function CommunicationManagement() {
       if (activeTab === 'notices') {
         const payload: any = {
           title: formData.title,
-          content: formData.description,
+          description: formData.description,
           target_audience: formData.audience || 'All',
           publish_date: formData.publish_date || new Date().toISOString().substring(0, 10),
           is_active: true
@@ -160,7 +161,10 @@ export default function CommunicationManagement() {
         }
       } else if (activeTab === 'sms') {
         const payload: any = {
-          message: formData.message,
+          message_text: formData.message,
+          // recipient_phone is NOT NULL; a campaign fans out to a group rather
+          // than one number, so record the group label it was sent to.
+          recipient_phone: formData.target_group || 'Broadcast',
           type: formData.category || 'Academic',
           status: 'Delivered',
           recipient_count: Number(formData.recipient_count || 50)
@@ -373,9 +377,7 @@ CREATE TABLE IF NOT EXISTS push_alerts (
 
   return (
     <div className="space-y-5 max-w-7xl mx-auto pb-16 text-slate-700 font-sans antialiased">
-      <Toaster position="top-right" richColors />
-
-      {/* 1. Header Toolbar */}
+{/* 1. Header Toolbar */}
       <AdminHeader
         title="Noticeboard & Broadcast Campaigns"
         subtitle="Broadcast school notices, urgent bulletins, security alerts, fee deadlines, attendance push logs, and email newsletters to guardians."

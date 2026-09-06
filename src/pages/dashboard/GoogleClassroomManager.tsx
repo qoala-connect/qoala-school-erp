@@ -37,7 +37,7 @@ import {
   ClassroomAnnouncement,
   ClassroomCourseWork
 } from '@/services/googleClassroomService';
-import { Toaster, toast } from 'sonner';
+import { toast } from 'sonner';
 
 export default function GoogleClassroomManager() {
   const [googleUser, setGoogleUser] = useState<any>(null);
@@ -882,9 +882,7 @@ export default function GoogleClassroomManager() {
 
   return (
     <div className="space-y-6 pb-24 text-slate-700">
-      <Toaster position="top-center" richColors />
-
-      {/* Workspace Header Panel */}
+{/* Workspace Header Panel */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-5 bg-white border border-slate-200/60 rounded-[24px] shadow-sm">
         <div className="space-y-0.5">
           <div className="flex items-center gap-2">

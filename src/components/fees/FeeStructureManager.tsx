@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Building, Plus, Edit2, Check, X, RefreshCcw, 
-  Settings, Layers, AlertTriangle, Loader2, Save, Sparkles 
+  Settings, Layers, AlertTriangle, Loader2, Save, Sparkles,
+  Trash2, RotateCcw, HelpCircle, CheckCircle2, ChevronDown, Sliders
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/context/AuthContext';
 import { feeService } from '@/services/feeService';
 import { FeeCategory, FeeStructureItem } from '@/types/fee';
 
@@ -28,6 +30,9 @@ export default function FeeStructureManager({
   academicYears,
   currentAcademicYear
 }: FeeStructureManagerProps) {
+  const { role, can } = useAuth();
+  const isAdmin = (role as string) === 'admin' || (role as string) === 'super_admin' || can('fees.manage');
+
   const [selectedYearId, setSelectedYearId] = useState<string>(currentAcademicYear?.id || '');
   const [categories, setCategories] = useState<FeeCategory[]>([]);
   const [structures, setStructures] = useState<FeeStructureItem[]>([]);
@@ -40,8 +45,22 @@ export default function FeeStructureManager({
   const [catFrequency, setCatFrequency] = useState('Monthly');
   const [catAmount, setCatAmount] = useState<number | ''>('');
   const [catDescription, setCatDescription] = useState('');
+  const [catIsActive, setCatIsActive] = useState(true);
   const [isSavingCategory, setIsSavingCategory] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
+
+  // Category Delete Confirmation Modal
+  const [categoryToDelete, setCategoryToDelete] = useState<FeeCategory | null>(null);
+  const [isDeletingCategory, setIsDeletingCategory] = useState(false);
+
+  // Class Reset Confirmation Modal
+  const [classToReset, setClassToReset] = useState<{ id: string; class_name: string } | null>(null);
+  const [isResettingClass, setIsResettingClass] = useState(false);
+
+  // Quick Class Config Modal
+  const [isQuickConfigOpen, setIsQuickConfigOpen] = useState(false);
+  const [quickConfigClassId, setQuickConfigClassId] = useState<string>('');
+  const [quickConfigAmounts, setQuickConfigAmounts] = useState<Record<string, number>>({});
 
   // Matrix Editing State: classId_categoryId -> amount
   const [matrixValues, setMatrixValues] = useState<Record<string, number>>({});
@@ -87,6 +106,7 @@ export default function FeeStructureManager({
     setCatFrequency('Monthly');
     setCatAmount('');
     setCatDescription('');
+    setCatIsActive(true);
     setIsCategoryModalOpen(true);
   };
 
@@ -96,6 +116,7 @@ export default function FeeStructureManager({
     setCatFrequency(cat.frequency);
     setCatAmount(cat.amount || '');
     setCatDescription(cat.description || '');
+    setCatIsActive(cat.is_active !== false);
     setIsCategoryModalOpen(true);
   };
 
@@ -112,9 +133,9 @@ export default function FeeStructureManager({
         frequency: catFrequency,
         amount: typeof catAmount === 'number' ? catAmount : 0,
         description: catDescription.trim() || undefined,
-        is_active: true
+        is_active: catIsActive
       });
-      toast.success('Fee category saved successfully.', { id: 'save-cat' });
+      toast.success(editingCategory?.id ? 'Fee category updated successfully.' : 'New fee category created successfully.', { id: 'save-cat' });
       setIsCategoryModalOpen(false);
       loadData();
     } catch (err: any) {
@@ -122,6 +143,27 @@ export default function FeeStructureManager({
       toast.error(err.message || 'Failed to save fee category.', { id: 'save-cat' });
     } finally {
       setIsSavingCategory(false);
+    }
+  };
+
+  const handleDeleteCategory = async () => {
+    if (!categoryToDelete) return;
+    setIsDeletingCategory(true);
+    toast.loading(`Deleting fee category ${categoryToDelete.category_name}...`, { id: 'del-cat' });
+    try {
+      const result = await feeService.deleteFeeCategory(categoryToDelete.id);
+      if (result.deactivated) {
+        toast.info(result.message, { id: 'del-cat', duration: 5000 });
+      } else {
+        toast.success('Fee category deleted successfully.', { id: 'del-cat' });
+      }
+      setCategoryToDelete(null);
+      loadData();
+    } catch (err: any) {
+      console.error('Delete category error:', err);
+      toast.error(err.message || 'Failed to delete fee category.', { id: 'del-cat' });
+    } finally {
+      setIsDeletingCategory(false);
     }
   };
 
@@ -165,28 +207,62 @@ export default function FeeStructureManager({
     }));
   };
 
+  // 1-Click apply category default amounts to a single class
+  const handleApplyDefaultsToClass = (classId: string) => {
+    setMatrixValues(prev => {
+      const updated = { ...prev };
+      categories.forEach(cat => {
+        updated[`${classId}_${cat.id}`] = Number(cat.amount || 0);
+      });
+      return updated;
+    });
+    toast.success('Populated default base rates for class.');
+  };
+
+  // 1-Click clear all rates for a single class
+  const handleClearClassRates = async (cls: { id: string; class_name: string }) => {
+    setIsResettingClass(true);
+    toast.loading(`Clearing fee structure for Class ${cls.class_name}...`, { id: 'clear-cls' });
+    try {
+      await feeService.deleteClassFeeStructure(cls.id, selectedYearId);
+      setMatrixValues(prev => {
+        const updated = { ...prev };
+        categories.forEach(cat => {
+          updated[`${cls.id}_${cat.id}`] = 0;
+        });
+        return updated;
+      });
+      toast.success(`Fee structure cleared for Class ${cls.class_name}.`, { id: 'clear-cls' });
+      setClassToReset(null);
+      loadData();
+    } catch (err: any) {
+      console.error('Clear class fee structure error:', err);
+      toast.error(err.message || 'Failed to clear class fee structure.', { id: 'clear-cls' });
+    } finally {
+      setIsResettingClass(false);
+    }
+  };
+
   const handleSaveAllMatrix = async () => {
     if (!selectedYearId) return toast.error('Select an academic session first.');
 
     setIsSavingMatrix(true);
     toast.loading('Saving class fee structure matrix...', { id: 'save-matrix' });
     try {
-      const promises: Promise<void>[] = [];
+      const itemsToSave: { classId: string; feeCategoryId: string; academicYearId: string; amount: number }[] = [];
       for (const cls of classes) {
         for (const cat of categories) {
           const key = `${cls.id}_${cat.id}`;
           const amount = matrixValues[key] ?? cat.amount;
-          promises.push(
-            feeService.saveFeeStructureItem({
-              classId: cls.id,
-              feeCategoryId: cat.id,
-              academicYearId: selectedYearId,
-              amount
-            })
-          );
+          itemsToSave.push({
+            classId: cls.id,
+            feeCategoryId: cat.id,
+            academicYearId: selectedYearId,
+            amount: Number(amount || 0)
+          });
         }
       }
-      await Promise.all(promises);
+      await feeService.saveBatchFeeStructures(itemsToSave);
       toast.success('Class fee structures saved successfully.', { id: 'save-matrix' });
       loadData();
     } catch (err: any) {
@@ -197,18 +273,54 @@ export default function FeeStructureManager({
     }
   };
 
+  const handleOpenQuickConfig = (classId?: string) => {
+    const targetClassId = classId || classes[0]?.id || '';
+    setQuickConfigClassId(targetClassId);
+    
+    // Prefill amounts from matrix or defaults
+    const amounts: Record<string, number> = {};
+    categories.forEach(cat => {
+      const key = `${targetClassId}_${cat.id}`;
+      amounts[cat.id] = matrixValues[key] !== undefined ? matrixValues[key] : Number(cat.amount || 0);
+    });
+    setQuickConfigAmounts(amounts);
+    setIsQuickConfigOpen(true);
+  };
+
+  const handleSaveQuickConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickConfigClassId || !selectedYearId) return toast.error('Class and session are required.');
+
+    toast.loading('Applying class fee structure...', { id: 'save-quick' });
+    try {
+      const items = categories.map(cat => ({
+        classId: quickConfigClassId,
+        feeCategoryId: cat.id,
+        academicYearId: selectedYearId,
+        amount: Number(quickConfigAmounts[cat.id] || 0)
+      }));
+
+      await feeService.saveBatchFeeStructures(items);
+      toast.success('Class fee structure updated successfully.', { id: 'save-quick' });
+      setIsQuickConfigOpen(false);
+      loadData();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update class fee structure.', { id: 'save-quick' });
+    }
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 font-sans">
       
       {/* 1. Control Header Bar */}
-      <div className="bg-white border border-slate-200/60 rounded-2xl p-5 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-3 bg-violet-50 text-violet-600 rounded-2xl border border-violet-100">
+          <div className="p-3 bg-blue-50 text-blue-700 rounded-2xl border border-blue-100">
             <Layers className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-lg font-display font-black text-slate-900 tracking-tight">Fee Structure & Categories Master</h2>
-            <p className="text-xs text-slate-500 font-medium">Define grade-wise fee structures per academic session and manage fee heads.</p>
+            <h2 className="text-lg font-bold font-sans text-slate-900 tracking-tight">Fee Structure & Categories Master</h2>
+            <p className="text-xs text-slate-500 font-normal mt-0.5">Define grade-wise fee structures per academic session, create fee heads, and configure tuition rates.</p>
           </div>
         </div>
 
@@ -216,7 +328,7 @@ export default function FeeStructureManager({
           <select
             value={selectedYearId}
             onChange={(e) => setSelectedYearId(e.target.value)}
-            className="bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs font-bold text-slate-800 outline-none cursor-pointer"
+            className="bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs font-semibold text-slate-800 outline-none cursor-pointer"
           >
             {academicYears.map(y => (
               <option key={y.id} value={y.id}>Session {y.name}</option>
@@ -227,24 +339,35 @@ export default function FeeStructureManager({
             <button
               onClick={handleSeedDefaultHeads}
               disabled={isSeeding}
-              className="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold rounded-xl border border-emerald-200 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              className="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-xl border border-emerald-200 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
               title="Add standard CBSE heads: Tuition, Admission, Exam, Lab, Sports, Transport"
             >
               <Sparkles className="w-3.5 h-3.5" /> Seed CBSE Heads
             </button>
           )}
 
-          <button
-            onClick={handleOpenAddCategory}
-            className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" /> Add Fee Category
-          </button>
+          {isAdmin && (
+            <button
+              onClick={handleOpenAddCategory}
+              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+            >
+              <Plus className="w-3.5 h-3.5 text-blue-600" /> Create Fee Head
+            </button>
+          )}
+
+          {isAdmin && (
+            <button
+              onClick={() => handleOpenQuickConfig()}
+              className="px-3.5 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold rounded-xl border border-blue-200/80 transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+            >
+              <Sliders className="w-3.5 h-3.5" /> Configure Class
+            </button>
+          )}
 
           <button
             onClick={handleSaveAllMatrix}
             disabled={isSavingMatrix}
-            className="px-4 py-2 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white text-xs font-bold rounded-xl shadow-md shadow-violet-500/20 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs shadow-blue-500/20 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-95"
           >
             {isSavingMatrix ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             Save Structure
@@ -253,81 +376,140 @@ export default function FeeStructureManager({
       </div>
 
       {/* 2. Fee Categories Catalogue Cards */}
-      <div className="bg-white border border-slate-200/60 rounded-2xl p-5 shadow-xs space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-xs font-display font-black text-slate-800 uppercase tracking-wider">
-            Fee Category Heads Catalogue ({categories.length})
-          </h3>
-          <span className="text-[11px] text-slate-400 font-medium">Standard institutional billing components</span>
+      <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-2xs space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold font-sans text-slate-800 uppercase tracking-wider">
+              Fee Category Heads Catalogue ({categories.length})
+            </span>
+            <span className="text-[11px] font-normal text-slate-400">Institutional billing components</span>
+          </div>
+          {isAdmin && (
+            <button
+              onClick={handleOpenAddCategory}
+              className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" /> Add New Head
+            </button>
+          )}
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5">
           {categories.map(cat => (
             <div
               key={cat.id}
-              className="p-3.5 rounded-xl border border-slate-200/80 bg-slate-50/50 hover:bg-slate-50 transition-colors flex items-start justify-between shadow-2xs"
+              className={cn(
+                "p-4 rounded-2xl border transition-all flex flex-col justify-between shadow-2xs group relative bg-white",
+                cat.is_active === false 
+                  ? "border-slate-200 bg-slate-50/70 opacity-70" 
+                  : "border-slate-200/90 hover:border-blue-300 hover:shadow-xs"
+              )}
             >
               <div>
-                <div className="font-bold text-xs text-slate-900">{cat.category_name}</div>
-                <div className="text-[10px] text-slate-500 font-medium mt-0.5">
-                  Freq: <span className="font-bold text-slate-700">{cat.frequency}</span>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="font-bold text-xs text-slate-900 font-sans leading-tight">
+                    {cat.category_name}
+                  </div>
+                  {cat.is_active === false && (
+                    <span className="text-[9px] font-bold uppercase tracking-wider bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded">
+                      Inactive
+                    </span>
+                  )}
                 </div>
-                <div className="text-xs font-mono font-extrabold text-violet-700 mt-1">
-                  Default: ₹{Number(cat.amount).toFixed(2)}
+
+                <div className="text-[11px] text-slate-500 font-normal mt-1 flex items-center gap-1.5">
+                  <span>Frequency:</span>
+                  <span className="font-semibold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded text-[10px]">
+                    {cat.frequency}
+                  </span>
                 </div>
+
+                {cat.description && (
+                  <p className="text-[11px] text-slate-400 font-normal mt-1.5 line-clamp-1" title={cat.description}>
+                    {cat.description}
+                  </p>
+                )}
               </div>
 
-              <button
-                onClick={() => handleOpenEditCategory(cat)}
-                className="p-1.5 text-slate-400 hover:text-violet-600 rounded-lg hover:bg-violet-50 transition-colors cursor-pointer"
-                title="Edit Category"
-              >
-                <Edit2 className="w-3.5 h-3.5" />
-              </button>
+              <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] text-slate-400 font-normal block">Base Default</span>
+                  <span className="text-xs font-bold font-sans tabular-nums text-blue-700">
+                    ₹{Number(cat.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+
+                {isAdmin && (
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => handleOpenEditCategory(cat)}
+                      className="p-1.5 text-slate-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition-colors cursor-pointer"
+                      title="Edit Category"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setCategoryToDelete(cat)}
+                      className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
+                      title="Delete / Deactivate Category"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           ))}
         </div>
       </div>
 
       {/* 3. Grade-wise Fee Rate Matrix */}
-      <div className="bg-white border border-slate-200/60 rounded-2xl p-5 shadow-xs space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+      <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-2xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
           <div>
-            <h3 className="text-xs font-display font-black text-slate-800 uppercase tracking-wider">
+            <span className="text-xs font-bold font-sans text-slate-800 uppercase tracking-wider block">
               Grade-Wise Fee Structure Matrix
-            </h3>
-            <p className="text-[11px] text-slate-400 font-medium">Set the applicable fee amount for each grade and fee head.</p>
+            </span>
+            <p className="text-[11px] text-slate-400 font-normal mt-0.5">Set the applicable billing rates for each grade and fee category in Session {academicYears.find(y => y.id === selectedYearId)?.name || 'Current'}.</p>
           </div>
-          <span className="text-xs font-bold text-slate-500">{classes.length} Classes configured</span>
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-semibold text-slate-500">{classes.length} Classes configured</span>
+          </div>
         </div>
 
         {isLoading ? (
           <div className="flex flex-col items-center justify-center h-48">
-            <Loader2 className="w-7 h-7 text-violet-600 animate-spin mb-2" />
-            <span className="text-xs text-slate-500">Loading fee structure matrix...</span>
+            <Loader2 className="w-7 h-7 text-blue-600 animate-spin mb-2" />
+            <span className="text-xs text-slate-500 font-medium">Loading fee structure matrix...</span>
           </div>
         ) : (
-          <div className="overflow-x-auto border border-slate-200 rounded-xl">
+          <div className="overflow-x-auto border border-slate-200 rounded-2xl">
             <table className="w-full text-xs text-left border-collapse">
               <thead>
-                <tr className="border-b border-slate-200 text-[10px] uppercase tracking-wider text-slate-500 font-black bg-slate-50/80">
-                  <th className="py-3 px-4 w-40 text-left border-r border-slate-200/60">Class / Grade</th>
+                <tr className="border-b border-slate-200 text-[10px] uppercase tracking-wider text-slate-500 font-bold bg-slate-50/80">
+                  <th className="py-3 px-4 w-44 text-left border-r border-slate-200/60 font-sans">Class / Grade</th>
                   {categories.map(cat => (
-                    <th key={cat.id} className="py-3 px-4 text-right min-w-[140px] border-r border-slate-200/60">
-                      {cat.category_name} (₹)
+                    <th key={cat.id} className="py-3 px-4 text-right min-w-[140px] border-r border-slate-200/60 font-sans">
+                      <div className="font-bold text-slate-700">{cat.category_name}</div>
+                      <div className="text-[9px] text-slate-400 font-normal lowercase">({cat.frequency})</div>
                     </th>
                   ))}
-                  <th className="py-3 px-4 text-right w-44 font-black text-slate-900 bg-slate-100/50">
-                    Total Demand / Term (₹)
+                  <th className="py-3 px-4 text-right w-44 font-bold text-slate-900 bg-slate-100/50 font-sans">
+                    Total Demand / Term
                   </th>
+                  {isAdmin && (
+                    <th className="py-3 px-3 text-center w-28 font-bold text-slate-500 font-sans">
+                      Actions
+                    </th>
+                  )}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 font-medium">
+              <tbody className="divide-y divide-slate-100 font-normal">
                 {classes.map(cls => {
                   let rowTotal = 0;
                   return (
                     <tr key={cls.id} className="hover:bg-slate-50/60 transition-colors">
-                      <td className="py-3 px-4 font-bold text-slate-900 border-r border-slate-100">
+                      <td className="py-3 px-4 font-bold text-slate-900 border-r border-slate-100 font-sans">
                         Class {cls.class_name}
                       </td>
 
@@ -346,16 +528,37 @@ export default function FeeStructureManager({
                                 value={currentVal || ''}
                                 placeholder="0.00"
                                 onChange={(e) => handleMatrixCellChange(cls.id, cat.id, e.target.value === '' ? 0 : Number(e.target.value))}
-                                className="w-28 text-right bg-white border border-slate-200 rounded-xl py-1.5 px-2.5 text-xs font-mono font-bold text-slate-900 outline-none focus:ring-2 focus:ring-violet-500/10 focus:border-violet-500 shadow-2xs transition-all"
+                                className="w-28 text-right bg-white border border-slate-200 rounded-xl py-1.5 px-2.5 text-xs font-sans font-bold tabular-nums text-slate-900 outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-500 shadow-2xs transition-all"
                               />
                             </div>
                           </td>
                         );
                       })}
 
-                      <td className="py-3 px-4 text-right font-mono font-extrabold text-violet-700 text-sm bg-slate-50/40">
-                        ₹{rowTotal.toFixed(2)}
+                      <td className="py-3 px-4 text-right font-sans font-bold tabular-nums text-blue-700 text-sm bg-slate-50/40">
+                        ₹{rowTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </td>
+
+                      {isAdmin && (
+                        <td className="py-3 px-3 text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              onClick={() => handleApplyDefaultsToClass(cls.id)}
+                              className="p-1.5 text-slate-400 hover:text-emerald-600 rounded-lg hover:bg-emerald-50 transition-colors cursor-pointer"
+                              title="Fill Base Defaults"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => setClassToReset(cls)}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
+                              title="Delete / Clear Class Fee Structure"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
@@ -367,47 +570,51 @@ export default function FeeStructureManager({
 
       {/* Category Creation / Edit Modal */}
       {isCategoryModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-xs font-sans">
           <div className="w-full max-w-md bg-white rounded-3xl p-6 shadow-2xl space-y-4 border border-slate-200">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-base font-bold text-slate-900">
-                {editingCategory ? 'Edit Fee Category Head' : 'Create New Fee Category Head'}
-              </h3>
+              <div>
+                <h3 className="text-base font-bold text-slate-900 font-sans">
+                  {editingCategory ? 'Edit Fee Category Head' : 'Create New Fee Category Head'}
+                </h3>
+                <p className="text-xs text-slate-400 font-normal">Define institutional billing fee component.</p>
+              </div>
               <button onClick={() => setIsCategoryModalOpen(false)} className="text-slate-400 hover:text-slate-700">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveCategory} className="space-y-3 text-xs">
+            <form onSubmit={handleSaveCategory} className="space-y-3.5 text-xs">
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Category Name</label>
+                <label className="font-semibold text-slate-700 block mb-1">Category Name *</label>
                 <input
                   type="text"
                   placeholder="e.g. Computer & Lab Fee"
                   value={catName}
                   onChange={(e) => setCatName(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs font-bold text-slate-800 outline-none"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-500"
+                  required
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Billing Frequency</label>
+                  <label className="font-semibold text-slate-700 block mb-1">Billing Frequency</label>
                   <select
                     value={catFrequency}
                     onChange={(e) => setCatFrequency(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs font-bold text-slate-800 outline-none"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs font-semibold text-slate-800 outline-none cursor-pointer"
                   >
                     <option value="Monthly">Monthly</option>
                     <option value="Quarterly">Quarterly</option>
-                    <option value="Term">Per Term</option>
+                    <option value="Term">Per Term / Term-wise</option>
                     <option value="Annual">Annual</option>
                     <option value="One-time">One-time / Admission</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Base Default Amount (₹)</label>
+                  <label className="font-semibold text-slate-700 block mb-1">Default Base Rate (₹)</label>
                   <input
                     type="number"
                     min="0"
@@ -415,37 +622,237 @@ export default function FeeStructureManager({
                     placeholder="0.00"
                     value={catAmount}
                     onChange={(e) => setCatAmount(e.target.value === '' ? '' : Number(e.target.value))}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs font-mono font-bold text-slate-800 outline-none"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs font-sans font-bold tabular-nums text-slate-800 outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-500"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Description (Optional)</label>
+                <label className="font-semibold text-slate-700 block mb-1">Description (Optional)</label>
                 <textarea
                   rows={2}
-                  placeholder="Brief notes about this fee head"
+                  placeholder="Brief notes regarding this fee head (e.g. includes lab manuals and smart class access)"
                   value={catDescription}
                   onChange={(e) => setCatDescription(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs text-slate-800 outline-none resize-none"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs text-slate-800 outline-none resize-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-500"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="cat-active-toggle"
+                  checked={catIsActive}
+                  onChange={(e) => setCatIsActive(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 rounded cursor-pointer"
+                />
+                <label htmlFor="cat-active-toggle" className="text-xs font-semibold text-slate-700 cursor-pointer">
+                  Active (Visible in student fee invoices and structure matrix)
+                </label>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setIsCategoryModalOpen(false)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl cursor-pointer"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSavingCategory}
-                  className="px-5 py-2 bg-violet-600 hover:bg-violet-700 text-white font-bold rounded-xl shadow-xs cursor-pointer"
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-xs cursor-pointer flex items-center gap-1.5"
                 >
-                  {isSavingCategory ? 'Saving...' : 'Save Category'}
+                  {isSavingCategory && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {editingCategory ? 'Update Category' : 'Create Category'}
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Category Confirmation Modal */}
+      {categoryToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-xs font-sans">
+          <div className="w-full max-w-md bg-white rounded-3xl p-6 shadow-2xl space-y-4 border border-slate-200">
+            <div className="flex items-center gap-3 text-rose-600">
+              <div className="p-3 bg-rose-50 rounded-2xl border border-rose-100">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900 font-sans">Delete Fee Category</h3>
+                <p className="text-xs text-slate-500 font-normal">Confirm removal of fee component</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed font-normal">
+              Are you sure you want to delete <strong className="text-slate-900 font-bold">"{categoryToDelete.category_name}"</strong>?
+              If student fee invoices exist for this category, it will be safely deactivated to protect historical audit records.
+            </p>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setCategoryToDelete(null)}
+                disabled={isDeletingCategory}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteCategory}
+                disabled={isDeletingCategory}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl shadow-xs cursor-pointer flex items-center gap-1.5"
+              >
+                {isDeletingCategory && <Loader2 className="w-4 h-4 animate-spin" />}
+                Confirm Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reset Class Structure Confirmation Modal */}
+      {classToReset && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-xs font-sans">
+          <div className="w-full max-w-md bg-white rounded-3xl p-6 shadow-2xl space-y-4 border border-slate-200">
+            <div className="flex items-center gap-3 text-rose-600">
+              <div className="p-3 bg-rose-50 rounded-2xl border border-rose-100">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900 font-sans">Clear Class Fee Structure</h3>
+                <p className="text-xs text-slate-500 font-normal">Reset rates for Class {classToReset.class_name}</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed font-normal">
+              Are you sure you want to clear all configured fee rates for <strong className="text-slate-900 font-bold">Class {classToReset.class_name}</strong> in Session {academicYears.find(y => y.id === selectedYearId)?.name || 'Current'}?
+            </p>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setClassToReset(null)}
+                disabled={isResettingClass}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleClearClassRates(classToReset)}
+                disabled={isResettingClass}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl shadow-xs cursor-pointer flex items-center gap-1.5"
+              >
+                {isResettingClass && <Loader2 className="w-4 h-4 animate-spin" />}
+                Clear Class Rates
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Configure Class Modal */}
+      {isQuickConfigOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-xs font-sans">
+          <div className="w-full max-w-lg bg-white rounded-3xl p-6 shadow-2xl space-y-4 border border-slate-200 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 font-sans">
+                  Configure Class Fee Structure
+                </h3>
+                <p className="text-xs text-slate-400 font-normal">Set all fee head amounts for a selected grade at once.</p>
+              </div>
+              <button onClick={() => setIsQuickConfigOpen(false)} className="text-slate-400 hover:text-slate-700">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveQuickConfig} className="space-y-4 text-xs">
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Target Class *</label>
+                <select
+                  value={quickConfigClassId}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    setQuickConfigClassId(id);
+                    const amounts: Record<string, number> = {};
+                    categories.forEach(cat => {
+                      const key = `${id}_${cat.id}`;
+                      amounts[cat.id] = matrixValues[key] !== undefined ? matrixValues[key] : Number(cat.amount || 0);
+                    });
+                    setQuickConfigAmounts(amounts);
+                  }}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs font-bold text-slate-800 outline-none cursor-pointer"
+                >
+                  {classes.map(cls => (
+                    <option key={cls.id} value={cls.id}>Class {cls.class_name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2.5">
+                <label className="font-semibold text-slate-700 block">Fee Categories & Rates (INR)</label>
+                <div className="divide-y divide-slate-100 border border-slate-200 rounded-2xl p-3 bg-slate-50/50 space-y-2">
+                  {categories.map(cat => (
+                    <div key={cat.id} className="pt-2 first:pt-0 flex items-center justify-between gap-3">
+                      <div>
+                        <span className="font-bold text-slate-800 text-xs block">{cat.category_name}</span>
+                        <span className="text-[10px] text-slate-400">Freq: {cat.frequency} • Default: ₹{Number(cat.amount).toFixed(2)}</span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-slate-400">₹</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="50"
+                          value={quickConfigAmounts[cat.id] ?? ''}
+                          placeholder="0.00"
+                          onChange={(e) => {
+                            const val = e.target.value === '' ? 0 : Number(e.target.value);
+                            setQuickConfigAmounts(prev => ({ ...prev, [cat.id]: val }));
+                          }}
+                          className="w-28 bg-white border border-slate-200 rounded-xl py-1 px-2.5 text-xs font-sans font-bold tabular-nums text-slate-900 text-right outline-none"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const amounts: Record<string, number> = {};
+                    categories.forEach(cat => { amounts[cat.id] = Number(cat.amount || 0); });
+                    setQuickConfigAmounts(amounts);
+                  }}
+                  className="text-xs font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
+                >
+                  Reset to Catalogue Defaults
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsQuickConfigOpen(false)}
+                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-xs cursor-pointer"
+                  >
+                    Apply & Save
+                  </button>
+                </div>
               </div>
             </form>
           </div>

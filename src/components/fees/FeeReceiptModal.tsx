@@ -82,18 +82,15 @@ export default function FeeReceiptModal({ isOpen, onClose, fee }: FeeReceiptModa
 
   if (!isOpen || !fee) return null;
 
-  // Extract financial data
-  const gross = Number(fee.total_amount ?? fee.paid_amount ?? 0);
-  const paid = Number(fee.paid_amount ?? 0) || gross;
+  // Extract financial data - Receipt represents the exact transaction payment made
+  const paid = Number(fee.paid_amount ?? fee.amount_paid ?? fee.amount ?? fee.total_amount ?? 0);
   const fine = Number(fee.fine_amount ?? 0);
   const discount = Number(fee.discount_amount ?? 0);
+  const remaining = Number(fee.remaining_amount ?? fee.balance ?? 0);
   
-  // Format items breakdown — a single real line item for the fee category
-  // actually billed. Previously this split anything over ₹5,000 into a
-  // fabricated "Exam Fee ₹1,700 + Composit Annual Fee" pair that had no
-  // relationship to what the fee category/structure actually billed.
+  // Format items breakdown — line item for the fee category actually received
   const items: { sNo: number; description: string; amount: number }[] = [
-    { sNo: 1, description: fee.category_name || 'Fee Payment', amount: gross > 0 ? gross : paid }
+    { sNo: 1, description: fee.category_name || 'Fee Payment', amount: paid }
   ];
 
   if (fine > 0) {
@@ -103,9 +100,9 @@ export default function FeeReceiptModal({ isOpen, onClose, fee }: FeeReceiptModa
     items.push({ sNo: items.length + 1, description: 'Concession / Discount', amount: -discount });
   }
 
-  const totalAmount = items.reduce((sum, item) => sum + item.amount, 0);
-  const amountReceived = paid > 0 ? paid : totalAmount;
-  const inWords = numberToWords(amountReceived);
+  const totalAmount = paid;
+  const amountReceived = paid;
+  const inWords = `${numberToWords(amountReceived)} Rupees Only`;
 
   // Student & receipt metadata
   const student = fee.students || {};
@@ -308,14 +305,22 @@ export default function FeeReceiptModal({ isOpen, onClose, fee }: FeeReceiptModa
         <div className="mt-1 space-y-0.5 text-[9px] text-black">
           <div className="flex justify-between border-b border-slate-200 pb-0.5 font-bold">
             <span>Amount Received:</span>
-            <span className="font-mono">{amountReceived.toFixed(0)}</span>
+            <span className="font-mono">₹{amountReceived.toFixed(2)}</span>
           </div>
           <div className="leading-tight">
             <span className="font-bold">In Words:</span>{' '}
             <span className="capitalize">{inWords}</span>
           </div>
+          {remaining !== undefined && (
+            <div className="leading-tight text-slate-700">
+              <span className="font-bold">Account Balance:</span>{' '}
+              <span className="font-mono font-bold">
+                {remaining === 0 ? '₹0.00 (FULL SETTLEMENT - NO DUES)' : `₹${remaining.toFixed(2)} Remaining Due`}
+              </span>
+            </div>
+          )}
           <div className="leading-tight">
-            <span className="font-bold">Remark :</span>{remark}
+            <span className="font-bold">Remark :</span> {remark}
           </div>
         </div>
       </div>

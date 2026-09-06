@@ -43,7 +43,7 @@ import {
   RotateCcw
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { toast, Toaster } from 'sonner';
+import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthContext';
 import { AdmissionRecord, AdmissionStatus } from '@/types/admission';
 import { admissionService } from '@/services/admissionService';
@@ -518,9 +518,7 @@ export default function AdmissionsManagement() {
 
   return (
     <div className="space-y-5 max-w-7xl mx-auto pb-16 font-sans text-slate-800 antialiased selection:bg-blue-600 selection:text-white">
-      <Toaster position="top-right" richColors closeButton />
-
-      {/* 1. Header Toolbar */}
+{/* 1. Header Toolbar */}
       <AdminHeader
         title="Admissions Management"
         subtitle="Enterprise admissions pipeline: enquiry queue, document audit, SMS/call parent follow-up, and direct SIS enrolment."

@@ -1,0 +1,151 @@
+{
+  "generatedAt": "2026-09-06T00:35:04.248Z",
+  "pass": 18,
+  "fail": 0,
+  "results": [
+    {
+      "module": "Staff",
+      "page": "Teachers/Directory",
+      "action": "Load teacher directory (select teachers)",
+      "status": "PASS",
+      "detail": "25 teachers",
+      "ms": 183
+    },
+    {
+      "module": "Staff",
+      "page": "Teachers/Form",
+      "action": "Reference dropdowns load (departments/profiles)",
+      "status": "PASS",
+      "detail": "6 departments / 3 linkable profiles",
+      "ms": 148
+    },
+    {
+      "module": "Staff",
+      "page": "Teachers/Form",
+      "action": "Submit new teacher (insert teachers)",
+      "status": "PASS",
+      "detail": "id=713047e7",
+      "ms": 180
+    },
+    {
+      "module": "Staff",
+      "page": "Teachers/Form",
+      "action": "Save teacher edits (update teachers)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 141
+    },
+    {
+      "module": "Staff",
+      "page": "Teachers/Directory",
+      "action": "Every lifecycle status accepted (update teachers.status)",
+      "status": "PASS",
+      "detail": "8 statuses",
+      "ms": 1152
+    },
+    {
+      "module": "Staff",
+      "page": "Teachers/Assignments",
+      "action": "Create assignment (insert teacher_assignments)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 164
+    },
+    {
+      "module": "Staff",
+      "page": "Teachers/Assignments",
+      "action": "Every assignment type accepted (update teacher_assignments)",
+      "status": "PASS",
+      "detail": "3 types",
+      "ms": 368
+    },
+    {
+      "module": "Staff",
+      "page": "Teachers/Assignments",
+      "action": "Duplicate class teacher is rejected (uq_single_active_class_teacher)",
+      "status": "PASS",
+      "detail": "guard enforced",
+      "ms": 279
+    },
+    {
+      "module": "Staff",
+      "page": "Teachers/Assignments",
+      "action": "Load assignments with joins (select teacher_assignments)",
+      "status": "PASS",
+      "detail": "200 assignments",
+      "ms": 162
+    },
+    {
+      "module": "Staff",
+      "page": "Teachers/Assignments",
+      "action": "Deactivate + delete assignment",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 358
+    },
+    {
+      "module": "Staff",
+      "page": "Teachers/Teacher360",
+      "action": "Load 360 panels (workload/timetable/exams)",
+      "status": "PASS",
+      "detail": "4 panels ok",
+      "ms": 183
+    },
+    {
+      "module": "Staff",
+      "page": "Teachers/Teacher360",
+      "action": "Teacher summary (rpc teacher_academic_summary)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 182
+    },
+    {
+      "module": "Staff",
+      "page": "Staff/Departments",
+      "action": "Create department (insert departments)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 229
+    },
+    {
+      "module": "Staff",
+      "page": "Employees",
+      "action": "Submit new employee (insert staff)",
+      "status": "PASS",
+      "detail": "id=a40a2a6e",
+      "ms": 145
+    },
+    {
+      "module": "Staff",
+      "page": "Employees",
+      "action": "Save employee edits (update staff)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 126
+    },
+    {
+      "module": "Staff",
+      "page": "Employees",
+      "action": "Every employee status accepted (rpc set_staff_status)",
+      "status": "PASS",
+      "detail": "7 statuses",
+      "ms": 1001
+    },
+    {
+      "module": "Staff",
+      "page": "Employees",
+      "action": "Load staff directory (select staff)",
+      "status": "PASS",
+      "detail": "9 staff",
+      "ms": 122
+    },
+    {
+      "module": "Staff",
+      "page": "Staff/Leave",
+      "action": "Create + approve leave request (insert/update leave_requests)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 231
+    }
+  ]
+}

@@ -132,7 +132,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let isMounted = true;
 
     const initialize = async () => {
-      const { data: { session: initialSession } } = await supabase.auth.getSession();
+      let initialSession: Session | null = null;
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        initialSession = data.session;
+      } catch (err) {
+        // A persisted session whose refresh token can't be exchanged
+        // (revoked/expired token, or a CORS-blocked /auth/v1/token call when
+        // the dev server was previously served from a different port) would
+        // otherwise reject here and leave the app stuck on the loading screen.
+        // Drop the corrupt session locally so the login form can render.
+        console.warn('[Auth] Session restore failed, clearing local session:', err);
+        try {
+          await supabase.auth.signOut({ scope: 'local' });
+        } catch {
+          /* ignore */
+        }
+      }
       if (!isMounted) return;
 
       setSession(initialSession);

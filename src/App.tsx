@@ -1,5 +1,6 @@
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'sonner';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 
 // Static imports for core public/auth pages
@@ -41,6 +42,7 @@ const FrontOfficeManagement = lazy(() => import('@/pages/dashboard/FrontOfficeMa
 const AIAssistant = lazy(() => import('@/pages/dashboard/AIAssistant'));
 const ExaminationModule = lazy(() => import('@/pages/dashboard/examination/ExaminationModule'));
 const StudentPortal = lazy(() => import('@/pages/dashboard/StudentPortal'));
+const TeacherWorkspace = lazy(() => import('@/pages/dashboard/TeacherWorkspace'));
 
 const RouteLoader = () => (
   <div className="flex items-center justify-center min-h-[50vh] w-full">
@@ -106,6 +108,14 @@ const ProtectedRoute = ({
 export default function App() {
   return (
     <AuthProvider>
+      {/*
+        The single, app-wide toast outlet. Individual pages used to mount their
+        own <Toaster/>, which meant every module that didn't (Academics, Fees,
+        Examination, ...) silently swallowed its toasts: a blocked delete would
+        return a perfectly good "still has 43 students enrolled" message from
+        the database and the user would see nothing happen at all.
+      */}
+      <Toaster position="top-right" richColors closeButton duration={5000} />
       <BrowserRouter>
         <Suspense fallback={<RouteLoader />}>
           <Routes>
@@ -233,13 +243,33 @@ export default function App() {
               </ProtectedRoute>
             } 
           />
-          <Route 
-            path="/dashboard/academics/:view" 
+          <Route
+            path="/dashboard/academics/:view"
             element={
               <ProtectedRoute>
                 <DashboardLayout children={<AcademicsManagement />} />
               </ProtectedRoute>
-            } 
+            }
+          />
+          {/* Teacher daily workspace: attendance, lesson plans, homework,
+              assignments and syllabus progress for the signed-in teacher's
+              own classes. Gated on academics.teach; the database scopes
+              every read and write to that teacher. */}
+          <Route
+            path="/dashboard/teaching"
+            element={
+              <ProtectedRoute allowedPermission="academics.teach">
+                <DashboardLayout children={<TeacherWorkspace />} />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard/teaching/:view"
+            element={
+              <ProtectedRoute allowedPermission="academics.teach">
+                <DashboardLayout children={<TeacherWorkspace />} />
+              </ProtectedRoute>
+            }
           />
           {/* The academic structure used to be reachable from several
               guessable paths. They now resolve to the one module that owns it. */}

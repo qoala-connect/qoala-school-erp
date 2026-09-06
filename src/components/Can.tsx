@@ -51,7 +51,7 @@ export const PERMISSION_CATALOGUE: { group: string; permissions: string[] }[] = 
   { group: 'Fees', permissions: ['fees.view', 'fees.collect', 'fees.refund'] },
   { group: 'Examinations', permissions: ['results.view', 'results.publish'] },
   { group: 'Reports', permissions: ['reports.view', 'reports.export'] },
-  { group: 'Academics', permissions: ['academics.manage', 'certificates.manage', 'documents.manage'] },
+  { group: 'Academics', permissions: ['academics.view', 'academics.manage', 'academics.teach', 'certificates.manage', 'documents.manage'] },
   { group: 'Operations', permissions: ['library.manage', 'transport.manage', 'hostel.manage', 'inventory.manage'] },
   { group: 'Administration', permissions: ['settings.manage', 'users.manage', 'audit.view', 'database.manage'] },
 ];

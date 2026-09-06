@@ -67,6 +67,16 @@ export default function TeacherAssignmentModal({
   const [isCheckingConflict, setIsCheckingConflict] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Identifies one opening of the dialog. The component is not unmounted on
+  // close, so field state survives; this is what lets the effects below tell
+  // "the user just changed the class" apart from "a new caller opened this".
+  const [openToken, setOpenToken] = useState(0);
+  const lastAppliedOpen = React.useRef(-1);
+
+  useEffect(() => {
+    if (isOpen) setOpenToken(t => t + 1);
+  }, [isOpen]);
+
   // Read as primitives so a caller passing a fresh prefill object on every
   // render cannot turn the loader below into a render loop.
   const prefillYearId = prefill?.academicYearId ?? null;
@@ -118,7 +128,7 @@ export default function TeacherAssignmentModal({
     loadAcademicStructure();
   }, [
     isOpen, selectedTeacher, teachers,
-    prefillYearId, prefillClassId, prefillSubjectId, prefillType
+    prefillYearId, prefillClassId, prefillSectionId, prefillSubjectId, prefillType
   ]);
 
   /**
@@ -184,12 +194,17 @@ export default function TeacherAssignmentModal({
       setSections(rows);
       setSectionId(prev => {
         if (prefillSectionId && rows.some((r: any) => r.id === prefillSectionId)) return prefillSectionId;
-        if (rows.some((r: any) => r.id === prev)) return prev;
+        // Keeping `prev` is only safe within one opening of the dialog. Across
+        // openings it is the previous caller's section, and because a class's
+        // sections are mostly the same letters it silently stays valid -- which
+        // is how Modify on 1-B could land on 1-C.
+        if (openToken === lastAppliedOpen.current && rows.some((r: any) => r.id === prev)) return prev;
         return rows[0]?.id ?? '';
       });
+      lastAppliedOpen.current = openToken;
     })();
     return () => { isMounted = false; };
-  }, [isOpen, classId, prefillSectionId]);
+  }, [isOpen, classId, prefillSectionId, openToken]);
 
   // Conflict validation on field change
   useEffect(() => {
@@ -241,7 +256,7 @@ export default function TeacherAssignmentModal({
     const toastId = toast.loading('Assigning academic responsibility...');
 
     try {
-      await saveAssignment({
+      const result = await saveAssignment({
         teacher_id: teacherId,
         academic_year_id: academicYearId,
         class_id: classId,
@@ -250,7 +265,14 @@ export default function TeacherAssignmentModal({
         assignment_type: assignmentType
       });
 
-      toast.success('Academic assignment successfully committed!', { id: toastId });
+      // Naming a new class teacher takes the role off the incumbent, so say
+      // who lost it and what happened to their other duties.
+      toast.success(
+        result.replacedTeacher
+          ? `Assignment committed. ${result.replacedTeacher} was ${result.replacedAction ?? 'replaced'} as class teacher.`
+          : 'Academic assignment successfully committed!',
+        { id: toastId }
+      );
       onAssigned();
       onClose();
     } catch (err: any) {
@@ -428,9 +450,19 @@ export default function TeacherAssignmentModal({
               <AlertTriangle size={16} className="shrink-0 mt-0.5" />
               <div>
                 <span className="font-bold block uppercase text-[10px] tracking-wider">
-                  {conflict.type === 'DUPLICATE_ASSIGNMENT' ? 'Duplicate Allocation Blocked' : 'Assignment Advisory'}
+                  {conflict.type === 'DUPLICATE_ASSIGNMENT'
+                    ? 'Duplicate Allocation Blocked'
+                    : conflict.type === 'EXISTING_CLASS_TEACHER'
+                      ? 'This will replace the current class teacher'
+                      : 'Assignment Advisory'}
                 </span>
                 <span>{conflict.message}</span>
+                {conflict.type === 'EXISTING_CLASS_TEACHER' && (
+                  <span className="block mt-1">
+                    Committing hands the class teacher role over. Any subject they teach
+                    to this section stays with them.
+                  </span>
+                )}
               </div>
             </div>
           )}

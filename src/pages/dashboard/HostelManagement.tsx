@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
-import { toast, Toaster } from 'sonner';
+import { toast } from 'sonner';
 import { AdminHeader } from '@/components/common/AdminHeader';
 import { AdminStatCard } from '@/components/common/AdminStatCard';
 
@@ -90,7 +90,7 @@ export default function HostelManagement() {
         setHostels(hostelsRes.data.map((h: any) => ({
           id: h.id,
           name: h.name || 'Hostel Block',
-          type: h.type || 'Boys',
+          type: h.hostel_type || 'Boys',
           capacity: Number(h.capacity || 100),
           warden_name: h.warden_name || 'Hostel Warden',
           warden_phone: h.warden_phone || 'N/A',
@@ -105,8 +105,8 @@ export default function HostelManagement() {
           room_no: r.room_number || '101',
           type: (r.room_type as any) || 'Double',
           capacity: Number(r.capacity || 2),
-          occupied: Number(r.current_occupancy || 0),
-          rent_monthly: Number(r.rent_amount || 3000),
+          occupied: Number(r.occupied || 0),
+          rent_monthly: Number(r.cost_per_month || 3000),
           facilities: ['Wi-Fi', 'Wardrobe', 'Study Table']
         })));
       }
@@ -132,7 +132,7 @@ export default function HostelManagement() {
       if (activeTab === 'hostels') {
         const payload: any = {
           name: formData.name,
-          type: formData.type || 'Boys',
+          hostel_type: formData.type || 'Boys',
           capacity: Number(formData.capacity || 100),
           warden_name: formData.warden_name,
           warden_phone: formData.warden_phone,
@@ -152,7 +152,9 @@ export default function HostelManagement() {
           room_number: formData.room_no,
           room_type: formData.type || 'Double',
           capacity: Number(formData.capacity || 2),
-          rent_amount: Number(formData.rent_monthly || 3000),
+          cost_per_month: Number(formData.rent_monthly || 3000),
+          // The form collects current occupancy; persist it rather than dropping it.
+          occupied: Number(formData.occupied || 0),
           status: 'Available'
         };
 
@@ -368,9 +370,7 @@ CREATE TABLE IF NOT EXISTS hostel_visitors (
 
   return (
     <div className="space-y-5 max-w-7xl mx-auto pb-16 text-slate-700 font-sans antialiased">
-      <Toaster position="top-right" richColors />
-
-      {/* 1. Header Toolbar */}
+{/* 1. Header Toolbar */}
       <AdminHeader
         title="Hostel & Residential Accommodation"
         subtitle="Track building registrations, room quotas, pupil room allocations, wardens, food services, and logs for visitors and guardians."

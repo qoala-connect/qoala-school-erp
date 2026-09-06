@@ -1090,8 +1090,9 @@ export default function Student360Drawer({
                                               setSelectedReceiptFee({
                                                 id: l.id,
                                                 receipt_number: latestPayment.receipt_number || `RCP/${student.admission_number || '2026'}`,
-                                                total_amount: l.net_amount || l.total_amount,
-                                                paid_amount: l.amount_paid,
+                                                total_amount: Number(latestPayment.amount_paid || l.amount_paid),
+                                                paid_amount: Number(latestPayment.amount_paid || l.amount_paid),
+                                                amount_paid: Number(latestPayment.amount_paid || l.amount_paid),
                                                 remaining_amount: Math.max(0, (l.net_amount || l.total_amount) - l.amount_paid),
                                                 category_name: l.fee_category_name,
                                                 payment_mode: latestPayment.payment_mode || 'Cash',

@@ -333,9 +333,10 @@ export const analyticsService = {
 
       if (attendanceRes.data && attendanceRes.data.length > 0) {
         const row = attendanceRes.data[0];
-        attendance.avgAttendance = Number(row.avg_attendance) || 95;
-        attendance.presentRate = Number(row.present_rate) || 95;
-        attendance.absentRate = Number(row.absent_rate) || 5;
+        const avg = Number(row.avg_attendance ?? row.present_rate) || 94;
+        attendance.avgAttendance = avg;
+        attendance.presentRate = avg;
+        attendance.absentRate = Math.max(0, 100 - avg);
       }
 
       if (attendanceClassRes.data && attendanceClassRes.data.length > 0) {

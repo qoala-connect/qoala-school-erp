@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Lock, ArrowRight, ChevronLeft, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { SchoolLogo } from '@/components/SchoolLogo';
-import { toast, Toaster } from 'sonner';
+import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 
 export default function ResetPassword() {
@@ -39,8 +39,7 @@ export default function ResetPassword() {
 
   return (
     <div className="min-h-screen w-full bg-[#f4f7fb] flex flex-col items-center justify-center p-4 font-sans text-slate-800 relative overflow-hidden select-none">
-      <Toaster position="top-right" richColors />
-      <div className="absolute inset-0 bg-gradient-to-tr from-slate-100/50 via-[#f4f7fb] to-blue-50/40 z-0 pointer-events-none" />
+<div className="absolute inset-0 bg-gradient-to-tr from-slate-100/50 via-[#f4f7fb] to-blue-50/40 z-0 pointer-events-none" />
 
       {/* Back to Login */}
       <div className="absolute top-5 left-5 z-20">

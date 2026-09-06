@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
-import { toast, Toaster } from 'sonner';
+import { toast } from 'sonner';
 import { AdminHeader } from '@/components/common/AdminHeader';
 import { AdminStatCard } from '@/components/common/AdminStatCard';
 
@@ -363,9 +363,7 @@ export default function TransportManagement() {
 
   return (
     <div className="space-y-5 max-w-7xl mx-auto pb-16 text-slate-700 font-sans antialiased">
-      <Toaster position="top-center" richColors />
-
-      {/* 1. Header Toolbar */}
+{/* 1. Header Toolbar */}
       <AdminHeader
         title="Transit Fleet & Routes"
         subtitle="Configure school transit lines, manage authorized driver licensing, track insurance expiry dates, and allocate seats for enrolled student residency."

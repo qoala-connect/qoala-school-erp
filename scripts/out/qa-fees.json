@@ -1,0 +1,143 @@
+{
+  "generatedAt": "2026-09-06T00:32:02.539Z",
+  "pass": 17,
+  "fail": 0,
+  "results": [
+    {
+      "module": "Fees",
+      "page": "Fees/Structure",
+      "action": "Load fee categories (select fee_categories)",
+      "status": "PASS",
+      "detail": "7 categories",
+      "ms": 137
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Structure",
+      "action": "Create fee category (insert fee_categories)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 130
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Structure",
+      "action": "Edit fee category — every frequency option (update fee_categories)",
+      "status": "PASS",
+      "detail": "5 frequencies",
+      "ms": 766
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Structure",
+      "action": "Set class fee amount (upsert fee_structure)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 246
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Structure",
+      "action": "Batch save class fees (upsert fee_structure x N)",
+      "status": "PASS",
+      "detail": "3 rows",
+      "ms": 241
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Ledgers",
+      "action": "Assign fee to student (insert student_fees)",
+      "status": "PASS",
+      "detail": "net=1900",
+      "ms": 130
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Ledgers",
+      "action": "Load ledger rows (select student_fees join)",
+      "status": "PASS",
+      "detail": "100 rows",
+      "ms": 131
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Collection",
+      "action": "Collect payment — every payment mode (rpc collect_fee)",
+      "status": "PASS",
+      "detail": "4 modes, 4 unique receipts",
+      "ms": 494
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Transactions",
+      "action": "Load transactions (select fee_payments join)",
+      "status": "PASS",
+      "detail": "100 rows",
+      "ms": 127
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Transactions",
+      "action": "Void payment (rpc void_fee_payment)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 244
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Transactions",
+      "action": "Void rolls the ledger back by exactly the voided amount",
+      "status": "PASS",
+      "detail": "amount_paid=300 matches 3 live payments",
+      "ms": 253
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Reports",
+      "action": "Load collection summary (select student_fees aggregate)",
+      "status": "PASS",
+      "detail": "billed=12497625 collected=9870871 over 507 ledgers",
+      "ms": 133
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Reports",
+      "action": "Load overdue report (select student_fees filtered)",
+      "status": "PASS",
+      "detail": "142 overdue",
+      "ms": 121
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Discounts",
+      "action": "Create discount (insert discounts)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 247
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Scholarships",
+      "action": "Create scholarship (insert scholarships)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 247
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Structure",
+      "action": "Delete fee structure item (delete fee_structure)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 237
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Structure",
+      "action": "Deactivate category in use (update fee_categories.is_active)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 236
+    }
+  ]
+}

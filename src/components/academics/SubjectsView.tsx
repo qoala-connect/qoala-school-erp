@@ -41,6 +41,7 @@ export default function SubjectsView({ onNavigateView }: { onNavigateView: (view
   const [editing, setEditing] = useState<SubjectDirectoryRow | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<SubjectDirectoryRow | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -87,12 +88,16 @@ export default function SubjectsView({ onNavigateView }: { onNavigateView: (view
   const handleDelete = async () => {
     if (!confirmDelete) return;
     setBusy(true);
+    setDeleteError(null);
     try {
       await deleteSubject(confirmDelete.subject_id);
       toast.success(`${confirmDelete.subject_name} deleted.`);
       setConfirmDelete(null);
       await load();
     } catch (err: any) {
+      // The dialog stays open on failure, so the reason has to be visible
+      // inside it -- a toast alone is easy to miss behind the modal.
+      setDeleteError(err.message);
       toast.error(err.message);
     } finally {
       setBusy(false);
@@ -249,10 +254,10 @@ export default function SubjectsView({ onNavigateView }: { onNavigateView: (view
       {confirmDelete && (
         <Modal
           title={`Delete ${confirmDelete.subject_name}?`}
-          onClose={() => setConfirmDelete(null)}
+          onClose={() => { setConfirmDelete(null); setDeleteError(null); }}
           footer={
             <>
-              <GhostButton onClick={() => setConfirmDelete(null)}>Cancel</GhostButton>
+              <GhostButton onClick={() => { setConfirmDelete(null); setDeleteError(null); }}>Cancel</GhostButton>
               <PrimaryButton onClick={handleDelete} disabled={busy} className="bg-rose-600 hover:bg-rose-700">
                 Delete subject
               </PrimaryButton>
@@ -266,6 +271,11 @@ export default function SubjectsView({ onNavigateView }: { onNavigateView: (view
                 ? `This subject is mapped to ${confirmDelete.classes_count} class(es). Remove those mappings first, or deactivate the subject instead.`
                 : 'Nothing references this subject, so it can be removed. Deactivating keeps it in the record if you may want it back.'}
           </p>
+          {deleteError && (
+            <p role="alert" className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
+              {deleteError}
+            </p>
+          )}
         </Modal>
       )}
     </>

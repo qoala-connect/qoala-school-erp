@@ -36,6 +36,7 @@ export default function AcademicYearsView() {
   const [editing, setEditing] = useState<AcademicYear | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<AcademicYear | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const openCreate = () => { setEditing(null); setIsFormOpen(true); };
@@ -57,12 +58,16 @@ export default function AcademicYearsView() {
   const handleDelete = async () => {
     if (!confirmDelete) return;
     setBusy(true);
+    setDeleteError(null);
     try {
       await deleteAcademicYear(confirmDelete.id);
       toast.success(`${confirmDelete.name} deleted.`);
       setConfirmDelete(null);
       await refresh();
     } catch (err: any) {
+      // The dialog stays open on failure, so the reason has to be visible
+      // inside it -- a toast alone is easy to miss behind the modal.
+      setDeleteError(err.message);
       toast.error(err.message);
     } finally {
       setBusy(false);
@@ -159,10 +164,10 @@ export default function AcademicYearsView() {
         <Modal
           title={`Delete ${confirmDelete.name}?`}
           description="This cannot be undone."
-          onClose={() => setConfirmDelete(null)}
+          onClose={() => { setConfirmDelete(null); setDeleteError(null); }}
           footer={
             <>
-              <GhostButton onClick={() => setConfirmDelete(null)}>Cancel</GhostButton>
+              <GhostButton onClick={() => { setConfirmDelete(null); setDeleteError(null); }}>Cancel</GhostButton>
               <PrimaryButton onClick={handleDelete} disabled={busy} className="bg-rose-600 hover:bg-rose-700">
                 Delete year
               </PrimaryButton>
@@ -173,6 +178,11 @@ export default function AcademicYearsView() {
             The database refuses this if any student is enrolled in {confirmDelete.name}, so history cannot be
             lost by accident. If it holds enrolment, set its status to archived instead.
           </p>
+          {deleteError && (
+            <p role="alert" className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
+              {deleteError}
+            </p>
+          )}
         </Modal>
       )}
     </>

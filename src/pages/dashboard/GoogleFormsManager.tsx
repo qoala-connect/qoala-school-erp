@@ -34,7 +34,7 @@ import {
   GoogleFormDetails,
   GoogleFormResponse
 } from '@/services/googleFormsService';
-import { Toaster, toast } from 'sonner';
+import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthContext';
 import { Link } from 'react-router-dom';
 
@@ -681,9 +681,7 @@ export default function GoogleFormsManager() {
 
   return (
     <div className="space-y-6 pb-24 text-slate-700">
-      <Toaster position="top-center" richColors />
-
-      {/* Main Header Card */}
+{/* Main Header Card */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-5 bg-white border border-slate-200/60 rounded-[24px] shadow-sm">
         <div className="space-y-0.5">
           <div className="flex items-center gap-2">

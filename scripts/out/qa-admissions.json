@@ -1,0 +1,87 @@
+{
+  "generatedAt": "2026-09-06T00:17:24.407Z",
+  "pass": 10,
+  "fail": 0,
+  "results": [
+    {
+      "module": "Admissions",
+      "page": "Admissions/NewApplication",
+      "action": "Submit new application (insert)",
+      "status": "PASS",
+      "detail": "id=2670f4f8",
+      "ms": 145
+    },
+    {
+      "module": "Admissions",
+      "page": "Admissions/Edit",
+      "action": "Save edits (update)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 132
+    },
+    {
+      "module": "Admissions",
+      "page": "Admissions/DetailsDrawer",
+      "action": "Verify document (rpc verify_admission_document)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 263
+    },
+    {
+      "module": "Admissions",
+      "page": "Admissions/StatusChange",
+      "action": "Every pipeline stage accepted (update status)",
+      "status": "PASS",
+      "detail": "11 stages",
+      "ms": 1410
+    },
+    {
+      "module": "Admissions",
+      "page": "Admissions/Approvals",
+      "action": "Approve application (rpc approve_admission -> student created)",
+      "status": "PASS",
+      "detail": "student=45e99631",
+      "ms": 259
+    },
+    {
+      "module": "Admissions",
+      "page": "Admissions/RejectModal",
+      "action": "Reject application (rpc reject_admission)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 783
+    },
+    {
+      "module": "Admissions",
+      "page": "Admissions/Delete",
+      "action": "Delete application (delete)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 242
+    },
+    {
+      "module": "Admissions",
+      "page": "Admissions/Reports",
+      "action": "Load report data (select)",
+      "status": "PASS",
+      "detail": "89 rows",
+      "ms": 123
+    },
+    {
+      "module": "Admissions",
+      "page": "Admissions/NewApplication",
+      "action": "Reference dropdowns load (classes/sections/years)",
+      "status": "PASS",
+      "detail": "13 classes / 3 sections / 2 years",
+      "ms": 124
+    },
+    {
+      "module": "Admissions",
+      "page": "FrontOffice",
+      "action": "Log visitor entry (insert front_office_logs)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 247
+    }
+  ]
+}

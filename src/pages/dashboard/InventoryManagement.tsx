@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
-import { toast, Toaster } from 'sonner';
+import { toast } from 'sonner';
 import { AdminHeader } from '@/components/common/AdminHeader';
 import { AdminStatCard } from '@/components/common/AdminStatCard';
 
@@ -98,7 +98,7 @@ export default function InventoryManagement() {
       if (assetsRes.data) {
         setAssets(assetsRes.data.map((a: any) => ({
           id: a.id,
-          code: a.asset_code || 'AST-001',
+          code: a.asset_tag || 'AST-001',
           name: a.asset_name || 'Campus Asset',
           category: (a.category as any) || 'Furniture',
           quantity: 1,
@@ -113,10 +113,10 @@ export default function InventoryManagement() {
           id: i.id,
           code: `STK-${i.id.substring(0, 6)}`,
           name: i.item_name || 'Stock Item',
-          quantity: Number(i.quantity || 0),
+          quantity: Number(i.quantity_total || 0),
           reorder_level: Number(i.min_quantity || 10),
           unit_price: 100,
-          status: Number(i.quantity || 0) === 0 ? 'Out-of-Stock' : Number(i.quantity || 0) <= Number(i.min_quantity || 10) ? 'Low-Stock' : 'In-Stock'
+          status: Number(i.quantity_total || 0) === 0 ? 'Out-of-Stock' : Number(i.quantity_total || 0) <= Number(i.min_quantity || 10) ? 'Low-Stock' : 'In-Stock'
         })));
       }
 
@@ -141,12 +141,13 @@ export default function InventoryManagement() {
       if (activeTab === 'assets') {
         const payload: any = {
           asset_name: formData.name,
-          asset_code: formData.code,
+          asset_tag: formData.code,
           category: formData.category || 'Furniture',
           purchase_date: formData.purchase_date || new Date().toISOString().substring(0, 10),
           purchase_cost: Number(formData.value || 5000),
           condition: formData.condition || 'Good',
-          status: 'Active'
+          // assets.status vocabulary is operational | under maintenance | damaged | written off.
+          status: 'operational'
         };
 
         if (editingItem) {
@@ -159,7 +160,8 @@ export default function InventoryManagement() {
       } else if (activeTab === 'stock') {
         const payload: any = {
           item_name: formData.name,
-          quantity: Number(formData.quantity || 0),
+          quantity_total: Number(formData.quantity || 0),
+          quantity_available: Number(formData.quantity || 0),
           min_quantity: Number(formData.reorder_level || 10),
           status: Number(formData.quantity || 0) <= 0 ? 'Out of Stock' : 'In Stock'
         };
@@ -368,9 +370,7 @@ CREATE TABLE IF NOT EXISTS inventory_orders (
 
   return (
     <div className="space-y-5 max-w-7xl mx-auto pb-16 text-slate-700 font-sans antialiased">
-      <Toaster position="top-right" richColors />
-
-      {/* 1. Header Toolbar */}
+{/* 1. Header Toolbar */}
       <AdminHeader
         title="Assets, Equipment & Inventory"
         subtitle="Supervise school physical assets, laboratory equipment, sports gear, consumable stationery items, vendors directories, and purchase orders."

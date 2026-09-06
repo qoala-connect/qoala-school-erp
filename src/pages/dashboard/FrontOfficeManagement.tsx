@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
-import { toast, Toaster } from 'sonner';
+import { toast } from 'sonner';
 import { AdminHeader } from '@/components/common/AdminHeader';
 import { AdminStatCard } from '@/components/common/AdminStatCard';
 
@@ -315,9 +315,7 @@ export default function FrontOfficeManagement() {
 
   return (
     <div className="space-y-5 max-w-7xl mx-auto pb-16 font-sans antialiased text-slate-800">
-      <Toaster position="top-center" richColors />
-
-      {/* 1. Header Toolbar */}
+{/* 1. Header Toolbar */}
       <AdminHeader
         title="Reception, Visitors & Front Office"
         subtitle="Register visitor gate passes, log incoming office phone calls, postal courier receipts, and general admission enquiries."

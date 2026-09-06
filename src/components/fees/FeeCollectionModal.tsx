@@ -322,23 +322,23 @@ export default function FeeCollectionModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3 sm:p-4 backdrop-blur-xs overflow-y-auto">
-      <div className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-200 flex flex-col max-h-[92vh] my-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-2 sm:p-4 backdrop-blur-xs font-sans overflow-y-auto">
+      <div className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-200 flex flex-col max-h-[92vh] my-auto overflow-hidden">
         
-        {/* 1. Fixed Header */}
-        <div className="shrink-0 p-5 border-b border-slate-100 flex items-center justify-between bg-white rounded-t-3xl">
+        {/* 1. Header */}
+        <div className="shrink-0 px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-100">
+            <div className="p-2.5 bg-emerald-50 text-emerald-700 rounded-2xl border border-emerald-100">
               <Receipt className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-display font-black text-slate-900">
-                {selectedLedger ? 'Settle Outstanding Fee Due' : 'Fee Collection & Cashier Desk'}
+              <h2 className="text-base sm:text-lg font-bold font-sans text-slate-900 leading-tight">
+                {selectedLedger ? 'Settle Fee Due & Issue Receipt' : 'Fee Collection & Cashier Desk'}
               </h2>
-              <p className="text-xs text-slate-500 font-medium">
+              <p className="text-xs text-slate-500 font-normal">
                 {selectedLedger 
-                  ? `Direct settlement for ${selectedLedger.category_name} (Outstanding Due: ₹${selectedLedger.remaining_amount.toFixed(2)})`
-                  : 'Record fee payment, issue sequential receipt, and update student balance.'}
+                  ? `Direct settlement for ${selectedLedger.category_name} • Balance: ₹${selectedLedger.remaining_amount.toFixed(2)}`
+                  : 'Record student payment, generate sequential CBSE receipt, and update ledger balance.'}
               </p>
             </div>
           </div>
@@ -350,62 +350,64 @@ export default function FeeCollectionModal({
           </button>
         </div>
 
-        {/* 2. Scrollable Body */}
-        <form id="fee-collection-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-4">
+        {/* 2. Form Body (Single unified scroll area) */}
+        <form id="fee-collection-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4">
           
-          {/* A. Student Selector & Filter Section */}
-          <div className="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-200/80">
+          {/* A. Student Selector / Active Card */}
+          <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-3">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <Users className="w-4 h-4 text-violet-600" />
-                <label className="text-xs font-bold text-slate-800 uppercase tracking-wider">Select Student</label>
+              <div className="flex items-center gap-2">
+                <Users className="w-4 h-4 text-blue-600" />
+                <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                  Student Particulars
+                </span>
               </div>
 
               {selectedStudent && (
                 <button
                   type="button"
                   onClick={() => setShowStudentPicker(p => !p)}
-                  className="text-xs font-bold text-violet-600 hover:text-violet-800 underline cursor-pointer"
+                  className="text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors cursor-pointer"
                 >
-                  {showStudentPicker ? 'Hide Student List' : 'Change Student'}
+                  {showStudentPicker ? 'Close Search' : 'Change Student'}
                 </button>
               )}
             </div>
 
-            {/* Selected Student Active Card */}
+            {/* Selected Student Highlight Card */}
             {selectedStudent && !showStudentPicker ? (
-              <div className="bg-white p-3.5 rounded-xl border border-violet-200 flex items-center justify-between shadow-2xs">
+              <div className="bg-white p-3.5 rounded-xl border border-blue-200 flex items-center justify-between shadow-2xs">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-violet-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">
+                  <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-xs">
                     {selectedStudent.name?.charAt(0).toUpperCase()}
                   </div>
                   <div>
                     <div className="font-bold text-slate-900 text-sm">{selectedStudent.name}</div>
-                    <div className="text-[11px] text-slate-500">
-                      Class <strong className="text-slate-700">{selectedStudent.class}-{selectedStudent.section}</strong> • ADM: <span className="font-mono font-bold text-violet-700">{selectedStudent.admission_number || 'N/A'}</span>
+                    <div className="text-[11px] text-slate-500 font-normal mt-0.5">
+                      Class <strong className="text-slate-800 font-semibold">{selectedStudent.class}-{selectedStudent.section}</strong> • ADM: <span className="font-mono font-bold text-blue-700">{selectedStudent.admission_number || 'N/A'}</span> • Roll: {selectedStudent.roll_number || 'N/A'}
                     </div>
                   </div>
                 </div>
 
                 <div className="text-right">
-                  <span className="text-[10px] uppercase font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100 block">
-                    Student Selected
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                    Active Student
                   </span>
-                  <div className="text-[10px] text-slate-400 mt-0.5 font-medium">
+                  <div className="text-[11px] text-slate-400 mt-1">
                     Father: {selectedStudent.father_name || 'N/A'}
                   </div>
                 </div>
               </div>
             ) : (
               <div className="space-y-2.5">
-                {/* Class & Section Filter Row */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {/* Search & Filters */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Filter by Class</label>
+                    <label className="text-[10px] font-semibold text-slate-500 uppercase block mb-1">Class Filter</label>
                     <select
                       value={classFilter}
                       onChange={(e) => setClassFilter(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-xl py-1.5 px-2.5 text-xs font-bold text-slate-700 outline-none cursor-pointer"
+                      className="w-full bg-white border border-slate-200 rounded-xl py-1.5 px-2.5 text-xs font-semibold text-slate-700 outline-none cursor-pointer"
                     >
                       <option value="All">All Classes ({availableClasses.length})</option>
                       {availableClasses.map(c => (
@@ -415,11 +417,11 @@ export default function FeeCollectionModal({
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Filter by Section</label>
+                    <label className="text-[10px] font-semibold text-slate-500 uppercase block mb-1">Section</label>
                     <select
                       value={sectionFilter}
                       onChange={(e) => setSectionFilter(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-xl py-1.5 px-2.5 text-xs font-bold text-slate-700 outline-none cursor-pointer"
+                      className="w-full bg-white border border-slate-200 rounded-xl py-1.5 px-2.5 text-xs font-semibold text-slate-700 outline-none cursor-pointer"
                     >
                       <option value="All">All Sections</option>
                       {availableSections.map(s => (
@@ -428,8 +430,8 @@ export default function FeeCollectionModal({
                     </select>
                   </div>
 
-                  <div className="col-span-2 sm:col-span-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Search Student</label>
+                  <div>
+                    <label className="text-[10px] font-semibold text-slate-500 uppercase block mb-1">Search Student</label>
                     <div className="relative">
                       <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2" />
                       <input
@@ -437,34 +439,35 @@ export default function FeeCollectionModal({
                         placeholder="Name, ADM, Roll..."
                         value={studentSearch}
                         onChange={(e) => setStudentSearch(e.target.value)}
-                        className="w-full bg-white border border-slate-200 rounded-xl py-1.5 pl-8 pr-2 text-xs font-medium text-slate-800 outline-none"
+                        className="w-full bg-white border border-slate-200 rounded-xl py-1.5 pl-8 pr-2.5 text-xs text-slate-800 outline-none focus:border-blue-500"
+                        autoFocus
                       />
                     </div>
                   </div>
                 </div>
 
-                {/* Student Selection Roster List */}
-                <div className="max-h-40 overflow-y-auto divide-y divide-slate-100 bg-white border border-slate-200 rounded-xl">
+                {/* Quick Student Results */}
+                <div className="max-h-44 overflow-y-auto divide-y divide-slate-100 bg-white border border-slate-200 rounded-xl shadow-2xs">
                   {isLoadingStudents ? (
                     <div className="p-4 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin text-violet-600" /> Loading active students roster...
+                      <Loader2 className="w-4 h-4 animate-spin text-blue-600" /> Loading student records...
                     </div>
                   ) : filteredStudents.length === 0 ? (
                     <div className="p-4 text-center text-xs text-slate-400">
-                      No active students found matching class/search criteria.
+                      No students found matching your criteria.
                     </div>
                   ) : (
-                    filteredStudents.map(st => (
+                    filteredStudents.slice(0, 30).map(st => (
                       <div
                         key={st.id}
                         onClick={() => handleSelectStudent(st)}
                         className={cn(
-                          "p-2.5 flex items-center justify-between hover:bg-violet-50/70 transition-colors cursor-pointer",
-                          selectedStudent?.id === st.id && "bg-violet-50"
+                          "p-2.5 flex items-center justify-between hover:bg-blue-50/70 transition-colors cursor-pointer",
+                          selectedStudent?.id === st.id && "bg-blue-50"
                         )}
                       >
                         <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-xs">
+                          <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center font-bold text-xs">
                             {st.name?.charAt(0).toUpperCase()}
                           </div>
                           <div>
@@ -474,10 +477,10 @@ export default function FeeCollectionModal({
                         </div>
 
                         <div className="flex items-center gap-2">
-                          <span className="font-mono text-[10px] font-bold text-violet-700 bg-violet-100 px-1.5 py-0.5 rounded">
+                          <span className="font-mono text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
                             {st.admission_number || 'N/A'}
                           </span>
-                          <span className="text-xs text-slate-400 font-bold">Select &rarr;</span>
+                          <span className="text-xs text-blue-600 font-bold">Select &rarr;</span>
                         </div>
                       </div>
                     ))
@@ -487,76 +490,65 @@ export default function FeeCollectionModal({
             )}
           </div>
 
-          {/* B. Target Outstanding Invoices Card (If student has pending dues) */}
-          {selectedStudent && (
+          {/* B. Pending Invoices Selector (If student selected) */}
+          {selectedStudent && studentPendingInvoices.length > 0 && (
             <div className="bg-amber-50/50 border border-amber-200/80 p-3.5 rounded-2xl space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900">
                   <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
-                  <span>Student Fee Obligations & Outstanding Dues ({studentPendingInvoices.length})</span>
+                  <span>Pending Fee Ledger Obligations ({studentPendingInvoices.length})</span>
                 </div>
                 {selectedLedger && (
                   <button
                     type="button"
                     onClick={clearSelectedLedger}
-                    className="text-[11px] font-bold text-amber-800 hover:text-amber-950 underline cursor-pointer"
+                    className="text-[11px] font-semibold text-amber-800 hover:text-amber-950 underline cursor-pointer"
                   >
-                    + Create New Charge Instead
+                    + New Custom Charge Instead
                   </button>
                 )}
               </div>
 
-              {studentPendingInvoices.length > 0 ? (
-                <div className="space-y-1.5">
-                  {studentPendingInvoices.map(inv => (
-                    <div
-                      key={inv.id}
-                      onClick={() => applyLedger(inv)}
-                      className={cn(
-                        "p-2.5 rounded-xl border transition-all flex items-center justify-between cursor-pointer",
-                        selectedLedger?.id === inv.id
-                          ? "bg-amber-100/80 border-amber-400 ring-2 ring-amber-400/30"
-                          : "bg-white border-amber-200/60 hover:bg-amber-50"
-                      )}
-                    >
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-xs text-slate-900">{inv.category_name}</span>
-                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-amber-100 text-amber-800">
-                            {inv.status}
-                          </span>
-                        </div>
-                        <div className="text-[10px] text-slate-500 font-medium mt-0.5">
-                          Total Demand: ₹{inv.total_amount.toFixed(2)} • Paid: ₹{inv.amount_paid.toFixed(2)} • Due: {inv.due_date || 'N/A'}
-                        </div>
-                      </div>
-
-                      <div className="text-right shrink-0">
-                        <div className="text-xs font-mono font-black text-rose-700">₹{inv.remaining_amount.toFixed(2)} Due</div>
-                        <span className="text-[10px] font-bold text-amber-700 flex items-center gap-0.5 justify-end">
-                          {selectedLedger?.id === inv.id ? 'Selected ✓' : 'Settle →'}
-                        </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {studentPendingInvoices.map(inv => (
+                  <div
+                    key={inv.id}
+                    onClick={() => applyLedger(inv)}
+                    className={cn(
+                      "p-2.5 rounded-xl border transition-all flex items-center justify-between cursor-pointer",
+                      selectedLedger?.id === inv.id
+                        ? "bg-white border-blue-500 ring-2 ring-blue-500/20 shadow-xs"
+                        : "bg-white border-amber-200/70 hover:border-amber-300"
+                    )}
+                  >
+                    <div className="min-w-0 pr-2">
+                      <div className="font-bold text-xs text-slate-900 truncate">{inv.category_name}</div>
+                      <div className="text-[10px] text-slate-400 mt-0.5 font-mono">
+                        Demand: ₹{inv.total_amount} • Paid: ₹{inv.amount_paid}
                       </div>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-emerald-700 font-medium flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> No overdue balances on record. Ready for advance/new collection.
-                </p>
-              )}
+
+                    <div className="text-right shrink-0">
+                      <div className="text-xs font-mono font-bold text-rose-700">₹{inv.remaining_amount.toFixed(2)}</div>
+                      <span className="text-[10px] font-semibold text-blue-700">
+                        {selectedLedger?.id === inv.id ? 'Selected ✓' : 'Settle →'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
-          {/* C. Fee Category Head & Due Date */}
+          {/* C. Fee Category & Due Date */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1">Fee Category Head</label>
+              <label className="text-xs font-semibold text-slate-700 block mb-1">Fee Category Head *</label>
               <select
                 value={feeCategoryId}
                 onChange={(e) => setFeeCategoryId(e.target.value)}
                 disabled={!!selectedLedger}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-violet-500/10 cursor-pointer disabled:opacity-75"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500/15 cursor-pointer disabled:opacity-75"
               >
                 {feeCategories.map(c => (
                   <option key={c.id} value={c.id}>
@@ -567,22 +559,22 @@ export default function FeeCollectionModal({
             </div>
 
             <div>
-              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1">Due Date</label>
+              <label className="text-xs font-semibold text-slate-700 block mb-1">Billing Due Date</label>
               <input
                 type="date"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
                 disabled={!!selectedLedger}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-violet-500/10 cursor-pointer disabled:opacity-75"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500/15 cursor-pointer disabled:opacity-75"
               />
             </div>
           </div>
 
-          {/* D. Amounts & Dynamic Calculations */}
-          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 space-y-3">
-            <div className="grid grid-cols-3 gap-3">
+          {/* D. Amount & Payment Breakdown Container */}
+          <div className="bg-slate-50/70 border border-slate-200/80 rounded-2xl p-4 space-y-3">
+            <div className="grid grid-cols-3 gap-2.5">
               <div>
-                <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block mb-1">Gross Fee (₹)</label>
+                <label className="text-[10px] font-semibold text-slate-600 uppercase block mb-1">Gross Fee (₹)</label>
                 <input
                   type="number"
                   min="0"
@@ -591,12 +583,12 @@ export default function FeeCollectionModal({
                   value={grossAmount}
                   onChange={(e) => handleGrossChange(e.target.value)}
                   disabled={!!selectedLedger}
-                  className="w-full bg-white border border-slate-200 rounded-xl py-2 px-3 text-xs font-bold text-slate-900 font-mono outline-none focus:border-violet-500 disabled:opacity-75"
+                  className="w-full bg-white border border-slate-200 rounded-xl py-2 px-2.5 text-xs font-bold text-slate-900 font-mono outline-none focus:border-blue-500 disabled:opacity-75"
                 />
               </div>
 
               <div>
-                <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block mb-1">Discount / Concession (₹)</label>
+                <label className="text-[10px] font-semibold text-slate-600 uppercase block mb-1">Discount (₹)</label>
                 <input
                   type="number"
                   min="0"
@@ -605,12 +597,12 @@ export default function FeeCollectionModal({
                   value={discountAmount}
                   onChange={(e) => handleDiscountChange(e.target.value)}
                   disabled={!!selectedLedger}
-                  className="w-full bg-white border border-slate-200 rounded-xl py-2 px-3 text-xs font-bold text-emerald-700 font-mono outline-none focus:border-emerald-500 disabled:opacity-75"
+                  className="w-full bg-white border border-slate-200 rounded-xl py-2 px-2.5 text-xs font-bold text-emerald-700 font-mono outline-none focus:border-emerald-500 disabled:opacity-75"
                 />
               </div>
 
               <div>
-                <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block mb-1">Late Fine (₹)</label>
+                <label className="text-[10px] font-semibold text-slate-600 uppercase block mb-1">Late Fine (₹)</label>
                 <input
                   type="number"
                   min="0"
@@ -619,56 +611,60 @@ export default function FeeCollectionModal({
                   value={fineAmount}
                   onChange={(e) => handleFineChange(e.target.value)}
                   disabled={!!selectedLedger}
-                  className="w-full bg-white border border-slate-200 rounded-xl py-2 px-3 text-xs font-bold text-rose-700 font-mono outline-none focus:border-rose-500 disabled:opacity-75"
+                  className="w-full bg-white border border-slate-200 rounded-xl py-2 px-2.5 text-xs font-bold text-rose-700 font-mono outline-none focus:border-rose-500 disabled:opacity-75"
                 />
               </div>
             </div>
 
-            {/* Net Calculation Summary */}
-            <div className="flex items-center justify-between bg-white p-3 rounded-xl border border-slate-200 text-xs">
-              <span className="font-bold text-slate-600">
-                {selectedLedger ? 'Outstanding Ledger Balance to Settle:' : 'Net Payable Total:'}
+            {/* Total Balance Summary Box */}
+            <div className="flex items-center justify-between bg-white px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs">
+              <span className="font-semibold text-slate-600">
+                {selectedLedger ? 'Outstanding Ledger Balance:' : 'Net Demand Payable:'}
               </span>
-              <span className="font-mono font-extrabold text-slate-900 text-sm">
+              <span className="font-mono font-bold text-slate-900 text-sm">
                 ₹{(selectedLedger ? selectedLedger.remaining_amount : netPayable).toFixed(2)}
               </span>
             </div>
 
-            {/* Paying Amount Input & Quick Settle Buttons */}
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                  Amount Being Paid Today (₹)
+            {/* Primary Payment Input */}
+            <div className="space-y-1.5 pt-1">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                  Amount Paying Now (₹) *
                 </label>
                 {selectedLedger && (
                   <button
                     type="button"
                     onClick={() => setPayingAmount(selectedLedger.remaining_amount)}
-                    className="text-[11px] font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 cursor-pointer"
+                    className="text-[11px] font-semibold text-emerald-700 hover:text-emerald-900 bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-200 cursor-pointer"
                   >
-                    Pay Full Balance (₹{selectedLedger.remaining_amount.toFixed(2)})
+                    Pay Full Due (₹{selectedLedger.remaining_amount.toFixed(2)})
                   </button>
                 )}
               </div>
-              <input
-                type="number"
-                min="0.01"
-                step="0.01"
-                placeholder="Enter amount paying..."
-                value={payingAmount}
-                onChange={(e) => setPayingAmount(e.target.value === '' ? '' : Number(e.target.value))}
-                className="w-full bg-white border-2 border-violet-500 rounded-xl py-2 px-3 text-base font-extrabold text-violet-700 font-mono outline-none focus:ring-2 focus:ring-violet-500/20"
-              />
-              
-              {/* Balance preview */}
-              <div className="mt-1.5 flex items-center justify-between text-xs">
+              <div className="relative">
+                <span className="absolute left-3.5 top-2.5 text-lg font-bold text-slate-400">₹</span>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={payingAmount}
+                  onChange={(e) => setPayingAmount(e.target.value === '' ? '' : Number(e.target.value))}
+                  className="w-full bg-white border-2 border-emerald-500 rounded-xl py-2 pl-8 pr-3 text-lg font-bold text-emerald-800 font-mono outline-none focus:ring-2 focus:ring-emerald-500/20 shadow-2xs"
+                  required
+                />
+              </div>
+
+              {/* Settlement Preview */}
+              <div className="pt-1 text-xs">
                 {balanceAfterPayment === 0 && numPaying > 0 ? (
                   <span className="text-emerald-700 font-bold flex items-center gap-1">
                     <CheckCircle2 className="w-3.5 h-3.5" /> Full Settlement: Dues will be cleared to ₹0.00!
                   </span>
                 ) : numPaying > 0 ? (
-                  <span className="text-amber-700 font-bold">
-                    Partial Payment: Balance ₹{balanceAfterPayment.toFixed(2)} will remain due.
+                  <span className="text-amber-700 font-semibold">
+                    Partial Payment: Balance of <strong className="font-mono font-bold">₹{balanceAfterPayment.toFixed(2)}</strong> will remain due.
                   </span>
                 ) : null}
               </div>
@@ -678,7 +674,7 @@ export default function FeeCollectionModal({
           {/* E. Payment Mode & Reference */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1">Payment Mode</label>
+              <label className="text-xs font-semibold text-slate-700 block mb-1">Payment Mode</label>
               <div className="grid grid-cols-4 gap-1.5">
                 {(['cash', 'upi', 'bank', 'online'] as PaymentMode[]).map((mode) => (
                   <button
@@ -686,7 +682,7 @@ export default function FeeCollectionModal({
                     type="button"
                     onClick={() => setPaymentMode(mode)}
                     className={cn(
-                      "py-2 px-1 text-center rounded-xl text-xs font-bold capitalize border transition-all cursor-pointer",
+                      "py-2 px-1 text-center rounded-xl text-xs font-semibold capitalize border transition-all cursor-pointer",
                       paymentMode === mode
                         ? "bg-slate-900 text-white border-slate-900 shadow-xs"
                         : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
@@ -699,38 +695,39 @@ export default function FeeCollectionModal({
             </div>
 
             <div>
-              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1">
-                Transaction Ref / Cheque No
+              <label className="text-xs font-semibold text-slate-700 block mb-1">
+                Transaction / Ref / Cheque No
               </label>
               <input
                 type="text"
-                placeholder="e.g. UPI-930491823"
+                placeholder="e.g. UPI-930491823 / Cheque #1049"
                 value={transactionId}
                 onChange={(e) => setTransactionId(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs font-mono font-medium text-slate-800 outline-none"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs font-mono font-medium text-slate-800 outline-none focus:border-blue-500"
               />
             </div>
           </div>
 
+          {/* F. Remarks */}
           <div>
-            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1">Cashier Remarks (Optional)</label>
+            <label className="text-xs font-semibold text-slate-700 block mb-1">Cashier Remarks (Optional)</label>
             <input
               type="text"
               placeholder="e.g. Term fee clearance, paid by father"
               value={remarks}
               onChange={(e) => setRemarks(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs font-medium text-slate-800 outline-none"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs text-slate-800 outline-none focus:border-blue-500"
             />
           </div>
 
         </form>
 
-        {/* 3. Fixed Footer with Actions */}
-        <div className="shrink-0 p-4 border-t border-slate-100 bg-slate-50/70 rounded-b-3xl flex items-center justify-end gap-2.5">
+        {/* 3. Fixed Footer */}
+        <div className="shrink-0 p-4 border-t border-slate-100 bg-slate-50/80 flex items-center justify-end gap-2.5">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer shadow-2xs"
+            className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl transition-colors cursor-pointer shadow-2xs"
           >
             Cancel
           </button>
@@ -738,10 +735,10 @@ export default function FeeCollectionModal({
             type="submit"
             form="fee-collection-form"
             disabled={isSubmitting || !numPaying || numPaying <= 0 || !selectedStudent}
-            className="px-5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-500/20 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs shadow-emerald-500/20 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
           >
             {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-            {isSubmitting ? 'Recording...' : `Record Payment ${numPaying > 0 ? `of ₹${numPaying.toFixed(2)}` : ''}`}
+            {isSubmitting ? 'Recording Payment...' : `Record Payment ${numPaying > 0 ? `of ₹${numPaying.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : ''}`}
           </button>
         </div>
 

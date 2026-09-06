@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
-import { toast, Toaster } from 'sonner';
+import { toast } from 'sonner';
 import { AdminHeader } from '@/components/common/AdminHeader';
 import { AdminStatCard } from '@/components/common/AdminStatCard';
 
@@ -59,12 +59,12 @@ export default function SchoolCalendar() {
 
       const mapped = (data || []).map((h: any) => ({
         id: h.id,
-        title: h.name || 'School Event',
+        title: h.title || 'School Event',
         description: h.description || 'Academic Calendar Notice',
-        start_date: h.date || new Date().toISOString().substring(0, 10),
-        end_date: h.end_date || h.date || new Date().toISOString().substring(0, 10),
-        event_type: (h.is_restricted ? 'Meeting' : 'Holiday') as any,
-        color_tag: h.is_restricted ? '#3B82F6' : '#EF4444'
+        start_date: h.start_date || new Date().toISOString().substring(0, 10),
+        end_date: h.end_date || h.start_date || new Date().toISOString().substring(0, 10),
+        event_type: (h.event_type || 'Holiday') as any,
+        color_tag: typeToColor[h.event_type] || '#EF4444'
       }));
 
       setEvents(mapped);
@@ -142,12 +142,15 @@ export default function SchoolCalendar() {
     setIsSubmitting(true);
     try {
       const payload: any = {
-        name: formData.title,
+        title: formData.title,
         description: formData.description || '',
-        date: formData.start_date,
+        start_date: formData.start_date,
         end_date: formData.end_date || formData.start_date,
-        is_restricted: formData.event_type === 'Meeting',
-        academic_year: '2026-2027'
+        // Store the chosen kind verbatim. It used to be squashed into a
+        // boolean, so five of the six event types were lost on save.
+        event_type: formData.event_type || 'Holiday',
+        is_national: formData.event_type === 'Holiday',
+        is_active: true
       };
 
       if (editingItem) {
@@ -325,9 +328,7 @@ export default function SchoolCalendar() {
 
   return (
     <div className="space-y-5 max-w-7xl mx-auto pb-16 font-sans antialiased text-slate-800">
-      <Toaster position="top-right" richColors />
-
-      {/* 1. Header Toolbar */}
+{/* 1. Header Toolbar */}
       <AdminHeader
         title="Institutional Academic Calendar & Events"
         subtitle="Plan holidays, schedule parent-teacher meetings, track CBSE examinations, and view academic milestones."

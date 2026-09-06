@@ -1,0 +1,127 @@
+{
+  "generatedAt": "2026-09-06T00:20:50.815Z",
+  "pass": 15,
+  "fail": 0,
+  "results": [
+    {
+      "module": "Students",
+      "page": "Students/Directory",
+      "action": "Load directory (select selective columns)",
+      "status": "PASS",
+      "detail": "100 rows",
+      "ms": 225
+    },
+    {
+      "module": "Students",
+      "page": "Students/AddStudent",
+      "action": "Submit new student (rpc create_student)",
+      "status": "PASS",
+      "detail": "id=01a3574f",
+      "ms": 288
+    },
+    {
+      "module": "Students",
+      "page": "Students/AddStudent",
+      "action": "Post-save CBSE/extended fields (update students)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 256
+    },
+    {
+      "module": "Students",
+      "page": "Students/EditStudent",
+      "action": "Save edits (rpc update_student)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 257
+    },
+    {
+      "module": "Students",
+      "page": "Students/StatusChange",
+      "action": "Change status inactive/active (rpc set_student_status)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 381
+    },
+    {
+      "module": "Students",
+      "page": "Students/Student360",
+      "action": "Add internal note (insert student_notes)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 153
+    },
+    {
+      "module": "Students",
+      "page": "Students/Student360",
+      "action": "Link document — every dropdown option (insert student_documents)",
+      "status": "PASS",
+      "detail": "6 types",
+      "ms": 804
+    },
+    {
+      "module": "Students",
+      "page": "Students/Student360",
+      "action": "Set photo_url (update students)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 232
+    },
+    {
+      "module": "Students",
+      "page": "Students/Student360",
+      "action": "Load all 360 tabs (select x11)",
+      "status": "PASS",
+      "detail": "11 tabs ok",
+      "ms": 362
+    },
+    {
+      "module": "Students",
+      "page": "Students/Promotion",
+      "action": "Promote student (promotions + history + students + activity)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 745
+    },
+    {
+      "module": "Students",
+      "page": "Medical",
+      "action": "Register health card (insert student_medical)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 112
+    },
+    {
+      "module": "Students",
+      "page": "Medical",
+      "action": "Update health card (update student_medical)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 224
+    },
+    {
+      "module": "Students",
+      "page": "Discipline",
+      "action": "Log incident (insert disciplinary_records)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 132
+    },
+    {
+      "module": "Students",
+      "page": "Discipline",
+      "action": "Update incident (update disciplinary_records)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 237
+    },
+    {
+      "module": "Students",
+      "page": "Students/IDCards",
+      "action": "Generate ID card (insert student_id_cards)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 136
+    }
+  ]
+}

@@ -1,0 +1,151 @@
+{
+  "generatedAt": "2026-09-06T00:40:58.257Z",
+  "pass": 18,
+  "fail": 0,
+  "results": [
+    {
+      "module": "Operations",
+      "page": "Library/Books",
+      "action": "Add book (insert library_books)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 140
+    },
+    {
+      "module": "Operations",
+      "page": "Library/Issues",
+      "action": "Issue book (insert book_issues)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 122
+    },
+    {
+      "module": "Operations",
+      "page": "Library/Books",
+      "action": "Edit + delete book (update/delete library_books)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 121
+    },
+    {
+      "module": "Operations",
+      "page": "Transport/Routes",
+      "action": "Add route (insert transport_routes)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 144
+    },
+    {
+      "module": "Operations",
+      "page": "Transport/Vehicles",
+      "action": "Add vehicle (insert vehicles)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 112
+    },
+    {
+      "module": "Operations",
+      "page": "Transport/Drivers",
+      "action": "Add driver (insert drivers)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 119
+    },
+    {
+      "module": "Operations",
+      "page": "Transport/Allotments",
+      "action": "Allot transport to student (insert student_transport)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 232
+    },
+    {
+      "module": "Operations",
+      "page": "Inventory/Assets",
+      "action": "Add asset (insert assets)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 123
+    },
+    {
+      "module": "Operations",
+      "page": "Inventory/Stock",
+      "action": "Add stock item (insert inventory)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 115
+    },
+    {
+      "module": "Operations",
+      "page": "Hostel/Hostels",
+      "action": "Add hostel (insert hostels)",
+      "status": "PASS",
+      "detail": "4 hostel types",
+      "ms": 578
+    },
+    {
+      "module": "Operations",
+      "page": "Hostel/Rooms",
+      "action": "Add room (insert rooms)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 120
+    },
+    {
+      "module": "Operations",
+      "page": "Communication/Notices",
+      "action": "Publish notice (insert notices)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 117
+    },
+    {
+      "module": "Operations",
+      "page": "Communication/SMS",
+      "action": "Send SMS campaign (insert sms_logs)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 112
+    },
+    {
+      "module": "Operations",
+      "page": "Communication/Email",
+      "action": "Send email broadcast (insert email_logs)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 134
+    },
+    {
+      "module": "Operations",
+      "page": "OnlineClasses",
+      "action": "Schedule online class (insert online_classes)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 270
+    },
+    {
+      "module": "Operations",
+      "page": "SchoolCalendar",
+      "action": "Add calendar event (insert holidays)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 118
+    },
+    {
+      "module": "Operations",
+      "page": "Certificates",
+      "action": "Issue certificate (insert certificates)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 111
+    },
+    {
+      "module": "Operations",
+      "page": "FrontOffice",
+      "action": "Update visitor log status (update front_office_logs)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 228
+    }
+  ]
+}

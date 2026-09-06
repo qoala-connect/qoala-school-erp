@@ -48,17 +48,17 @@ export function AdminHeader({
           <div className="flex items-center gap-2 mb-1.5 flex-wrap">
             {badge && (
               <span className={cn(
-                "px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border flex items-center gap-1",
+                "px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border flex items-center gap-1",
                 badgeStyle
               )}>
-                {BadgeIcon && <BadgeIcon size={12} className="shrink-0" />}
+                {BadgeIcon && <BadgeIcon size={11} className="shrink-0" />}
                 <span>{badge.text}</span>
               </span>
             )}
             {badge && sessionBadge && <span className="text-slate-300">•</span>}
             {sessionBadge && (
-              <span className="text-[11px] font-mono text-slate-400 font-bold">
-                {sessionBadge}
+              <span className="text-[11px] font-mono text-slate-500 font-semibold">
+                Session: {sessionBadge.replace(/^Session:\s*/i, '')}
               </span>
             )}
           </div>

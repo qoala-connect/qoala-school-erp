@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { toast, Toaster } from 'sonner';
+import { toast } from 'sonner';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Users, Search, Plus, Download, RefreshCcw, Eye, Edit,
@@ -931,9 +931,7 @@ export default function Students() {
         onSaved={fetchStudents}
       />
 
-      <Toaster position="top-right" richColors closeButton />
-
-      <StudentStatusChangeModal
+<StudentStatusChangeModal
         isOpen={statusModalOpen}
         onClose={() => {
           setStatusModalOpen(false);

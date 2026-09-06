@@ -34,7 +34,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { Navbar } from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { cn } from '@/lib/utils';
-import { Toaster, toast } from 'sonner';
+import { toast } from 'sonner';
 import { Field, inputCls, selectCls, textareaCls } from '@/components/admissions/AdmissionUI';
 import { admissionService } from '@/services/admissionService';
 
@@ -308,9 +308,7 @@ export default function Admissions() {
   return (
     <div className="min-h-screen bg-[#f8fafc] flex flex-col justify-between font-sans text-slate-800 antialiased selection:bg-blue-600 selection:text-white">
       <Navbar transparent={false} />
-      <Toaster position="top-center" richColors />
-
-      {/* Hero Header */}
+{/* Hero Header */}
       <section className="relative pt-28 sm:pt-36 pb-12 bg-gradient-to-b from-blue-950 via-slate-900 to-slate-900 text-white overflow-hidden border-b border-blue-900/40">
         {/* Glow backdrop circles */}
         <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-[800px] h-[350px] bg-blue-600/20 blur-[120px] rounded-full pointer-events-none" />

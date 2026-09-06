@@ -1,0 +1,71 @@
+{
+  "generatedAt": "2026-09-06T00:44:08.151Z",
+  "pass": 8,
+  "fail": 0,
+  "results": [
+    {
+      "module": "Attendance",
+      "page": "Attendance/Entry",
+      "action": "Load class roster (select students)",
+      "status": "PASS",
+      "detail": "1-A: 17 students",
+      "ms": 152
+    },
+    {
+      "module": "Attendance",
+      "page": "Attendance/Entry",
+      "action": "Load teacher scope (select teacher_assignments)",
+      "status": "PASS",
+      "detail": "23 class-teacher scopes",
+      "ms": 130
+    },
+    {
+      "module": "Attendance",
+      "page": "Attendance/Entry",
+      "action": "Load approved student leaves (select leave_requests)",
+      "status": "PASS",
+      "detail": "0 on leave",
+      "ms": 127
+    },
+    {
+      "module": "Attendance",
+      "page": "Attendance/Entry",
+      "action": "Save attendance — every status (rpc save_attendance)",
+      "status": "PASS",
+      "detail": "5 rows, 5 statuses",
+      "ms": 279
+    },
+    {
+      "module": "Attendance",
+      "page": "Attendance/Entry",
+      "action": "Re-save same day is idempotent (rpc save_attendance)",
+      "status": "PASS",
+      "detail": "no duplicates, values overwritten",
+      "ms": 284
+    },
+    {
+      "module": "Attendance",
+      "page": "Attendance/Entry",
+      "action": "Future date is rejected (rpc save_attendance)",
+      "status": "PASS",
+      "detail": "guard raised: 23514",
+      "ms": 127
+    },
+    {
+      "module": "Attendance",
+      "page": "Attendance/Entry",
+      "action": "Attendance edit trail recorded (select attendance_logs)",
+      "status": "PASS",
+      "detail": "0 log entries",
+      "ms": 116
+    },
+    {
+      "module": "Attendance",
+      "page": "Attendance/Reports",
+      "action": "Attendance summary query (select attendance)",
+      "status": "PASS",
+      "detail": "1000 records, 879 present",
+      "ms": 286
+    }
+  ]
+}
