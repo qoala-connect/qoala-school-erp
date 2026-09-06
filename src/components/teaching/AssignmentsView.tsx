@@ -12,6 +12,9 @@ import {
 } from '@/components/academics/shared';
 import SubmissionReviewDrawer from './SubmissionReviewDrawer';
 
+/** A <select> with nothing chosen yields "", which is not a valid uuid. */
+const blankToNull = (v: string | null | undefined) => (v ? v : null);
+
 /**
  * The teacher's homework and assignments across all their classes, with
  * filters, a create / edit form and the submission review drawer.
@@ -85,7 +88,21 @@ export default function AssignmentsView({
     if (!form) return;
     if (!form.title?.trim()) { toast.error('Give it a title.'); return; }
     if (!form.class_id) { toast.error('Choose a class.'); return; }
-    const sc = scope.find(s => s.class_id === form.class_id && (!form.section_id || s.section_id === form.section_id));
+    // A blank select is "" — never a uuid — so normalise it to null. "Whole
+    // class" must stay null: row level security only shows a row to a student
+    // when the section matches or is unset, so pinning it to one of the
+    // teacher's sections would hide the homework from every other section.
+    const sectionId = blankToNull(form.section_id);
+    const sc = sectionId
+      ? scope.find(s => s.class_id === form.class_id && s.section_id === sectionId)
+      : undefined;
+    // Whole class keeps a subject only when the teacher takes exactly one in
+    // that class; otherwise it is left unset rather than guessed.
+    const classSubjects = [...new Set(
+      scope.filter(s => s.class_id === form.class_id).map(s => s.subject_id).filter(Boolean),
+    )];
+    const subjectId = blankToNull(form.subject_id)
+      ?? (sectionId ? sc?.subject_id ?? null : (classSubjects.length === 1 ? classSubjects[0]! : null));
     setBusy(true);
     try {
       await saveAssignment({
@@ -93,8 +110,8 @@ export default function AssignmentsView({
         teacher_id: teacherId,
         academic_year_id: academicYearId,
         class_id: form.class_id!,
-        section_id: form.section_id ?? sc?.section_id ?? null,
-        subject_id: form.subject_id ?? sc?.subject_id ?? null,
+        section_id: sectionId,
+        subject_id: subjectId,
         kind: (form.kind as AssignmentKind) ?? 'homework',
         title: form.title!,
         description: form.description ?? null,
@@ -250,9 +267,9 @@ export default function AssignmentsView({
                 <select id="a-sec" className={selectClass} value={form.section_id ?? ''} disabled={!form.class_id}
                   onChange={e => {
                     const s = formSections.find(x => x.section_id === e.target.value);
-                    setForm({ ...form, section_id: e.target.value, subject_id: s?.subject_id ?? undefined });
+                    setForm({ ...form, section_id: blankToNull(e.target.value) ?? undefined, subject_id: s?.subject_id ?? undefined });
                   }}>
-                  <option value="">Whole class</option>
+                  <option value="">Whole class (every section)</option>
                   {formSections.map(s => (
                     <option key={s.assignment_id} value={s.section_id}>
                       Sec {s.section_name}{s.subject_name ? ` · ${s.subject_name}` : ''}

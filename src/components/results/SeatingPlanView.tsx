@@ -18,6 +18,7 @@ import {
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import { printRegion } from '@/lib/printRegion';
 
 interface Hall {
   id: string;
@@ -48,59 +49,54 @@ interface Invigilator {
 
 export default function SeatingPlanView({ initialTab }: { initialTab?: 'seating' | 'halls' | 'invigilators' } = {}) {
   const [activeTab, setActiveTab] = useState<'seating' | 'halls' | 'invigilators'>(initialTab || 'seating');
-  const [selectedHall, setSelectedHall] = useState('hall-a');
-  const [selectedClass, setSelectedClass] = useState('10th');
-  const [alternateClass, setAlternateClass] = useState('12th');
+  const [selectedHall, setSelectedHall] = useState('');
+  const [selectedClass, setSelectedClass] = useState('');
+  const [alternateClass, setAlternateClass] = useState('');
   const [enableAntiCheating, setEnableAntiCheating] = useState(true);
 
   // Database / Local states
-  const [halls, setHalls] = useState<Hall[]>([
-    { id: 'hall-a', name: 'Main Auditorium Hall A', capacity: 60, rows: 6, cols: 10 },
-    { id: 'hall-b', name: 'Science Wing Lab B', capacity: 30, rows: 5, cols: 6 },
-    { id: 'room-101', name: 'Class Room 101', capacity: 24, rows: 4, cols: 6 },
-    { id: 'room-102', name: 'Class Room 102', capacity: 24, rows: 4, cols: 6 }
-  ]);
+  const [halls, setHalls] = useState<Hall[]>([]);
+  const [dbClasses, setDbClasses] = useState<string[]>([]);
 
   const [students, setStudents] = useState<any[]>([]);
+  const [teachers, setTeachers] = useState<any[]>([]);
   const [seatingAssignments, setSeatingAssignments] = useState<Record<string, SeatedStudent[]>>({});
-  const [invigilators, setInvigilators] = useState<Invigilator[]>([
-    { id: 'inv-1', name: 'Prof. Albus D.', hallId: 'hall-a', shift: 'Morning (09:00 AM)', date: '2026-07-15' },
-    { id: 'inv-2', name: 'Dr. Minerva M.', hallId: 'hall-b', shift: 'Morning (09:00 AM)', date: '2026-07-15' },
-    { id: 'inv-3', name: 'Mrs. Pomona S.', hallId: 'room-101', shift: 'Afternoon (01:30 PM)', date: '2026-07-15' }
-  ]);
+  const [invigilatorDuties, setInvigilatorDuties] = useState<Invigilator[]>([]);
 
+  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [selectedSeat, setSelectedSeat] = useState<{ row: number; col: number } | null>(null);
 
-  // Load from Supabase with fallback
+  // Load real students and teachers from Supabase
   useEffect(() => {
-    const fetchStudentsAndConfig = async () => {
+    const fetchData = async () => {
+      setIsLoading(true);
       try {
-        const { data: stdData } = await supabase.from('students').select('*').order('name');
-        if (stdData && stdData.length > 0) {
-          setStudents(stdData);
-        } else {
-          // Robust high-fidelity fallback dataset
-          setStudents([
-            { id: 's1', name: 'Arjun Kumar', roll_number: '20261001', class: '10th', section: 'A' },
-            { id: 's2', name: 'Meera Deshmukh', roll_number: '20261002', class: '10th', section: 'A' },
-            { id: 's3', name: 'Kabir Singh', roll_number: '20261003', class: '10th', section: 'B' },
-            { id: 's4', name: 'Priya Patel', roll_number: '20261004', class: '10th', section: 'C' },
-            { id: 's5', name: 'Amit Roy', roll_number: '20261005', class: '10th', section: 'B' },
-            { id: 's6', name: 'Divya Iyer', roll_number: '20261006', class: '10th', section: 'A' },
-            { id: 's7', name: 'Rahul Varma', roll_number: '20261201', class: '12th', section: 'A' },
-            { id: 's8', name: 'Ananya Sen', roll_number: '20261202', class: '12th', section: 'B' },
-            { id: 's9', name: 'Vikram Malhotra', roll_number: '20261203', class: '12th', section: 'A' },
-            { id: 's10', name: 'Sneha Reddy', roll_number: '20261204', class: '12th', section: 'C' },
-            { id: 's11', name: 'Rohan Gupta', roll_number: '20261205', class: '12th', section: 'B' },
-            { id: 's12', name: 'Aditi Nair', roll_number: '20261206', class: '12th', section: 'A' }
-          ]);
+        const [stdRes, teacherRes] = await Promise.all([
+          supabase.from('students').select('id, name, roll_number, class, section, class_id').eq('status', 'active').order('roll_number', { ascending: true }),
+          supabase.from('teachers').select('id, name, designation, department').eq('status', 'Active').order('name')
+        ]);
+
+        const studentData = stdRes.data || [];
+        const teacherData = teacherRes.data || [];
+        setStudents(studentData);
+        setTeachers(teacherData);
+
+        // Extract unique class names
+        const uniqueClasses = [...new Set(studentData.map(s => s.class).filter(Boolean))].sort();
+        setDbClasses(uniqueClasses);
+        if (uniqueClasses.length > 0) {
+          setSelectedClass(uniqueClasses[0]);
+          setAlternateClass(uniqueClasses.length > 1 ? uniqueClasses[1] : uniqueClasses[0]);
         }
       } catch (err) {
-        console.error('Failed to load student lists:', err);
+        console.error('Failed to load seating plan data:', err);
+        toast.error('Failed to load student and teacher data.');
+      } finally {
+        setIsLoading(false);
       }
     };
-    fetchStudentsAndConfig();
+    fetchData();
   }, []);
 
   const activeHallObj = useMemo(() => {
@@ -228,23 +224,49 @@ export default function SeatingPlanView({ initialTab }: { initialTab?: 'seating'
   };
 
   const handleSaveSeatingPlan = async () => {
+    if (activeAssignments.length === 0) {
+      toast.error('No seating assignments to save for this hall.');
+      return;
+    }
     setIsSaving(true);
     try {
-      // Simulate/Write seating allocations to a supabase table if desired
-      // We will perform local save & state feedback
-      setTimeout(() => {
-        setIsSaving(false);
-        toast.success('Seating arrangements, hall mappings, and invigilator duties committed safely!');
-      }, 1000);
+      // Seating plans are session-based layouts — logged for reference in audit_logs.
+      // Full persistence would require a dedicated seating_allocations table.
+      const { data: { user } } = await supabase.auth.getUser();
+      await supabase.from('audit_logs').insert({
+        user_id: user?.id || null,
+        user_email: user?.email || null,
+        action_type: 'SEATING_PLAN_COMMITTED',
+        table_name: 'seating_plan',
+        record_id: selectedHall,
+        new_values: {
+          hall_id: selectedHall,
+          hall_name: activeHallObj?.name,
+          student_count: activeAssignments.length,
+          committed_at: new Date().toISOString()
+        },
+        created_at: new Date().toISOString()
+      });
+      toast.success(`Seating plan for "${activeHallObj?.name}" committed. ${activeAssignments.length} students allocated.`);
     } catch (err) {
-      toast.error('Failure saving seating configuration.');
+      toast.error('Failed to commit seating plan. Please try again.');
+    } finally {
       setIsSaving(false);
     }
   };
 
   const currentInvigilators = useMemo(() => {
-    return invigilators.filter(inv => inv.hallId === selectedHall);
-  }, [invigilators, selectedHall]);
+    return invigilatorDuties.filter(inv => inv.hallId === selectedHall);
+  }, [invigilatorDuties, selectedHall]);
+
+  if (isLoading) {
+    return (
+      <div className="py-20 flex flex-col items-center justify-center space-y-3">
+        <div className="w-7 h-7 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
+        <p className="text-xs font-bold text-slate-500">Loading student and teacher roster...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -272,7 +294,23 @@ export default function SeatingPlanView({ initialTab }: { initialTab?: 'seating'
         ))}
       </div>
 
-      {activeTab === 'seating' && (
+      {activeTab === 'seating' && halls.length === 0 && (
+        <div className="py-16 flex flex-col items-center justify-center text-center space-y-3 bg-white border border-slate-200/60 rounded-2xl">
+          <MapPin className="w-10 h-10 text-slate-300" />
+          <p className="text-sm font-bold text-slate-700">No Exam Halls Configured</p>
+          <p className="text-xs text-slate-400 max-w-xs">
+            Go to the <strong>Exam Halls Management</strong> tab to add examination venues before generating seating arrangements.
+          </p>
+          <button
+            onClick={() => setActiveTab('halls')}
+            className="mt-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-xl transition-all"
+          >
+            Configure Exam Halls →
+          </button>
+        </div>
+      )}
+
+      {activeTab === 'seating' && halls.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Seating Parameters & Generator Panel */}
           <div className="bg-white border border-slate-200/60 shadow-sm rounded-[24px] p-6 space-y-5 h-fit">
@@ -305,8 +343,10 @@ export default function SeatingPlanView({ initialTab }: { initialTab?: 'seating'
                     value={selectedClass}
                     onChange={(e) => setSelectedClass(e.target.value)}
                     className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 cursor-pointer outline-none"
+                    disabled={dbClasses.length === 0}
                   >
-                    {['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th', '11th', '12th'].map(c => (
+                    {dbClasses.length === 0 && <option value="">No classes found</option>}
+                    {dbClasses.map(c => (
                       <option key={c} value={c}>Class {c}</option>
                     ))}
                   </select>
@@ -318,8 +358,10 @@ export default function SeatingPlanView({ initialTab }: { initialTab?: 'seating'
                     value={alternateClass}
                     onChange={(e) => setAlternateClass(e.target.value)}
                     className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 cursor-pointer outline-none"
+                    disabled={dbClasses.length === 0}
                   >
-                    {['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th', '11th', '12th'].map(c => (
+                    {dbClasses.length === 0 && <option value="">No classes found</option>}
+                    {dbClasses.map(c => (
                       <option key={c} value={c}>Class {c}</option>
                     ))}
                   </select>
@@ -401,8 +443,8 @@ export default function SeatingPlanView({ initialTab }: { initialTab?: 'seating'
             {/* Print Seating Button */}
             <button 
               onClick={() => {
-                window.print();
-                toast.success(`Printing complete Seating Layout for ${activeHallObj.name}`);
+                const ok = printRegion('seating-layout-print', `Seating Layout — ${activeHallObj.name}`);
+                if (!ok) toast.error('Could not open the seating layout for printing.');
               }}
               className="w-full mt-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm"
             >
@@ -411,7 +453,7 @@ export default function SeatingPlanView({ initialTab }: { initialTab?: 'seating'
           </div>
 
           {/* Interactive Seating Layout Canvas */}
-          <div className="lg:col-span-2 bg-white border border-slate-200/60 shadow-sm rounded-[24px] p-6 space-y-5">
+          <div id="seating-layout-print" className="lg:col-span-2 bg-white border border-slate-200/60 shadow-sm rounded-[24px] p-6 space-y-5">
             <div className="flex items-center justify-between">
               <div>
                 <h4 className="text-base font-extrabold text-slate-900">{activeHallObj.name} Grid Map</h4>
@@ -541,44 +583,53 @@ export default function SeatingPlanView({ initialTab }: { initialTab?: 'seating'
               <p className="text-slate-400 text-xs">Define layout parameters (rows and columns) for automated seat generator grids</p>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs font-semibold text-slate-600">
-                <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                    <th className="py-3 px-4">Hall Venue</th>
-                    <th className="py-3 px-4 text-center">Row Spans</th>
-                    <th className="py-3 px-4 text-center">Col Spans</th>
-                    <th className="py-3 px-4 text-center">Capacity Floor</th>
-                    <th className="py-3 px-4 text-right pr-6 w-[80px]">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100/60 text-slate-700 font-medium">
-                  {halls.map((h) => (
-                    <tr key={h.id} className="hover:bg-slate-50/50">
-                      <td className="py-3.5 px-4 font-bold text-slate-900">{h.name}</td>
-                      <td className="py-3.5 px-4 text-center font-mono text-slate-500">{h.rows} Rows</td>
-                      <td className="py-3.5 px-4 text-center font-mono text-slate-500">{h.cols} Columns</td>
-                      <td className="py-3.5 px-4 text-center">
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-indigo-50 text-indigo-600 border border-indigo-100">
-                          {h.capacity} Max Seats
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4 text-right pr-6">
-                        <button 
-                          onClick={() => {
-                            setHalls(halls.filter(x => x.id !== h.id));
-                            toast.success('Examination venue deregistered from system context.');
-                          }}
-                          className="p-1 text-slate-400 hover:text-rose-600"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </td>
+            {halls.length === 0 ? (
+              <div className="py-12 text-center space-y-2 text-slate-400">
+                <MapPin className="w-8 h-8 mx-auto text-slate-300" />
+                <p className="text-xs font-bold text-slate-600">No Examination Halls Added</p>
+                <p className="text-[11px]">Use the form on the right to register your first examination venue.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs font-semibold text-slate-600">
+                  <thead>
+                    <tr className="border-b border-slate-100 bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      <th className="py-3 px-4">Hall Venue</th>
+                      <th className="py-3 px-4 text-center">Row Spans</th>
+                      <th className="py-3 px-4 text-center">Col Spans</th>
+                      <th className="py-3 px-4 text-center">Capacity Floor</th>
+                      <th className="py-3 px-4 text-right pr-6 w-[80px]">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100/60 text-slate-700 font-medium">
+                    {halls.map((h) => (
+                      <tr key={h.id} className="hover:bg-slate-50/50">
+                        <td className="py-3.5 px-4 font-bold text-slate-900">{h.name}</td>
+                        <td className="py-3.5 px-4 text-center font-mono text-slate-500">{h.rows} Rows</td>
+                        <td className="py-3.5 px-4 text-center font-mono text-slate-500">{h.cols} Columns</td>
+                        <td className="py-3.5 px-4 text-center">
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-indigo-50 text-indigo-600 border border-indigo-100">
+                            {h.capacity} Max Seats
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-right pr-6">
+                          <button 
+                            onClick={() => {
+                              setHalls(halls.filter(x => x.id !== h.id));
+                              if (selectedHall === h.id) setSelectedHall(halls.filter(x => x.id !== h.id)[0]?.id || '');
+                              toast.success('Examination venue removed.');
+                            }}
+                            className="p-1 text-slate-400 hover:text-rose-600"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
           <form 
@@ -590,15 +641,21 @@ export default function SeatingPlanView({ initialTab }: { initialTab?: 'seating'
               const c = Number(target.hallCols.value);
               if (!name) return;
 
-              setHalls([...halls, {
-                id: Math.random().toString(),
+              const newHall = {
+                id: Math.random().toString(36).slice(2),
                 name,
                 rows: r,
                 cols: c,
                 capacity: r * c
-              }]);
+              };
+              setHalls(prev => {
+                const updated = [...prev, newHall];
+                return updated;
+              });
+              // Auto-select if no hall selected
+              if (!selectedHall) setSelectedHall(newHall.id);
               target.reset();
-              toast.success('Exam Hall successfully added to venues listing.');
+              toast.success(`Exam hall "${name}" added (${r * c} seats).`);
             }}
             className="bg-white border border-slate-200/60 shadow-sm rounded-[24px] p-6 space-y-4 h-fit"
           >
@@ -653,16 +710,17 @@ export default function SeatingPlanView({ initialTab }: { initialTab?: 'seating'
       {/* Invigilators assignment duty list */}
       {activeTab === 'invigilators' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 bg-white border border-slate-200/60 shadow-sm rounded-[24px] p-6 space-y-4">
+          <div id="invigilator-duty-print" className="lg:col-span-2 bg-white border border-slate-200/60 shadow-sm rounded-[24px] p-6 space-y-4">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
               <div>
                 <h4 className="text-sm font-extrabold text-slate-800">Teacher Invigilator Assignments</h4>
-                <p className="text-slate-400 text-xs mt-0.5">Manage supervisor duties to avoid double-bookings during test slots</p>
+                <p className="text-slate-400 text-xs mt-0.5">Manage supervisor duties per hall to avoid double-bookings during test slots</p>
               </div>
               <button 
+                data-print-hide
                 onClick={() => {
-                  window.print();
-                  toast.success('Printing duty schedule roster copy');
+                  const ok = printRegion('invigilator-duty-print', 'Invigilator Duty List');
+                  if (!ok) toast.error('Could not open the duty list for printing.');
                 }}
                 className="px-3.5 py-1.5 border border-slate-200 text-slate-500 rounded-xl text-xs font-bold transition-all hover:bg-slate-50 flex items-center gap-1.5"
               >
@@ -670,47 +728,55 @@ export default function SeatingPlanView({ initialTab }: { initialTab?: 'seating'
               </button>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs font-semibold text-slate-600">
-                <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                    <th className="py-3 px-4">Supervisor Teacher</th>
-                    <th className="py-3 px-4">Hall Venue</th>
-                    <th className="py-3 px-4 text-center">Duty Shift</th>
-                    <th className="py-3 px-4 text-center">Duty Date</th>
-                    <th className="py-3 px-4 text-right pr-6 w-[80px]">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100/60 text-slate-700 font-medium">
-                  {invigilators.map((inv) => {
-                    const hall = halls.find(h => h.id === inv.hallId);
-                    return (
-                      <tr key={inv.id} className="hover:bg-slate-50/50">
-                        <td className="py-3 px-4 font-bold text-slate-900">{inv.name}</td>
-                        <td className="py-3 px-4 text-slate-600">{hall ? hall.name : 'Unknown venue'}</td>
-                        <td className="py-3 px-4 text-center">
-                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-indigo-50 text-indigo-600 border border-indigo-100">
-                            {inv.shift}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-center font-mono text-slate-500 font-bold">{inv.date}</td>
-                        <td className="py-3 px-4 text-right pr-6">
-                          <button 
-                            onClick={() => {
-                              setInvigilators(invigilators.filter(x => x.id !== inv.id));
-                              toast.success('Invigilator duty revoked.');
-                            }}
-                            className="p-1 text-slate-400 hover:text-rose-600"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            {invigilatorDuties.length === 0 ? (
+              <div className="py-12 text-center text-slate-400 space-y-2">
+                <UserCheck className="w-8 h-8 mx-auto text-slate-300" />
+                <p className="text-xs font-bold text-slate-600">No Invigilator Duties Assigned</p>
+                <p className="text-[11px]">Use the form on the right to assign teacher duties per hall and shift.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs font-semibold text-slate-600">
+                  <thead>
+                    <tr className="border-b border-slate-100 bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      <th className="py-3 px-4">Supervisor Teacher</th>
+                      <th className="py-3 px-4">Hall Venue</th>
+                      <th className="py-3 px-4 text-center">Duty Shift</th>
+                      <th className="py-3 px-4 text-center">Duty Date</th>
+                      <th className="py-3 px-4 text-right pr-6 w-[80px]">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100/60 text-slate-700 font-medium">
+                    {invigilatorDuties.map((inv) => {
+                      const hall = halls.find(h => h.id === inv.hallId);
+                      return (
+                        <tr key={inv.id} className="hover:bg-slate-50/50">
+                          <td className="py-3 px-4 font-bold text-slate-900">{inv.name}</td>
+                          <td className="py-3 px-4 text-slate-600">{hall ? hall.name : inv.hallId}</td>
+                          <td className="py-3 px-4 text-center">
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-indigo-50 text-indigo-600 border border-indigo-100">
+                              {inv.shift}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-center font-mono text-slate-500 font-bold">{inv.date}</td>
+                          <td className="py-3 px-4 text-right pr-6">
+                            <button 
+                              onClick={() => {
+                                setInvigilatorDuties(invigilatorDuties.filter(x => x.id !== inv.id));
+                                toast.success('Invigilator duty revoked.');
+                              }}
+                              className="p-1 text-slate-400 hover:text-rose-600"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
           {/* Form to assign invigilator */}
@@ -718,29 +784,32 @@ export default function SeatingPlanView({ initialTab }: { initialTab?: 'seating'
             onSubmit={(e) => {
               e.preventDefault();
               const target = e.target as any;
-              const name = target.invName.value;
+              const teacherId = target.invTeacherId.value;
               const hallId = target.invHall.value;
               const shift = target.invShift.value;
               const date = target.invDate.value;
               
-              if (!name || !hallId || !date) return;
+              if (!teacherId || !hallId || !date) return;
+
+              const teacher = teachers.find(t => t.id === teacherId);
+              const teacherName = teacher?.name || teacherId;
 
               // Double booking preventive check
-              const isDoubleBooked = invigilators.some(inv => inv.name === name && inv.date === date && inv.shift === shift);
+              const isDoubleBooked = invigilatorDuties.some(inv => inv.id === teacherId && inv.date === date && inv.shift === shift);
               if (isDoubleBooked) {
-                toast.error(`Double-booking prevented! ${name} is already assigned on ${date} during ${shift}.`);
+                toast.error(`Double-booking prevented! ${teacherName} is already assigned on ${date} during ${shift}.`);
                 return;
               }
 
-              setInvigilators([...invigilators, {
-                id: Math.random().toString(),
-                name,
+              setInvigilatorDuties([...invigilatorDuties, {
+                id: `${teacherId}-${Date.now()}`,
+                name: teacherName,
                 hallId,
                 shift,
                 date
               }]);
               target.reset();
-              toast.success('Invigilator supervision duty registered and mapped safely.');
+              toast.success(`${teacherName} assigned as invigilator.`);
             }}
             className="bg-white border border-slate-200/60 shadow-sm rounded-[24px] p-6 space-y-4 h-fit"
           >
@@ -750,16 +819,18 @@ export default function SeatingPlanView({ initialTab }: { initialTab?: 'seating'
               <div className="flex flex-col">
                 <label className="mb-1 text-[10px] font-black text-slate-400 uppercase tracking-wider">Select Teacher</label>
                 <select 
-                  name="invName"
+                  name="invTeacherId"
                   className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 cursor-pointer outline-none"
                   required
                 >
-                  <option value="Prof. Severus S.">Prof. Severus S.</option>
-                  <option value="Prof. Albus D.">Prof. Albus D.</option>
-                  <option value="Dr. Minerva M.">Dr. Minerva M.</option>
-                  <option value="Mrs. Pomona S.">Mrs. Pomona S.</option>
-                  <option value="Prof. Remus L.">Prof. Remus L.</option>
+                  <option value="">— Choose teacher —</option>
+                  {teachers.map(t => (
+                    <option key={t.id} value={t.id}>{t.name}{t.designation ? ` (${t.designation})` : ''}</option>
+                  ))}
                 </select>
+                {teachers.length === 0 && (
+                  <p className="text-[10px] text-amber-600 mt-1">No active teachers found in database.</p>
+                )}
               </div>
 
               <div className="flex flex-col">
@@ -769,10 +840,14 @@ export default function SeatingPlanView({ initialTab }: { initialTab?: 'seating'
                   className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 cursor-pointer outline-none"
                   required
                 >
+                  <option value="">— Choose hall —</option>
                   {halls.map(h => (
                     <option key={h.id} value={h.id}>{h.name}</option>
                   ))}
                 </select>
+                {halls.length === 0 && (
+                  <p className="text-[10px] text-amber-600 mt-1">No halls added yet. Go to "Exam Halls Management" tab to add halls first.</p>
+                )}
               </div>
 
               <div className="flex flex-col">
@@ -793,7 +868,6 @@ export default function SeatingPlanView({ initialTab }: { initialTab?: 'seating'
                 <input 
                   type="date" 
                   name="invDate"
-                  defaultValue="2026-07-15"
                   className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 cursor-pointer"
                   required
                 />

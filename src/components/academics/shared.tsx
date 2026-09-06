@@ -271,12 +271,21 @@ export function Modal({
   // keyboard path matches the mouse path.
   const ref = React.useRef<HTMLDivElement>(null);
 
+  // Callers pass an inline arrow for onClose, so its identity changes on
+  // every render. Read it through a ref so neither effect below depends on
+  // it — re-running them per keystroke would tear the Escape listener down
+  // and, worse, pull focus back to the dialog out of the field being typed in.
+  const onCloseRef = React.useRef(onClose);
+  onCloseRef.current = onClose;
+
+  // Focus the dialog once, when it opens — never again.
+  React.useEffect(() => { ref.current?.focus(); }, []);
+
   React.useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onCloseRef.current(); };
     document.addEventListener('keydown', onKey);
-    ref.current?.focus();
     return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, []);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-sm p-0 sm:p-4">

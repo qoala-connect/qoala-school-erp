@@ -386,27 +386,31 @@ export default function App() {
           {/* Examination Canonical & Submenu Routes */}
           <Route path="/dashboard/examination" element={<ProtectedRoute allowedPermission="results.view"><DashboardLayout children={<ExaminationModule />} /></ProtectedRoute>} />
           <Route path="/dashboard/examination/dashboard" element={<ProtectedRoute allowedPermission="results.view"><DashboardLayout children={<ExaminationModule view="dashboard" />} /></ProtectedRoute>} />
-          <Route path="/dashboard/examination/exam-types" element={<ProtectedRoute allowedPermission="results.view"><DashboardLayout children={<ExaminationModule view="exam-types" />} /></ProtectedRoute>} />
           <Route path="/dashboard/examination/exams" element={<ProtectedRoute allowedPermission="results.publish"><DashboardLayout children={<ExaminationModule view="exams" />} /></ProtectedRoute>} />
-          <Route path="/dashboard/examination/schedule" element={<ProtectedRoute allowedPermission="results.publish"><DashboardLayout children={<ExaminationModule view="schedule" />} /></ProtectedRoute>} />
-          <Route path="/dashboard/examination/subject-mapping" element={<ProtectedRoute allowedPermission="results.view"><DashboardLayout children={<ExaminationModule view="subject-mapping" />} /></ProtectedRoute>} />
-          <Route path="/dashboard/examination/seating-plan" element={<ProtectedRoute allowedPermission="results.view"><DashboardLayout children={<ExaminationModule view="seating-plan" />} /></ProtectedRoute>} />
-          <Route path="/dashboard/examination/hall-allocation" element={<ProtectedRoute allowedPermission="results.view"><DashboardLayout children={<ExaminationModule view="hall-allocation" />} /></ProtectedRoute>} />
-          <Route path="/dashboard/examination/invigilator-assignment" element={<ProtectedRoute allowedPermission="results.view"><DashboardLayout children={<ExaminationModule view="invigilator-assignment" />} /></ProtectedRoute>} />
-          <Route path="/dashboard/examination/marks-entry" element={<ProtectedRoute allowedPermission="results.view"><DashboardLayout children={<ExaminationModule view="marks-entry" />} /></ProtectedRoute>} />
-          <Route path="/dashboard/examination/marks-verification" element={<ProtectedRoute allowedPermission="results.view"><DashboardLayout children={<ExaminationModule view="marks-verification" />} /></ProtectedRoute>} />
-          <Route path="/dashboard/examination/grace-marks" element={<ProtectedRoute allowedPermission="results.view"><DashboardLayout children={<ExaminationModule view="grace-marks" />} /></ProtectedRoute>} />
-          <Route path="/dashboard/examination/grade-rules" element={<ProtectedRoute allowedPermission="results.view"><DashboardLayout children={<ExaminationModule view="grade-rules" />} /></ProtectedRoute>} />
-          <Route path="/dashboard/examination/result-processing" element={<ProtectedRoute allowedPermission="results.publish"><DashboardLayout children={<ExaminationModule view="result-processing" />} /></ProtectedRoute>} />
-          <Route path="/dashboard/examination/result-publication" element={<ProtectedRoute allowedPermission="results.publish"><DashboardLayout children={<ExaminationModule view="result-publication" />} /></ProtectedRoute>} />
-          <Route path="/dashboard/examination/report-cards" element={<ProtectedRoute allowedPermission="results.view"><DashboardLayout children={<ExaminationModule view="report-cards" />} /></ProtectedRoute>} />
+          <Route path="/dashboard/examination/schedule" element={<ProtectedRoute allowedPermission="results.view"><DashboardLayout children={<ExaminationModule view="schedule" />} /></ProtectedRoute>} />
           <Route path="/dashboard/examination/admit-cards" element={<ProtectedRoute allowedPermission="results.view"><DashboardLayout children={<ExaminationModule view="admit-cards" />} /></ProtectedRoute>} />
-          <Route path="/dashboard/examination/hall-tickets" element={<ProtectedRoute allowedPermission="results.view"><DashboardLayout children={<ExaminationModule view="hall-tickets" />} /></ProtectedRoute>} />
-          <Route path="/dashboard/examination/merit-list" element={<ProtectedRoute allowedPermission="results.view"><DashboardLayout children={<ExaminationModule view="merit-list" />} /></ProtectedRoute>} />
-          <Route path="/dashboard/examination/rank-list" element={<ProtectedRoute allowedPermission="results.view"><DashboardLayout children={<ExaminationModule view="rank-list" />} /></ProtectedRoute>} />
-          <Route path="/dashboard/examination/certificates" element={<ProtectedRoute allowedPermission="student.view"><DashboardLayout children={<ExaminationModule view="certificates" />} /></ProtectedRoute>} />
-          <Route path="/dashboard/examination/reports" element={<ProtectedRoute allowedPermission="results.view"><DashboardLayout children={<ExaminationModule view="reports" />} /></ProtectedRoute>} />
+          <Route path="/dashboard/examination/seating-plan" element={<ProtectedRoute allowedPermission="results.view"><DashboardLayout children={<ExaminationModule view="seating-plan" />} /></ProtectedRoute>} />
+          <Route path="/dashboard/examination/invigilation" element={<ProtectedRoute allowedPermission="results.view"><DashboardLayout children={<ExaminationModule view="invigilation" />} /></ProtectedRoute>} />
+          <Route path="/dashboard/examination/invigilator-assignment" element={<ProtectedRoute allowedPermission="results.view"><DashboardLayout children={<ExaminationModule view="invigilation" />} /></ProtectedRoute>} />
+          <Route path="/dashboard/examination/exam-attendance" element={<ProtectedRoute allowedPermission="results.view"><DashboardLayout children={<ExaminationModule view="exam-attendance" />} /></ProtectedRoute>} />
+          <Route path="/dashboard/examination/attendance" element={<ProtectedRoute allowedPermission="results.view"><DashboardLayout children={<ExaminationModule view="exam-attendance" />} /></ProtectedRoute>} />
+          <Route path="/dashboard/examination/marks-entry" element={<ProtectedRoute allowedPermission="results.view"><DashboardLayout children={<ExaminationModule view="marks-entry" />} /></ProtectedRoute>} />
+          <Route path="/dashboard/examination/marks-verification" element={<ProtectedRoute allowedPermission="results.publish"><DashboardLayout children={<ExaminationModule view="marks-verification" />} /></ProtectedRoute>} />
+          <Route path="/dashboard/examination/result-processing" element={<ProtectedRoute allowedPermission="results.publish"><DashboardLayout children={<ExaminationModule view="result-processing" />} /></ProtectedRoute>} />
+          <Route path="/dashboard/examination/report-cards" element={<ProtectedRoute allowedPermission="results.view"><DashboardLayout children={<ExaminationModule view="report-cards" />} /></ProtectedRoute>} />
+          <Route path="/dashboard/examination/result-publishing" element={<ProtectedRoute allowedPermission="results.publish"><DashboardLayout children={<ExaminationModule view="result-publishing" />} /></ProtectedRoute>} />
+          <Route path="/dashboard/examination/result-publication" element={<ProtectedRoute allowedPermission="results.publish"><DashboardLayout children={<ExaminationModule view="result-publishing" />} /></ProtectedRoute>} />
           <Route path="/dashboard/examination/analytics" element={<ProtectedRoute allowedPermission="results.view"><DashboardLayout children={<ExaminationModule view="analytics" />} /></ProtectedRoute>} />
+          <Route path="/dashboard/examination/settings" element={<ProtectedRoute allowedPermission="results.publish"><DashboardLayout children={<ExaminationModule view="settings" />} /></ProtectedRoute>} />
+          <Route path="/dashboard/examination/exam-types" element={<ProtectedRoute allowedPermission="results.publish"><DashboardLayout children={<ExaminationModule view="settings" />} /></ProtectedRoute>} />
+          <Route path="/dashboard/examination/grade-rules" element={<ProtectedRoute allowedPermission="results.publish"><DashboardLayout children={<ExaminationModule view="settings" />} /></ProtectedRoute>} />
+          <Route path="/dashboard/examination/subject-mapping" element={<ProtectedRoute allowedPermission="results.publish"><DashboardLayout children={<ExaminationModule view="exams" />} /></ProtectedRoute>} />
+          <Route path="/dashboard/examination/hall-allocation" element={<ProtectedRoute allowedPermission="results.view"><DashboardLayout children={<ExaminationModule view="seating-plan" />} /></ProtectedRoute>} />
+          <Route path="/dashboard/examination/hall-tickets" element={<ProtectedRoute allowedPermission="results.view"><DashboardLayout children={<ExaminationModule view="admit-cards" />} /></ProtectedRoute>} />
+          <Route path="/dashboard/examination/merit-list" element={<ProtectedRoute allowedPermission="results.view"><DashboardLayout children={<ExaminationModule view="result-processing" />} /></ProtectedRoute>} />
+          <Route path="/dashboard/examination/rank-list" element={<ProtectedRoute allowedPermission="results.view"><DashboardLayout children={<ExaminationModule view="result-processing" />} /></ProtectedRoute>} />
+          <Route path="/dashboard/examination/certificates" element={<ProtectedRoute allowedPermission="student.view"><DashboardLayout children={<ExaminationModule view="report-cards" />} /></ProtectedRoute>} />
+          <Route path="/dashboard/examination/reports" element={<ProtectedRoute allowedPermission="results.view"><DashboardLayout children={<ExaminationModule view="report-cards" />} /></ProtectedRoute>} />
           
           {/* Fallback */}
           <Route path="*" element={<NotFound />} />

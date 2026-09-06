@@ -17,6 +17,7 @@ import TodayClasses from '@/components/teaching/TodayClasses';
 import LessonPlansView from '@/components/teaching/LessonPlansView';
 import AssignmentsView from '@/components/teaching/AssignmentsView';
 import SyllabusProgressView from '@/components/teaching/SyllabusProgressView';
+import TeacherMarksView from '@/components/teaching/TeacherMarksView';
 import ClassWorkspacePanel, { type ClassContext } from '@/components/teaching/ClassWorkspacePanel';
 
 /**
@@ -30,6 +31,7 @@ const TABS = [
   { id: 'classes', label: 'My Classes', icon: LayoutGrid },
   { id: 'lessons', label: 'Lesson Plans', icon: NotebookPen },
   { id: 'work', label: 'Homework & Assignments', icon: PencilRuler },
+  { id: 'marks', label: 'Marks Entry', icon: ClipboardCheck },
   { id: 'syllabus', label: 'Syllabus Progress', icon: ListTree },
 ] as const;
 
@@ -207,6 +209,8 @@ export default function TeacherWorkspace() {
         <LessonPlansView teacherId={teacher.id} academicYearId={selectedYearId} scope={scope} />
       ) : tab === 'work' ? (
         <AssignmentsView teacherId={teacher.id} academicYearId={selectedYearId} scope={scope} />
+      ) : tab === 'marks' ? (
+        <TeacherMarksView teacherId={teacher.id} academicYearId={selectedYearId} />
       ) : tab === 'syllabus' ? (
         <SyllabusProgressView teacherId={teacher.id} academicYearId={selectedYearId} scope={scope} />
       ) : null}

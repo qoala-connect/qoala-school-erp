@@ -39,13 +39,20 @@ import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthContext';
 
 // Child view components
-import ResultsView from '@/components/results/ResultsView';
+import DashboardView from '@/components/results/DashboardView';
+import ExamsView from '@/components/results/ExamsView';
 import DatesheetsView from '@/components/results/DatesheetsView';
-import AnalyticsView from '@/components/results/AnalyticsView';
 import AdmitCardsView from '@/components/results/AdmitCardsView';
-import StudentReportsView from '@/components/results/StudentReportsView';
-import ConfigView from '@/components/results/ConfigView';
+import SeatingPlanView from '@/components/results/SeatingPlanView';
+import InvigilationView from '@/components/results/InvigilationView';
+import ExamAttendanceView from '@/components/results/ExamAttendanceView';
+import ResultsView from '@/components/results/ResultsView';
+import MarksVerificationView from '@/components/results/MarksVerificationView';
 import ResultProcessingView from '@/components/results/ResultProcessingView';
+import StudentReportsView from '@/components/results/StudentReportsView';
+import ResultPublishingView from '@/components/results/ResultPublishingView';
+import AnalyticsView from '@/components/results/AnalyticsView';
+import ConfigView from '@/components/results/ConfigView';
 import TeacherTasksView from '@/components/results/TeacherTasksView';
 import AdminHeader from '@/components/common/AdminHeader';
 import AdminStatCard from '@/components/common/AdminStatCard';
@@ -71,34 +78,56 @@ export default function ExaminationModule({ view: propView }: ExaminationModuleP
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Tab state: 'overview' | 'tasks' | 'exams' | 'marks' | 'results' | 'reports' | 'schedule' | 'analytics' | 'config'
+  // Canonical tab mapping supporting all 14 CBSE examination sub-modules
   const currentTab = useMemo(() => {
     const tabParam = searchParams.get('tab');
     if (tabParam) return tabParam;
     
     const path = location.pathname.toLowerCase();
-    if (path.includes('report-cards') || path.includes('certificates')) return 'reports';
-    if (path.includes('admit-cards') || path.includes('hall-tickets') || path.includes('schedule')) return 'schedule';
-    if (path.includes('result-processing') || path.includes('result-publication') || path.includes('merit-list') || path.includes('rank-list')) return 'results';
-    if (path.includes('marks-entry') || path.includes('marks-verification') || path.includes('grace-marks')) return 'marks';
-    if (path.includes('analytics') || path.includes('reports')) return 'analytics';
-    if (path.includes('grade-rules') || path.includes('exam-types')) return 'config';
+    if (path.includes('dashboard')) return 'dashboard';
+    if (path.includes('seating-plan') || path.includes('hall-allocation')) return 'seating-plan';
+    if (path.includes('invigilation') || path.includes('invigilator-assignment')) return 'invigilation';
+    if (path.includes('exam-attendance') || path.includes('attendance')) return 'exam-attendance';
+    if (path.includes('marks-verification')) return 'marks-verification';
+    if (path.includes('result-publishing') || path.includes('result-publication')) return 'result-publishing';
+    if (path.includes('result-processing') || path.includes('merit-list') || path.includes('rank-list')) return 'result-processing';
+    if (path.includes('report-cards') || path.includes('certificates') || path.includes('reports')) return 'report-cards';
+    if (path.includes('admit-cards') || path.includes('hall-tickets')) return 'admit-cards';
+    if (path.includes('schedule') || path.includes('datesheet')) return 'schedule';
+    if (path.includes('marks-entry') || path.includes('grace-marks')) return 'marks-entry';
+    if (path.includes('analytics')) return 'analytics';
+    if (path.includes('settings') || path.includes('grade-rules') || path.includes('exam-types')) return 'settings';
     if (path.includes('tasks') || path.includes('teacher')) return 'tasks';
+    if (path.includes('exams') || path.includes('subject-mapping')) return 'exams';
     
     if (propView) {
-      if (['report-cards', 'certificates'].includes(propView)) return 'reports';
-      if (['admit-cards', 'schedule', 'hall-tickets'].includes(propView)) return 'schedule';
-      if (['result-processing', 'result-publication', 'merit-list'].includes(propView)) return 'results';
-      if (['marks-entry', 'marks-verification', 'grace-marks'].includes(propView)) return 'marks';
+      if (propView === 'dashboard') return 'dashboard';
+      if (['seating-plan', 'hall-allocation'].includes(propView)) return 'seating-plan';
+      if (['invigilation', 'invigilator-assignment'].includes(propView)) return 'invigilation';
+      if (['exam-attendance', 'attendance'].includes(propView)) return 'exam-attendance';
+      if (['marks-verification'].includes(propView)) return 'marks-verification';
+      if (['result-publishing', 'result-publication'].includes(propView)) return 'result-publishing';
+      if (['result-processing', 'merit-list', 'rank-list'].includes(propView)) return 'result-processing';
+      if (['report-cards', 'certificates', 'reports'].includes(propView)) return 'report-cards';
+      if (['admit-cards', 'hall-tickets'].includes(propView)) return 'admit-cards';
+      if (['schedule', 'datesheet'].includes(propView)) return 'schedule';
+      if (['marks-entry', 'grace-marks'].includes(propView)) return 'marks-entry';
       if (['analytics'].includes(propView)) return 'analytics';
-      if (['grade-rules', 'exam-types'].includes(propView)) return 'config';
+      if (['settings', 'grade-rules', 'exam-types'].includes(propView)) return 'settings';
       if (['tasks', 'teacher'].includes(propView)) return 'tasks';
+      if (['exams', 'subject-mapping'].includes(propView)) return 'exams';
     }
 
-    return 'overview';
+    return 'dashboard';
   }, [searchParams, location.pathname, propView]);
 
-  const requiredTabPermission = (currentTab === 'exams' || currentTab === 'results')
+  const requiredTabPermission = (
+    currentTab === 'exams' || 
+    currentTab === 'marks-verification' || 
+    currentTab === 'result-processing' || 
+    currentTab === 'result-publishing' || 
+    currentTab === 'settings'
+  )
     ? 'results.publish'
     : 'results.view';
   const canViewTab = can(requiredTabPermission);
@@ -306,7 +335,7 @@ export default function ExaminationModule({ view: propView }: ExaminationModuleP
     setMarksTargetExamId(examId);
     setMarksTargetSubjectId(subjectId);
     if (classId) setMarksTargetClassId(classId);
-    setTab('marks');
+    setTab('marks-entry');
   };
 
   // Open Subject Mapping Modal
@@ -522,112 +551,32 @@ export default function ExaminationModule({ view: propView }: ExaminationModuleP
         }
       />
 
-      {/* 2. Interactive Examination Lifecycle Workflow Pipeline */}
-      <div className="bg-white rounded-3xl border border-slate-200/90 p-4 sm:p-5 shadow-xs space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
-          <div className="flex items-center gap-2">
-            <div className="p-2 bg-blue-50 border border-blue-200 text-blue-700 rounded-xl">
-              <Sparkles size={16} />
-            </div>
-            <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
-                End-to-End CBSE Examination Lifecycle
-              </h3>
-              <p className="text-[11px] text-slate-500">
-                ADMIN (Setup &amp; Approval) → TEACHER (Workload &amp; Drafts) → RESULT ENGINE → STUDENT / PARENT PORTAL
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 self-start sm:self-auto">
-            <span className="px-2.5 py-1 bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-[10px] font-mono font-bold">
-              St. Joseph's ERP Engine
-            </span>
-          </div>
-        </div>
-
-        {/* 6-Step Stepper Cards Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
-          {EXAM_WORKFLOW_PIPELINE.map((st) => {
-            const isCurrentActive = currentTab === st.tab;
-            return (
-              <button
-                key={st.step}
-                type="button"
-                onClick={() => {
-                  if (st.tab === 'exams' && st.step === 1 && can('results.publish')) {
-                    handleOpenCreateExamModal();
-                  } else {
-                    setTab(st.tab);
-                  }
-                }}
-                className={cn(
-                  "p-3 rounded-2xl border text-left flex flex-col justify-between transition-all duration-200 cursor-pointer select-none group",
-                  isCurrentActive 
-                    ? "bg-slate-900 border-slate-900 text-white shadow-md scale-[1.02]" 
-                    : "bg-slate-50/70 hover:bg-white border-slate-200/80 text-slate-700 hover:border-blue-300 hover:shadow-2xs"
-                )}
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className={cn(
-                      "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black",
-                      isCurrentActive ? "bg-white text-slate-900" : "bg-slate-200 text-slate-700 group-hover:bg-blue-100 group-hover:text-blue-700"
-                    )}>
-                      {st.step}
-                    </span>
-                    <span className={cn(
-                      "px-1.5 py-0.2 rounded text-[8.5px] font-black uppercase tracking-wider font-mono",
-                      st.role === 'ADMIN' 
-                        ? (isCurrentActive ? "bg-blue-400/20 text-blue-300" : "bg-blue-50 text-blue-700 border border-blue-100") :
-                      st.role === 'TEACHER' 
-                        ? (isCurrentActive ? "bg-amber-400/20 text-amber-300" : "bg-amber-50 text-amber-700 border border-amber-100") :
-                        (isCurrentActive ? "bg-emerald-400/20 text-emerald-300" : "bg-emerald-50 text-emerald-700 border border-emerald-100")
-                    )}>
-                      {st.role}
-                    </span>
-                  </div>
-                  <h4 className={cn("text-xs font-bold leading-tight", isCurrentActive ? "text-white" : "text-slate-900")}>
-                    {st.title}
-                  </h4>
-                  <p className={cn("text-[10px] line-clamp-2 mt-1 font-medium", isCurrentActive ? "text-slate-300" : "text-slate-400")}>
-                    {st.subtext}
-                  </p>
-                </div>
-                
-                <div className={cn(
-                  "mt-2 pt-1.5 border-t text-[10px] font-bold flex items-center justify-between",
-                  isCurrentActive ? "border-slate-800 text-blue-300" : "border-slate-200/60 text-blue-600 group-hover:text-blue-700"
-                )}>
-                  <span>{st.actionText}</span>
-                  <ArrowRight size={10} className="transition-transform group-hover:translate-x-0.5" />
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
       {/* 3. Workspace Navigation Tabs */}
       <div className="bg-slate-100/90 p-1.5 rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
         <nav className="flex items-center gap-1 overflow-x-auto no-scrollbar scroll-smooth py-0.5 px-0.5">
           {[
-            { id: 'overview', label: 'Overview', icon: Trophy },
-            { id: 'tasks', label: 'My Assigned Workload', icon: UserCheck },
-            { id: 'exams', label: 'Exams & Mapping', icon: Layers, permission: 'results.publish' },
-            { id: 'marks', label: 'CBSE Marks Entry', icon: ClipboardList },
-            { id: 'results', label: 'Result Processing & Publish', icon: Award, permission: 'results.publish' },
-            { id: 'reports', label: 'Report Cards Hub', icon: FileText },
-            { id: 'schedule', label: 'Schedule & Admit Cards', icon: Calendar },
+            { id: 'dashboard', label: 'Dashboard', icon: Trophy },
+            { id: 'exams', label: 'Exams & Assessments', icon: Layers, permission: 'results.publish' },
+            { id: 'schedule', label: 'Exam Schedule', icon: Calendar },
+            { id: 'admit-cards', label: 'Admit Cards', icon: IdCard },
+            { id: 'seating-plan', label: 'Seating Plan', icon: Sparkles },
+            { id: 'invigilation', label: 'Invigilation', icon: ShieldCheck },
+            { id: 'exam-attendance', label: 'Exam Attendance', icon: UserCheck },
+            { id: 'marks-entry', label: 'Marks Entry', icon: ClipboardList },
+            { id: 'marks-verification', label: 'Marks Verification', icon: CheckCircle2, permission: 'results.publish' },
+            { id: 'result-processing', label: 'Result Processing', icon: Award, permission: 'results.publish' },
+            { id: 'report-cards', label: 'Report Cards', icon: FileText },
+            { id: 'result-publishing', label: 'Result Publishing', icon: Send, permission: 'results.publish' },
             { id: 'analytics', label: 'Performance Analytics', icon: BarChart3 },
-            { id: 'config', label: 'Grading & Types', icon: Settings }
+            { id: 'settings', label: 'Examination Settings', icon: Settings, permission: 'results.publish' }
           ].filter(tab => !tab.permission || can(tab.permission)).map(tab => {
-            const isActive = currentTab === tab.id;
+            const isActive = currentTab === tab.id || (tab.id === 'dashboard' && currentTab === 'overview');
             return (
               <button
                 key={tab.id}
                 onClick={() => setTab(tab.id)}
                 className={cn(
-                  "flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer select-none",
+                  "flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer select-none",
                   isActive 
                     ? "bg-white text-slate-900 shadow-xs border border-slate-200/80" 
                     : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
@@ -650,280 +599,63 @@ export default function ExaminationModule({ view: propView }: ExaminationModuleP
           exit={{ opacity: 0, y: -4 }}
           transition={{ duration: 0.15 }}
         >
-          {/* TAB 0: OVERVIEW */}
-          {currentTab === 'overview' && (
-            <div className="space-y-5">
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                <AdminStatCard
-                  label="Configured Terms"
-                  value={exams.length}
-                  subtext={`Across ${classes.length} class grade levels`}
-                  icon={Layers}
-                  variant="violet"
-                />
-                <AdminStatCard
-                  label="Assigned Workloads"
-                  value={teacherTasks.length}
-                  subtext="Subject evaluation slots"
-                  icon={UserCheck}
-                  variant="primary"
-                />
-                <AdminStatCard
-                  label="Pending Verification"
-                  value={teacherTasks.filter(t => t.status === 'submitted').length}
-                  subtext="Submitted by teachers"
-                  icon={Clock}
-                  variant="amber"
-                />
-                <AdminStatCard
-                  label="Active Students"
-                  value={students.length}
-                  subtext="Eligible examination candidates"
-                  icon={Users}
-                  variant="emerald"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-                <div className="lg:col-span-2 bg-white border border-slate-200/60 rounded-[22px] p-5 shadow-2xs space-y-4">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                    <div>
-                      <h3 className="text-xs font-black uppercase text-slate-800 tracking-wider">Active Examination Terms</h3>
-                      <p className="text-slate-400 text-[10px]">Current academic session evaluations</p>
-                    </div>
-                    {can('results.publish') && (
-                      <button 
-                        onClick={() => setTab('exams')}
-                        className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1 cursor-pointer"
-                      >
-                        Manage Terms <ArrowRight size={12} />
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    {exams.slice(0, 5).map(ex => (
-                      <div key={ex.id} className="p-3 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 rounded-lg bg-blue-100/70 text-blue-700">
-                            <GraduationCap size={16} />
-                          </div>
-                          <div>
-                            <h4 className="text-xs font-extrabold text-slate-900">
-                              {ex.short_name || ex.exam_name}
-                            </h4>
-                            <p className="text-[10px] text-slate-400 font-semibold">
-                              {formatClassDisplay(ex.classes?.class_name || ex.class)} • {ex.academic_year}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => {
-                              setMarksTargetExamId(ex.id);
-                              if (ex.class_id) setMarksTargetClassId(ex.class_id);
-                              setTab('marks');
-                            }}
-                            className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-blue-50 text-blue-700 rounded-lg text-xs font-bold transition-colors cursor-pointer"
-                          >
-                            Enter Marks
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="bg-white border border-slate-200/60 rounded-[22px] p-5 shadow-2xs flex flex-col justify-between space-y-4">
-                  <div>
-                    <h3 className="text-xs font-black uppercase text-slate-800 tracking-wider mb-1">Examination Quick Actions</h3>
-                    <p className="text-slate-400 text-[10px] mb-3">Direct links to workflow modules</p>
-
-                    <div className="space-y-2">
-                      {[
-                        { label: 'My Assigned Workload', desc: 'Faculty marks evaluation tasks', tab: 'tasks', icon: UserCheck },
-                        { label: 'Result Processing Engine', desc: 'Compute totals, CBSE grades, ranks', tab: 'results', icon: Award },
-                        { label: 'Official Report Cards Hub', desc: 'St. Joseph\'s School report cards', tab: 'reports', icon: FileText },
-                        { label: 'CBSE Admit Cards Generator', desc: 'Entrance passes with datesheets', tab: 'schedule', sub: 'admitCard', icon: Calendar }
-                      ].map((action, i) => (
-                        <button
-                          key={i}
-                          onClick={() => {
-                            if (action.sub) {
-                              setTab(action.tab, { sub: action.sub });
-                              setScheduleSubMode(action.sub as any);
-                            } else {
-                              setTab(action.tab);
-                            }
-                          }}
-                          className="w-full text-left p-2.5 rounded-xl border border-slate-100 hover:border-blue-200 hover:bg-blue-50/50 transition-all flex items-center justify-between group cursor-pointer"
-                        >
-                          <div className="flex items-center gap-2.5">
-                            <div className="p-1.5 rounded-lg bg-slate-100 text-slate-600 group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                              <action.icon size={13} />
-                            </div>
-                            <div>
-                              <strong className="block text-xs text-slate-800 group-hover:text-blue-700">{action.label}</strong>
-                              <span className="text-[9.5px] text-slate-400 font-medium">{action.desc}</span>
-                            </div>
-                          </div>
-                          <ChevronRight size={14} className="text-slate-300 group-hover:text-blue-600 transition-colors" />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl text-[10px] text-blue-800 font-medium">
-                    <strong>St. Joseph's School Standard:</strong> Periodic Assessments scale independently (e.g. 20M) without mixing Annual 80M columns.
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 1: TEACHER WORKLOAD TASKS */}
-          {currentTab === 'tasks' && (
-            <TeacherTasksView 
-              tasks={teacherTasks}
-              teachers={teachers}
-              currentUserRole={role || 'admin'}
-              currentUserId={user?.id}
-              onOpenMarksEntry={handleOpenMarksFromTask}
-              onRefreshTasks={fetchBaselineData}
+          {/* TAB 1: DASHBOARD / OVERVIEW */}
+          {(currentTab === 'dashboard' || currentTab === 'overview') && (
+            <DashboardView
+              academicYears={academicYears}
+              selectedYearId={academicYears.find(y => y.is_current)?.id || academicYears[0]?.id || '2026-27'}
+              onNavigateTab={(targetTab, extra) => setTab(targetTab, extra)}
             />
           )}
 
-          {/* TAB 2: EXAMS & SUBJECT CONFIGURATION MASTER */}
+          {/* TAB 2: EXAMS & ASSESSMENTS */}
           {currentTab === 'exams' && (
-            <div className="space-y-4">
-              <div className="bg-white border border-slate-200/80 shadow-2xs rounded-2xl overflow-hidden">
-                <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-bold font-sans text-slate-900 tracking-tight">Active Assessment Terms &amp; Subject Schemes</h3>
-                    <p className="text-slate-500 text-xs mt-0.5">Configure exam types, maximum marks, pass criteria, and evaluator assignments</p>
-                  </div>
-                  <span className="text-xs font-mono font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-100">
-                    {exams.length} Terms Active
-                  </span>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-100 bg-slate-50/70 text-xs font-semibold text-slate-500">
-                        <th className="py-3 px-5">Assessment Term</th>
-                        <th className="py-3 px-4 text-center">Class Scope</th>
-                        <th className="py-3 px-4 text-center">Session</th>
-                        <th className="py-3 px-4 text-center">Mapped Subjects &amp; Evaluators</th>
-                        <th className="py-3 px-4 text-center">Publication Status</th>
-                        <th className="py-3 px-4 text-right pr-5">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100/70 text-slate-700 font-semibold">
-                      {isLoading ? (
-                        <tr>
-                          <td colSpan={6} className="py-16 text-center text-slate-400 font-bold">
-                            <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-blue-600" />
-                            Loading examinations...
-                          </td>
-                        </tr>
-                      ) : exams.length === 0 ? (
-                        <tr>
-                          <td colSpan={6} className="py-16 text-center text-slate-400 font-bold">
-                            No examinations created yet. Click "Create Exam Term" above to add your first assessment.
-                          </td>
-                        </tr>
-                      ) : (
-                        exams.map(ex => {
-                          const mappedCount = ex.exam_subjects?.length || 0;
-                          return (
-                            <tr key={ex.id} className="hover:bg-slate-50/40 transition-colors">
-                              <td className="py-3 px-5 font-bold text-slate-900 flex items-center gap-2">
-                                <div className="p-1.5 rounded-lg bg-blue-50 text-blue-600">
-                                  <GraduationCap size={14} />
-                                </div>
-                                <div>
-                                  <span>{ex.short_name || ex.exam_name}</span>
-                                  {ex.short_name && ex.short_name !== ex.exam_name && (
-                                    <span className="text-[10px] text-slate-400 block font-normal">{ex.exam_name}</span>
-                                  )}
-                                </div>
-                              </td>
-                              <td className="py-3 px-4 text-center">
-                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">
-                                  {formatClassDisplay(ex.classes?.class_name || ex.class)}
-                                </span>
-                              </td>
-                              <td className="py-3 px-4 text-center font-mono font-bold text-slate-600">
-                                {ex.academic_year}
-                              </td>
-                              <td className="py-3 px-4 text-center">
-                                <button
-                                  onClick={() => handleOpenSubjectMapping(ex)}
-                                  className="px-2.5 py-1 rounded-lg bg-slate-50 hover:bg-blue-50 text-blue-700 border border-slate-200 hover:border-blue-200 text-[10.5px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 mx-auto"
-                                >
-                                  <UserCheck size={12} />
-                                  <span>{mappedCount > 0 ? `${mappedCount} Subjects Configured` : 'Configure Subjects'}</span>
-                                </button>
-                              </td>
-                              <td className="py-3 px-4 text-center">
-                                <span className={cn(
-                                  "px-2.5 py-0.5 rounded-md text-[10px] font-bold border",
-                                  ex.is_published ? "bg-teal-50 text-teal-700 border-teal-200" : "bg-slate-100 text-slate-600 border-slate-200"
-                                )}>
-                                  {ex.is_published ? 'Published' : 'Draft'}
-                                </span>
-                              </td>
-                              <td className="py-3 px-4 text-right pr-5">
-                                <div className="flex items-center justify-end gap-1">
-                                  <button
-                                    onClick={() => {
-                                      setEditingExamId(ex.id);
-                                      setExamFormData({
-                                        exam_name: ex.exam_name,
-                                        short_name: ex.short_name || '',
-                                        exam_type: ex.exam_type || 'Periodic Assessment',
-                                        class_ids: [ex.class_id],
-                                        academic_year: ex.academic_year,
-                                        academic_year_id: ex.academic_year_id,
-                                        description: ex.description || '',
-                                        start_date: ex.start_date || '',
-                                        end_date: ex.end_date || '',
-                                        marks_entry_start_date: ex.marks_entry_start_date || '',
-                                        marks_entry_deadline: ex.marks_entry_deadline || '',
-                                        result_publish_date: ex.result_publish_date || '',
-                                        instructions: ex.instructions || ''
-                                      });
-                                      setShowExamModal(true);
-                                    }}
-                                    className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                                    title="Edit Exam Term"
-                                  >
-                                    <Edit2 size={13} />
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteExam(ex.id)}
-                                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                                    title="Delete Exam"
-                                  >
-                                    <Trash2 size={13} />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
+            <ExamsView
+              academicYears={academicYears}
+              classes={classes}
+              subjects={subjects}
+              teachers={teachers}
+              selectedYearId={academicYears.find(y => y.is_current)?.id || academicYears[0]?.id || '2026-27'}
+              onNavigateTab={(targetTab, extra) => setTab(targetTab, extra)}
+            />
           )}
 
-          {/* TAB 3: CBSE MARKS ENTRY */}
-          {currentTab === 'marks' && (
+          {/* TAB 3: EXAM SCHEDULE / DATESHEETS */}
+          {currentTab === 'schedule' && (
+            <DatesheetsView />
+          )}
+
+          {/* TAB 4: ADMIT CARDS */}
+          {currentTab === 'admit-cards' && (
+            <AdmitCardsView />
+          )}
+
+          {/* TAB 5: SEATING PLAN */}
+          {currentTab === 'seating-plan' && (
+            <SeatingPlanView />
+          )}
+
+          {/* TAB 6: INVIGILATION DUTIES */}
+          {currentTab === 'invigilation' && (
+            <InvigilationView
+              exams={exams}
+              teachers={teachers}
+              selectedYearId={academicYears.find(y => y.is_current)?.id || academicYears[0]?.id || '2026-27'}
+            />
+          )}
+
+          {/* TAB 7: EXAM ATTENDANCE REGISTER */}
+          {currentTab === 'exam-attendance' && (
+            <ExamAttendanceView
+              exams={exams}
+              classes={classes}
+              subjects={subjects}
+              selectedYearId={academicYears.find(y => y.is_current)?.id || academicYears[0]?.id || '2026-27'}
+            />
+          )}
+
+          {/* TAB 8: MARKS ENTRY */}
+          {currentTab === 'marks-entry' && (
             <ResultsView 
               exams={exams}
               subjects={subjects}
@@ -937,8 +669,19 @@ export default function ExaminationModule({ view: propView }: ExaminationModuleP
             />
           )}
 
-          {/* TAB 4: RESULT PROCESSING & PUBLICATION */}
-          {currentTab === 'results' && (
+          {/* TAB 9: MARKS VERIFICATION & MODERATION */}
+          {currentTab === 'marks-verification' && (
+            <MarksVerificationView
+              exams={exams}
+              classes={classes}
+              subjects={subjects}
+              selectedYearId={academicYears.find(y => y.is_current)?.id || academicYears[0]?.id || '2026-27'}
+              onNavigateTab={(targetTab, extra) => setTab(targetTab, extra)}
+            />
+          )}
+
+          {/* TAB 10: RESULT PROCESSING ENGINE */}
+          {currentTab === 'result-processing' && (
             <ResultProcessingView 
               exams={exams}
               classes={classes}
@@ -949,8 +692,8 @@ export default function ExaminationModule({ view: propView }: ExaminationModuleP
             />
           )}
 
-          {/* TAB 5: REPORT CARDS HUB */}
-          {currentTab === 'reports' && (
+          {/* TAB 11: REPORT CARDS HUB */}
+          {currentTab === 'report-cards' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between bg-white p-3 rounded-2xl border border-slate-200/60 shadow-2xs">
                 <div className="flex items-center gap-1">
@@ -961,7 +704,7 @@ export default function ExaminationModule({ view: propView }: ExaminationModuleP
                       reportSubMode === 'final' ? "bg-blue-600 text-white shadow-xs" : "text-slate-600 hover:bg-slate-50"
                     )}
                   >
-                    Official St. Joseph's Annual Report Card
+                    Official CBSE Annual Report Card
                   </button>
                   <button
                     onClick={() => setReportSubMode('coscholastic')}
@@ -979,46 +722,36 @@ export default function ExaminationModule({ view: propView }: ExaminationModuleP
             </div>
           )}
 
-          {/* TAB 6: SCHEDULE & ADMIT CARDS */}
-          {currentTab === 'schedule' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between bg-white p-3 rounded-2xl border border-slate-200/60 shadow-2xs">
-                <div className="flex items-center gap-1">
-                  {can('results.publish') && (
-                    <button
-                      onClick={() => setScheduleSubMode('datesheet')}
-                      className={cn(
-                        "px-4 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer",
-                        scheduleSubMode === 'datesheet' ? "bg-blue-600 text-white shadow-xs" : "text-slate-600 hover:bg-slate-50"
-                      )}
-                    >
-                      Examination Datesheets &amp; Venues
-                    </button>
-                  )}
-                  <button
-                    onClick={() => setScheduleSubMode('admitCard')}
-                    className={cn(
-                      "px-4 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer",
-                      scheduleSubMode === 'admitCard' ? "bg-blue-600 text-white shadow-xs" : "text-slate-600 hover:bg-slate-50"
-                    )}
-                  >
-                    CBSE Admit Cards &amp; Hall Tickets
-                  </button>
-                </div>
-              </div>
-
-              {scheduleSubMode === 'datesheet' && can('results.publish') ? <DatesheetsView /> : <AdmitCardsView />}
-            </div>
+          {/* TAB 12: RESULT PUBLISHING */}
+          {currentTab === 'result-publishing' && (
+            <ResultPublishingView
+              exams={exams}
+              classes={classes}
+              selectedYearId={academicYears.find(y => y.is_current)?.id || academicYears[0]?.id || '2026-27'}
+              onNavigateTab={(targetTab, extra) => setTab(targetTab, extra)}
+            />
           )}
 
-          {/* TAB 7: PERFORMANCE ANALYTICS */}
+          {/* TAB 13: PERFORMANCE ANALYTICS */}
           {currentTab === 'analytics' && (
             <AnalyticsView />
           )}
 
-          {/* TAB 8: CONFIG & RULES */}
-          {currentTab === 'config' && (
+          {/* TAB 14: EXAMINATION SETTINGS & RULES */}
+          {(currentTab === 'settings' || currentTab === 'config') && (
             <ConfigView />
+          )}
+
+          {/* BONUS: TEACHER WORKLOAD DIRECT TAB */}
+          {currentTab === 'tasks' && (
+            <TeacherTasksView 
+              tasks={teacherTasks}
+              teachers={teachers}
+              currentUserRole={role || 'admin'}
+              currentUserId={user?.id}
+              onOpenMarksEntry={handleOpenMarksFromTask}
+              onRefreshTasks={fetchBaselineData}
+            />
           )}
         </motion.div>
       </AnimatePresence>

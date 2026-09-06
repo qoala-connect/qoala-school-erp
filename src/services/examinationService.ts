@@ -118,6 +118,13 @@ export interface StudentMarkEntry {
   };
 }
 
+/** Outcome of a publish/unpublish run, so callers can report what really changed. */
+export interface PublishOutcome {
+  success: boolean;
+  affected: number;
+  message: string;
+}
+
 export interface StudentExamResult {
   id: string;
   exam_id: string;
@@ -175,6 +182,28 @@ class ExaminationService {
     } catch (err) {
       console.warn('[ExaminationService] Audit log warning:', err);
     }
+  }
+
+  /**
+   * Run a PostgREST select in pages.
+   *
+   * Supabase caps an unranged select at 1000 rows and returns no error when it
+   * truncates, so any bulk read that can exceed that silently loses rows (the
+   * marks table alone is well past it). Every such read must go through here.
+   */
+  private async fetchAllPaged<T = any>(
+    build: () => any,
+    pageSize = 1000
+  ): Promise<T[]> {
+    const all: T[] = [];
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await build().range(from, from + pageSize - 1);
+      if (error) throw error;
+      const page = (data as T[]) || [];
+      all.push(...page);
+      if (page.length < pageSize) break;
+    }
+    return all;
   }
 
   /**
@@ -636,39 +665,49 @@ class ExaminationService {
 
     // Roster sizes and entered-marks progress used to be fetched per task —
     // two round trips each, so ~300+ requests and ~45s for a full board. Both
-    // are now resolved with a single bulk query apiece and grouped in memory.
+    // are now resolved with one paged bulk read apiece and grouped in memory.
+    // The paging is not optional: marks is already past PostgREST's 1000-row
+    // cap, and an unranged read would truncate it without raising an error.
     const examIds = [...new Set(tasks.map((t: any) => t.exam_id).filter(Boolean))];
     const classIds = [...new Set(tasks.map((t: any) => t.exams?.class_id).filter(Boolean))];
     const classNames = [...new Set(tasks.map((t: any) => t.exams?.class).filter(Boolean))];
 
-    const [studentsRes, marksRes] = await Promise.all([
+    const rosterFilter = [
+      classIds.length ? `class_id.in.(${classIds.join(',')})` : '',
+      classNames.length ? `class.in.(${classNames.map(c => `"${c}"`).join(',')})` : '',
+    ].filter(Boolean).join(',');
+
+    const [studentRows, markRows] = await Promise.all([
       classIds.length || classNames.length
-        ? supabase
-            .from('students')
-            .select('id, class_id, class')
-            .eq('status', 'active')
-            .or([
-              classIds.length ? `class_id.in.(${classIds.join(',')})` : '',
-              classNames.length ? `class.in.(${classNames.map(c => `"${c}"`).join(',')})` : '',
-            ].filter(Boolean).join(','))
-        : Promise.resolve({ data: [] as any[] }),
+        ? this.fetchAllPaged<any>(() =>
+            supabase
+              .from('students')
+              .select('id, class_id, class')
+              .eq('status', 'active')
+              .or(rosterFilter)
+              .order('id', { ascending: true })
+          )
+        : Promise.resolve([] as any[]),
       examIds.length
-        ? supabase
-            .from('marks')
-            .select('exam_id, subject_id, obtained_marks, attendance_status')
-            .in('exam_id', examIds)
-        : Promise.resolve({ data: [] as any[] }),
+        ? this.fetchAllPaged<any>(() =>
+            supabase
+              .from('marks')
+              .select('exam_id, subject_id, obtained_marks, attendance_status')
+              .in('exam_id', examIds)
+              .order('id', { ascending: true })
+          )
+        : Promise.resolve([] as any[]),
     ]);
 
     const countByClassId = new Map<string, number>();
     const countByClassName = new Map<string, number>();
-    for (const s of (studentsRes as any).data || []) {
+    for (const s of studentRows) {
       if (s.class_id) countByClassId.set(s.class_id, (countByClassId.get(s.class_id) || 0) + 1);
       if (s.class) countByClassName.set(s.class, (countByClassName.get(s.class) || 0) + 1);
     }
 
     const enteredByKey = new Map<string, number>();
-    for (const m of (marksRes as any).data || []) {
+    for (const m of markRows) {
       if (m.obtained_marks === null && m.attendance_status === 'Present') continue;
       const key = `${m.exam_id}::${m.subject_id}`;
       enteredByKey.set(key, (enteredByKey.get(key) || 0) + 1);
@@ -886,13 +925,19 @@ class ExaminationService {
       throw error;
     }
 
-    // Update exam_subjects review status to in_progress if still draft
-    await supabase
-      .from('exam_subjects')
-      .update({ review_status: 'in_progress' })
-      .eq('exam_id', examId)
-      .eq('subject_id', subjectId)
-      .eq('review_status', 'draft');
+    // Move the stream to in_progress. exam_subjects is writable only by the
+    // exam office, so a teacher's direct update here matched 0 rows and raised
+    // nothing — the stream silently stayed 'draft'. The definer RPC lets the
+    // assigned evaluator make this one forward transition.
+    const { error: progressErr } = await supabase.rpc('marks_stream_mark_in_progress', {
+      _exam_id: examId,
+      _subject_id: subjectId,
+    });
+    // Advisory only: the marks themselves are saved, so a failure here must not
+    // lose the teacher's work. Surfaced on submit, which does hard-fail.
+    if (progressErr) {
+      console.warn('[ExaminationService] could not flag stream in_progress:', progressErr.message);
+    }
 
     await this.logAudit('MARKS_SAVED', 'marks', `${examId}:${subjectId}`, null, { count: marksList.length });
 
@@ -906,33 +951,17 @@ class ExaminationService {
    * Teacher submits marks for Admin Review
    */
   async submitMarksForReview(examId: string, subjectId: string, userId?: string): Promise<void> {
-    const now = new Date().toISOString();
-
-    // 1. Mark exam_subjects as submitted
-    const { error: subErr } = await supabase
-      .from('exam_subjects')
-      .update({
-        review_status: 'submitted',
-        reviewed_at: null,
-        reopen_reason: null
-      })
-      .eq('exam_id', examId)
-      .eq('subject_id', subjectId);
-
-    if (subErr) throw subErr;
-
-    // 2. Mark student marks as submitted
-    const { error: markErr } = await supabase
-      .from('marks')
-      .update({
-        status: 'submitted',
-        updated_by: userId || null,
-        updated_at: now
-      })
-      .eq('exam_id', examId)
-      .eq('subject_id', subjectId);
-
-    if (markErr) throw markErr;
+    // One definer RPC flips exam_subjects.review_status and the marks rows
+    // together, and refuses anyone who is neither the assigned evaluator nor
+    // exam office, a locked stream, or a stream already past review. Done in
+    // the database because exam_subjects is not teacher-writable: the previous
+    // direct update matched 0 rows for a teacher and threw nothing, so their
+    // submission never reached the admin verification queue.
+    const { error } = await supabase.rpc('marks_stream_submit_for_review', {
+      _exam_id: examId,
+      _subject_id: subjectId,
+    });
+    if (error) throw new Error(error.message || 'Could not submit these marks for review.');
 
     await this.logAudit('MARKS_SUBMITTED', 'exam_subjects', `${examId}:${subjectId}`, null, { submitted_by: userId });
   }
@@ -1010,6 +1039,69 @@ class ExaminationService {
       .eq('subject_id', subjectId);
 
     await this.logAudit('MARKS_APPROVED', 'exam_subjects', `${examId}:${subjectId}`, null, { approved_by: adminId });
+  }
+
+  /**
+   * Approve several exam subjects in one pass.
+   *
+   * approveMarks() costs three round trips per subject, which is unusable for a
+   * board of 150+ streams. Updates are grouped by exam so each statement stays
+   * an exact (exam_id, subject_id) match rather than a cross product.
+   */
+  async approveMarksBulk(
+    targets: { examId: string; subjectId: string }[],
+    adminId?: string
+  ): Promise<{ approved: number; failed: { examId: string; subjectId: string; message: string }[] }> {
+    const now = new Date().toISOString();
+    const byExam = new Map<string, string[]>();
+    for (const t of targets) {
+      if (!t.examId || !t.subjectId) continue;
+      const list = byExam.get(t.examId) || [];
+      list.push(t.subjectId);
+      byExam.set(t.examId, list);
+    }
+
+    let approved = 0;
+    const failed: { examId: string; subjectId: string; message: string }[] = [];
+
+    for (const [examId, subjectIds] of byExam) {
+      try {
+        const { error: subErr } = await supabase
+          .from('exam_subjects')
+          .update({
+            review_status: 'approved',
+            reopen_reason: null,
+            reviewed_by: adminId || null,
+            reviewed_at: now
+          })
+          .eq('exam_id', examId)
+          .in('subject_id', subjectIds);
+
+        if (subErr) throw subErr;
+
+        const { error: markErr } = await supabase
+          .from('marks')
+          .update({ status: 'approved', updated_at: now })
+          .eq('exam_id', examId)
+          .in('subject_id', subjectIds);
+
+        if (markErr) throw markErr;
+
+        approved += subjectIds.length;
+      } catch (err: any) {
+        for (const subjectId of subjectIds) {
+          failed.push({ examId, subjectId, message: err?.message || 'Approval failed' });
+        }
+      }
+    }
+
+    await this.logAudit('MARKS_APPROVED_BULK', 'exam_subjects', undefined, null, {
+      approved_by: adminId,
+      approved_count: approved,
+      failed_count: failed.length
+    });
+
+    return { approved, failed };
   }
 
   /**
@@ -1135,31 +1227,35 @@ class ExaminationService {
       );
     }
 
-    // 3. Fetch active students in class
-    let studentQuery = supabase
-      .from('students')
-      .select('id, name, roll_number, admission_number, class, section, class_id, section_id')
-      .eq('status', 'active');
+    // 3. Fetch active students in class. Built as a factory so each page gets
+    // its own query builder rather than re-ranging a spent one.
+    const rosterClassId = classId && classId !== 'all' ? classId : exam.class_id;
+    const buildStudentQuery = () => {
+      let q = supabase
+        .from('students')
+        .select('id, name, roll_number, admission_number, class, section, class_id, section_id')
+        .eq('status', 'active')
+        .order('id', { ascending: true });
+      if (rosterClassId) q = q.eq('class_id', rosterClassId);
+      return q;
+    };
 
-    if (classId && classId !== 'all') {
-      studentQuery = studentQuery.eq('class_id', classId);
-    } else if (exam.class_id) {
-      studentQuery = studentQuery.eq('class_id', exam.class_id);
-    }
-
-    const { data: students, error: stdErr } = await studentQuery;
-    if (stdErr || !students || students.length === 0) {
+    const students = await this.fetchAllPaged<any>(buildStudentQuery);
+    if (!students.length) {
       throw new Error('No students found enrolled in this class.');
     }
 
     // 4. Fetch all marks for this exam
-    const { data: allMarks } = await supabase
-      .from('marks')
-      .select('*')
-      .eq('exam_id', examId);
+    const allMarks = await this.fetchAllPaged<any>(() =>
+      supabase
+        .from('marks')
+        .select('*')
+        .eq('exam_id', examId)
+        .order('id', { ascending: true })
+    );
 
     const marksByStudent = new Map<string, any[]>();
-    for (const m of allMarks || []) {
+    for (const m of allMarks) {
       const list = marksByStudent.get(m.student_id) || [];
       list.push(m);
       marksByStudent.set(m.student_id, list);
@@ -1288,7 +1384,11 @@ class ExaminationService {
   /**
    * Publish Examination Results
    */
-  async publishExamResults(examId: string, classId?: string, adminId?: string): Promise<void> {
+  async publishExamResults(
+    examId: string,
+    classId?: string,
+    adminId?: string
+  ): Promise<PublishOutcome> {
     const now = new Date().toISOString();
 
     // 1. Mark exam as published
@@ -1311,17 +1411,30 @@ class ExaminationService {
         published: true,
         published_at: now,
         published_by: adminId || null
-      })
+      }, { count: 'exact' })
       .eq('exam_id', examId);
 
     if (classId && classId !== 'all') {
       resQuery = resQuery.eq('class_id', classId);
     }
 
-    const { error: resErr } = await resQuery;
+    const { error: resErr, count } = await resQuery;
     if (resErr) throw resErr;
 
     await this.logAudit('RESULT_PUBLISHED', 'exams', examId, null, { published_by: adminId, class_id: classId });
+
+    const affected = count || 0;
+    if (affected === 0) {
+      // The exam flag alone publishes nothing students can read. Say so rather
+      // than reporting a success that left every report card invisible.
+      return {
+        success: false,
+        affected: 0,
+        message: 'No processed results exist for this exam yet — run Result Processing before publishing.'
+      };
+    }
+
+    return { success: true, affected, message: `Published ${affected} student result(s).` };
   }
 
   /**
@@ -1371,6 +1484,420 @@ class ExaminationService {
       marks: marksData
     };
   }
+
+  /**
+   * Save or update a CBSE Grading Rule
+   */
+  async saveGradingRule(payload: Partial<GradingRule>): Promise<GradingRule> {
+    if (payload.id) {
+      const { data, error } = await supabase
+        .from('grading_rules')
+        .update({
+          grade_name: payload.grade_name,
+          min_score: payload.min_score,
+          max_score: payload.max_score,
+          points: payload.points,
+          remarks: payload.remarks
+        })
+        .eq('id', payload.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      await this.logAudit('GRADING_RULE_UPDATED', 'grading_rules', data.id, null, data);
+      return data;
+    } else {
+      const { data, error } = await supabase
+        .from('grading_rules')
+        .insert({
+          grade_name: payload.grade_name,
+          min_score: payload.min_score,
+          max_score: payload.max_score,
+          points: payload.points,
+          remarks: payload.remarks
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      await this.logAudit('GRADING_RULE_CREATED', 'grading_rules', data.id, null, data);
+      return data;
+    }
+  }
+
+  /**
+   * Delete a Grading Rule
+   */
+  async deleteGradingRule(id: string): Promise<void> {
+    const { error } = await supabase.from('grading_rules').delete().eq('id', id);
+    if (error) throw error;
+    await this.logAudit('GRADING_RULE_DELETED', 'grading_rules', id);
+  }
+
+  /**
+   * Unpublish Results (reverts to result_processed for correction)
+   */
+  async unpublishExamResults(
+    examId: string,
+    classId?: string,
+    adminId?: string
+  ): Promise<PublishOutcome> {
+    const now = new Date().toISOString();
+
+    const { error: examErr } = await supabase
+      .from('exams')
+      .update({
+        is_published: false,
+        status: 'result_processed',
+        published_at: null,
+        published_by: null
+      })
+      .eq('id', examId);
+
+    if (examErr) throw examErr;
+
+    let resQuery = supabase
+      .from('exam_results')
+      .update({
+        published: false,
+        published_at: null,
+        published_by: null
+      }, { count: 'exact' })
+      .eq('exam_id', examId);
+
+    if (classId && classId !== 'all') {
+      resQuery = resQuery.eq('class_id', classId);
+    }
+
+    const { error: resErr, count } = await resQuery;
+    if (resErr) throw resErr;
+
+    await this.logAudit('RESULT_UNPUBLISHED', 'exams', examId, null, { unpublished_by: adminId, class_id: classId });
+
+    const affected = count || 0;
+    return {
+      success: true,
+      affected,
+      message: `Retracted ${affected} student result(s) to draft.`
+    };
+  }
+
+  /**
+   * Evaluate Student Eligibility for an examination
+   */
+  async getStudentEligibility(
+    examId: string,
+    classId?: string,
+    sectionId?: string
+  ): Promise<{
+    total: number;
+    eligibleCount: number;
+    ineligibleCount: number;
+    students: Array<{
+      id: string;
+      name: string;
+      roll_number: string;
+      admission_number: string;
+      class: string;
+      section: string;
+      photo_url?: string;
+      is_eligible: boolean;
+      reason: string;
+    }>;
+  }> {
+    // 1. Fetch Exam
+    const { data: exam } = await supabase
+      .from('exams')
+      .select('*, academic_years(*)')
+      .eq('id', examId)
+      .single();
+
+    const targetClassId = classId && classId !== 'all' ? classId : exam?.class_id;
+
+    // 2. Fetch all students in class
+    let query = supabase
+      .from('students')
+      .select('*')
+      .order('roll_number', { ascending: true });
+
+    if (targetClassId) {
+      query = query.eq('class_id', targetClassId);
+    }
+    if (sectionId && sectionId !== 'All') {
+      query = query.eq('section_id', sectionId);
+    }
+
+    const { data: stdList } = await query;
+
+    const evaluatedStudents = (stdList || []).map(s => {
+      const isActive = s.status === 'active';
+      let isEligible = true;
+      let reason = 'Active enrollment in class curriculum';
+
+      if (!isActive) {
+        isEligible = false;
+        reason = `Student account is ${s.status || 'inactive'}`;
+      }
+
+      return {
+        id: s.id,
+        name: s.name,
+        roll_number: s.roll_number || '—',
+        admission_number: s.admission_number || '—',
+        class: s.class,
+        section: s.section || 'A',
+        photo_url: s.photo_url,
+        is_eligible: isEligible,
+        reason: reason
+      };
+    });
+
+    const eligibleCount = evaluatedStudents.filter(s => s.is_eligible).length;
+
+    return {
+      total: evaluatedStudents.length,
+      eligibleCount,
+      ineligibleCount: evaluatedStudents.length - eligibleCount,
+      students: evaluatedStudents
+    };
+  }
+
+  /**
+   * Check for Exam Schedule Conflicts
+   */
+  async checkScheduleConflicts(params: {
+    examId: string;
+    classId?: string;
+    date: string;
+    startTime: string;
+    endTime: string;
+    invigilatorId?: string;
+    room?: string;
+    excludeSubjectId?: string;
+  }): Promise<{ hasConflict: boolean; conflicts: string[] }> {
+    const conflicts: string[] = [];
+
+    if (!params.date) return { hasConflict: false, conflicts: [] };
+
+    // Fetch existing scheduled exam subjects on the same date
+    const { data: existingSlots } = await supabase
+      .from('exam_subjects')
+      .select('id, exam_id, subject_name, exam_date, start_time, end_time, room, invigilator_id, class_id, exams:exam_id(class, class_id), teachers:invigilator_id(name)')
+      .eq('exam_date', params.date);
+
+    for (const slot of existingSlots || []) {
+      if (params.excludeSubjectId && slot.id === params.excludeSubjectId) continue;
+
+      // Check time overlap (e.g. 09:00 AM vs 09:00 AM)
+      const slotStart = (slot.start_time || '').trim().toLowerCase();
+      const paramStart = (params.startTime || '').trim().toLowerCase();
+      const timeClash = slotStart === paramStart;
+
+      if (timeClash) {
+        // 1. Class conflict: Same class cannot have 2 exams at the same time
+        const slotClassId = slot.class_id || (slot.exams as any)?.class_id;
+        if (params.classId && slotClassId && params.classId === slotClassId) {
+          conflicts.push(`Class already has an exam scheduled (${slot.subject_name}) on ${params.date} at ${slot.start_time}`);
+        }
+
+        // 2. Invigilator conflict: Same teacher cannot invigilate 2 rooms at the same time
+        if (params.invigilatorId && slot.invigilator_id && params.invigilatorId === slot.invigilator_id) {
+          const tName = (slot.teachers as any)?.name || 'Invigilator';
+          conflicts.push(`${tName} is already assigned as invigilator for ${slot.subject_name} in ${slot.room || 'another room'} at ${slot.start_time}`);
+        }
+
+        // 3. Room conflict: Same room cannot host 2 different exams at the same time unless combined
+        if (params.room && slot.room && params.room.trim().toLowerCase() === slot.room.trim().toLowerCase()) {
+          conflicts.push(`Room "${params.room}" is already allocated for ${slot.subject_name} at ${slot.start_time}`);
+        }
+      }
+    }
+
+    return {
+      hasConflict: conflicts.length > 0,
+      conflicts
+    };
+  }
+
+  /**
+   * Save Exam Attendance (Present, Absent, Medical, Exempted, Withheld)
+   */
+  async saveExamAttendance(
+    examId: string,
+    subjectId: string,
+    attendanceList: Array<{
+      student_id: string;
+      attendance_status: 'Present' | 'Absent' | 'Medical' | 'Exempted';
+      remarks?: string;
+    }>,
+    adminId?: string
+  ): Promise<void> {
+    const now = new Date().toISOString();
+
+    const upserts = attendanceList.map(item => {
+      const isAbsent = item.attendance_status === 'Absent';
+      const isMedical = item.attendance_status === 'Medical';
+      const isExempted = item.attendance_status === 'Exempted';
+
+      return {
+        exam_id: examId,
+        student_id: item.student_id,
+        subject_id: subjectId,
+        attendance_status: item.attendance_status,
+        is_absent: isAbsent,
+        is_medical: isMedical,
+        is_exempted: isExempted,
+        remarks: item.remarks || null,
+        entered_by: adminId || null,
+        updated_at: now
+      };
+    });
+
+    const { error } = await supabase
+      .from('marks')
+      .upsert(upserts, { onConflict: 'exam_id,student_id,subject_id' });
+
+    if (error) throw error;
+
+    await this.logAudit('EXAM_ATTENDANCE_MARKED', 'marks', `${examId}:${subjectId}`, null, {
+      marked_count: attendanceList.length,
+      marked_by: adminId
+    });
+  }
+
+  /**
+   * Fetch comprehensive Performance Analytics from live database
+   */
+  async getExamPerformanceAnalytics(filters?: {
+    academicYearId?: string;
+    examId?: string;
+    classId?: string;
+  }): Promise<{
+    totalExams: number;
+    upcomingExamsCount: number;
+    ongoingExamsCount: number;
+    completedExamsCount: number;
+    marksPendingCount: number;
+    resultsPendingCount: number;
+    publishedResultsCount: number;
+    totalCandidates: number;
+    classAverages: Array<{ className: string; average: number; count: number }>;
+    gradeDistribution: Record<string, number>;
+    passFailStats: { pass: number; compartment: number; fail: number; withheld: number };
+    topRankers: any[];
+    examTrends: Array<{ examName: string; average: number; passRate: number }>;
+  }> {
+    // 1. Fetch Exams
+    let examQuery = supabase.from('exams').select('*, classes:class_id(*)');
+    if (filters?.academicYearId && filters.academicYearId !== 'all') {
+      examQuery = examQuery.eq('academic_year_id', filters.academicYearId);
+    }
+    if (filters?.examId && filters.examId !== 'all') {
+      examQuery = examQuery.eq('id', filters.examId);
+    }
+    if (filters?.classId && filters.classId !== 'all') {
+      examQuery = examQuery.eq('class_id', filters.classId);
+    }
+
+    const { data: allExams } = await examQuery;
+    const examsList = allExams || [];
+
+    const examIds = examsList.map(e => e.id);
+
+    // 2. Fetch Exam Results
+    let resQuery = supabase
+      .from('exam_results')
+      .select('*, students:student_id(*), exams:exam_id(*)');
+
+    if (examIds.length > 0) {
+      resQuery = resQuery.in('exam_id', examIds);
+    }
+
+    const { data: allResults } = await resQuery;
+    const resultsList = allResults || [];
+
+    // 3. Aggregate KPIs
+    const today = new Date().toISOString().slice(0, 10);
+
+    const upcomingExamsCount = examsList.filter(e => e.start_date && e.start_date > today).length;
+    const ongoingExamsCount = examsList.filter(e => e.start_date && e.end_date && e.start_date <= today && e.end_date >= today).length;
+    const completedExamsCount = examsList.filter(e => e.status === 'published' || (e.end_date && e.end_date < today)).length;
+    const marksPendingCount = examsList.filter(e => e.status === 'draft' || e.status === 'scheduled' || e.status === 'marks_entry_open').length;
+    const resultsPendingCount = examsList.filter(e => e.status === 'review' || e.status === 'locked' || e.status === 'result_processed').length;
+    const publishedResultsCount = resultsList.filter(r => r.published).length;
+
+    // 4. Grade distribution
+    const gradeDistribution: Record<string, number> = {
+      'A1': 0, 'A2': 0, 'B1': 0, 'B2': 0, 'C1': 0, 'C2': 0, 'D': 0, 'E': 0
+    };
+
+    const passFailStats = { pass: 0, compartment: 0, fail: 0, withheld: 0 };
+
+    const classScoreMap = new Map<string, { totalPct: number; count: number }>();
+
+    for (const r of resultsList) {
+      if (r.grade && gradeDistribution[r.grade] !== undefined) {
+        gradeDistribution[r.grade]++;
+      }
+      const st = (r.result_status || 'PASS').toUpperCase();
+      if (st === 'PASS') passFailStats.pass++;
+      else if (st === 'COMPARTMENT') passFailStats.compartment++;
+      else if (st === 'FAIL') passFailStats.fail++;
+      else passFailStats.withheld++;
+
+      const cName = r.students?.class || 'Class';
+      const entry = classScoreMap.get(cName) || { totalPct: 0, count: 0 };
+      entry.totalPct += Number(r.percentage || 0);
+      entry.count++;
+      classScoreMap.set(cName, entry);
+    }
+
+    const classAverages = Array.from(classScoreMap.entries()).map(([className, val]) => ({
+      className,
+      average: val.count > 0 ? Math.round((val.totalPct / val.count) * 10) / 10 : 0,
+      count: val.count
+    })).sort((a, b) => a.className.localeCompare(b.className, undefined, { numeric: true }));
+
+    // Top Rankers
+    const topRankers = [...resultsList]
+      .filter(r => r.percentage > 0)
+      .sort((a, b) => Number(b.percentage) - Number(a.percentage))
+      .slice(0, 10);
+
+    // Multi-term progression trends
+    const examMap = new Map<string, { examName: string; totalPct: number; passCount: number; totalCount: number }>();
+    for (const r of resultsList) {
+      const eName = r.exams?.exam_name || 'Exam';
+      const cur = examMap.get(eName) || { examName: eName, totalPct: 0, passCount: 0, totalCount: 0 };
+      cur.totalPct += Number(r.percentage || 0);
+      if (r.result_status === 'PASS') cur.passCount++;
+      cur.totalCount++;
+      examMap.set(eName, cur);
+    }
+
+    const examTrends = Array.from(examMap.values()).map(e => ({
+      examName: e.examName,
+      average: e.totalCount > 0 ? Math.round((e.totalPct / e.totalCount) * 10) / 10 : 0,
+      passRate: e.totalCount > 0 ? Math.round((e.passCount / e.totalCount) * 100) : 0
+    }));
+
+    return {
+      totalExams: examsList.length,
+      upcomingExamsCount,
+      ongoingExamsCount,
+      completedExamsCount,
+      marksPendingCount,
+      resultsPendingCount,
+      publishedResultsCount,
+      totalCandidates: resultsList.length,
+      classAverages,
+      gradeDistribution,
+      passFailStats,
+      topRankers,
+      examTrends
+    };
+  }
 }
 
 export const examinationService = new ExaminationService();
+

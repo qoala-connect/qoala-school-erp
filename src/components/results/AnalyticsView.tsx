@@ -26,6 +26,7 @@ import {
 } from 'recharts';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { printRegion } from '@/lib/printRegion';
 import { supabase } from '@/lib/supabase';
 import { isSameClass, formatClassDisplay, calculateCBSEGrade } from '@/lib/cbseExamUtils';
 
@@ -37,10 +38,11 @@ export default function AnalyticsView() {
   const [selectedClass, setSelectedClass] = useState<string>('All');
   
   // Data State
+  const [subjects, setSubjects] = useState<any[]>([]);
+  const [students, setStudents] = useState<any[]>([]);
+  const [classesList, setClassesList] = useState<any[]>([]);
   const [marks, setMarks] = useState<any[]>([]);
   const [results, setResults] = useState<any[]>([]);
-  const [students, setStudents] = useState<any[]>([]);
-  const [subjects, setSubjects] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -50,16 +52,18 @@ export default function AnalyticsView() {
   const fetchAnalyticsData = async () => {
     setIsLoading(true);
     try {
-      const [examsRes, subjectsRes, studentsRes] = await Promise.all([
+      const [examsRes, subjectsRes, studentsRes, classesRes] = await Promise.all([
         supabase.from('exams').select('*').order('created_at', { ascending: false }),
         supabase.from('subjects').select('*'),
-        supabase.from('students').select('*').eq('status', 'active')
+        supabase.from('students').select('*').eq('status', 'active'),
+        supabase.from('classes').select('*').order('display_order', { ascending: true })
       ]);
 
       const examList = examsRes.data || [];
       setExams(examList);
       setSubjects(subjectsRes.data || []);
       setStudents(studentsRes.data || []);
+      setClassesList(classesRes.data || []);
 
       if (examList.length > 0 && !selectedExamId) {
         setSelectedExamId(examList[0].id);
@@ -168,9 +172,9 @@ export default function AnalyticsView() {
   }, [activeStudents, marks, results, subjects]);
 
   return (
-    <div className="space-y-5">
+    <div id="exam-analytics-print" className="space-y-5">
       {/* 1. Header Filter Controls */}
-      <div className="bg-white rounded-[20px] border border-slate-200/60 p-4 shadow-2xs flex flex-wrap items-center justify-between gap-3">
+      <div data-print-hide className="bg-white rounded-[20px] border border-slate-200/60 p-4 shadow-2xs flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2.5">
           {/* Class Filter */}
           <div className="flex flex-col min-w-[120px]">
@@ -181,9 +185,15 @@ export default function AnalyticsView() {
               className="bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs font-bold text-slate-700 outline-none h-[36px] cursor-pointer focus:border-violet-500 focus:bg-white"
             >
               <option value="All">All Classes</option>
-              {['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'].map(c => (
-                <option key={c} value={c}>{formatClassDisplay(c)}</option>
-              ))}
+              {classesList.length > 0 ? (
+                classesList.map(c => (
+                  <option key={c.id} value={c.class_name}>{formatClassDisplay(c.class_name)}</option>
+                ))
+              ) : (
+                ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', 'LKG'].map(c => (
+                  <option key={c} value={c}>{formatClassDisplay(c)}</option>
+                ))
+              )}
             </select>
           </div>
 
@@ -204,8 +214,8 @@ export default function AnalyticsView() {
 
         <button 
           onClick={() => {
-            window.print();
-            toast.success('Printing Examination Performance Report');
+            const ok = printRegion('exam-analytics-print', 'Examination Performance Report');
+            if (!ok) toast.error('Could not open the performance report for printing.');
           }}
           className="flex items-center gap-1.5 px-4 h-[36px] border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
         >

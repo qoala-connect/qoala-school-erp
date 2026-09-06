@@ -27,6 +27,7 @@ import {
 import { QRCodeSVG } from 'qrcode.react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { printRegion } from '@/lib/printRegion';
 import { supabase } from '@/lib/supabase';
 import { jsPDF } from 'jspdf';
 import html2canvasSafe from '@/lib/html2canvasSafe';
@@ -65,6 +66,7 @@ export default function AdmitCardsView() {
   const [students, setStudents] = useState<any[]>([]);
   const [exams, setExams] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
+  const [classesList, setClassesList] = useState<any[]>([]);
   const [examSubjects, setExamSubjects] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -75,11 +77,12 @@ export default function AdmitCardsView() {
   const fetchInitialData = async () => {
     setIsLoading(true);
     try {
-      const [examsRes, subjectsRes, studentsRes, esRes] = await Promise.all([
+      const [examsRes, subjectsRes, studentsRes, esRes, classesRes] = await Promise.all([
         supabase.from('exams').select('*').order('created_at', { ascending: false }),
         supabase.from('subjects').select('*').order('subject_name'),
         supabase.from('students').select('*').eq('status', 'active').order('roll_number', { ascending: true }),
-        supabase.from('exam_subjects').select('*')
+        supabase.from('exam_subjects').select('*'),
+        supabase.from('classes').select('*').order('display_order', { ascending: true })
       ]);
 
       const examData = examsRes.data || [];
@@ -88,6 +91,7 @@ export default function AdmitCardsView() {
       setSubjects(subjectsRes.data || []);
       setStudents(studentData);
       setExamSubjects(esRes.data || []);
+      setClassesList(classesRes.data || []);
 
       if (examData.length > 0 && !selectedExamId) {
         setSelectedExamId(examData[0].id);
@@ -333,9 +337,15 @@ export default function AdmitCardsView() {
                 className="bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs font-bold text-slate-700 outline-none h-[36px] cursor-pointer focus:border-blue-500 focus:bg-white"
               >
                 <option value="All">All Classes</option>
-                {['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'].map(c => (
-                  <option key={c} value={c}>{formatClassDisplay(c)}</option>
-                ))}
+                {classesList.length > 0 ? (
+                  classesList.map(c => (
+                    <option key={c.id} value={c.class_name}>{formatClassDisplay(c.class_name)}</option>
+                  ))
+                ) : (
+                  ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', 'LKG'].map(c => (
+                    <option key={c} value={c}>{formatClassDisplay(c)}</option>
+                  ))
+                )}
               </select>
             </div>
 
@@ -539,7 +549,7 @@ export default function AdmitCardsView() {
                               onClick={() => {
                                 setSelectedStudentId(st.id);
                                 setViewMode('preview');
-                                setTimeout(() => window.print(), 200);
+                                setTimeout(() => printRegion('admit-card-print', 'Admit Card'), 200);
                               }}
                               className="px-2 py-1 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-[11px] font-bold transition-colors inline-flex items-center gap-1 cursor-pointer"
                               title="Print A4 Admit Card"
@@ -622,8 +632,8 @@ export default function AdmitCardsView() {
               
               <button 
                 onClick={() => {
-                  window.print();
-                  toast.success(`Printing Admit Card for ${activeStudent?.name}`);
+                  const ok = printRegion('admit-card-print', `Admit Card — ${activeStudent?.name || 'Student'}`);
+                  if (!ok) toast.error('Open a student admit card before printing.');
                 }}
                 className="flex items-center gap-1.5 px-3.5 h-[34px] bg-slate-900 hover:bg-slate-950 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
               >
@@ -636,6 +646,7 @@ export default function AdmitCardsView() {
           <div className="max-w-4xl mx-auto bg-slate-100 p-4 sm:p-8 rounded-[28px] border border-slate-200/50 overflow-auto flex justify-center">
             <div 
               ref={cardRef}
+              id="admit-card-print"
               style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}
               className="transition-transform duration-200 relative w-[210mm] min-h-[285mm] bg-white border-2 border-slate-900 p-[10mm] text-slate-900 shadow-xl font-sans"
             >

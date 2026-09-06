@@ -61,7 +61,10 @@ export default function LessonPlansView({
   const save = async () => {
     if (!form?.topic?.trim()) { toast.error('Give the lesson a topic.'); return; }
     if (!form.class_id) { toast.error('Choose a class.'); return; }
-    const sc = scope.find(s => s.class_id === form.class_id && (!form.section_id || s.section_id === form.section_id));
+    // A blank select is "", not a uuid — fall back to the teacher's first
+    // scope row for the class rather than sending it to Postgres.
+    const sectionId = form.section_id || null;
+    const sc = scope.find(s => s.class_id === form.class_id && (!sectionId || s.section_id === sectionId));
     setBusy(true);
     try {
       await saveLessonPlan({
@@ -69,8 +72,8 @@ export default function LessonPlansView({
         teacher_id: teacherId,
         class_id: form.class_id!,
         class_name: sc?.class_name ?? null,
-        section_id: form.section_id ?? sc?.section_id ?? null,
-        subject_id: form.subject_id ?? sc?.subject_id ?? null,
+        section_id: sectionId ?? sc?.section_id ?? null,
+        subject_id: (form.subject_id || null) ?? sc?.subject_id ?? null,
         subject_name: sc?.subject_name ?? null,
         academic_year_id: academicYearId,
         topic: form.topic!,

@@ -60,6 +60,11 @@ export default function ResultProcessingView({
     warnings: string[];
   } | null>(null);
 
+  // Subject ids of the selected exam that actually carry marks. Approving a
+  // subject with no marks would still add its max to every student's total in
+  // processClassResults, silently deflating percentages — so it is not offered.
+  const [subjectsWithMarks, setSubjectsWithMarks] = useState<Set<string>>(new Set());
+
   // Results list state
   const [examResultsList, setExamResultsList] = useState<StudentExamResult[]>([]);
   const [isLoadingResults, setIsLoadingResults] = useState<boolean>(false);
@@ -100,9 +105,35 @@ export default function ResultProcessingView({
     }
   };
 
+  const loadSubjectsWithMarks = async () => {
+    if (!selectedExamId) {
+      setSubjectsWithMarks(new Set());
+      return;
+    }
+    try {
+      const { data, error } = await supabase
+        .from('marks')
+        .select('subject_id, obtained_marks, attendance_status')
+        .eq('exam_id', selectedExamId);
+
+      if (error) throw error;
+
+      const withMarks = new Set<string>();
+      for (const m of data || []) {
+        if (m.obtained_marks === null && m.attendance_status === 'Present') continue;
+        if (m.subject_id) withMarks.add(m.subject_id);
+      }
+      setSubjectsWithMarks(withMarks);
+    } catch (err) {
+      console.warn('[ResultProcessingView] subjects-with-marks warn:', err);
+      setSubjectsWithMarks(new Set());
+    }
+  };
+
   useEffect(() => {
     if (selectedExamId) {
       loadExamResults();
+      loadSubjectsWithMarks();
     }
   }, [selectedExamId]);
 
@@ -124,11 +155,27 @@ export default function ResultProcessingView({
     return { total, pending, submitted, returned, approved, locked };
   }, [examSubjectsList]);
 
+  // Mirrors MarksVerificationView: a stream is approvable once it carries
+  // marks, whether or not the teacher formally submitted it.
+  const isApprovableSubject = (sub: any) => {
+    if (sub.locked || sub.review_status === 'approved' || sub.review_status === 'locked') return false;
+    return sub.review_status === 'submitted' || subjectsWithMarks.has(sub.subject_id);
+  };
+
   // Handle Approve Subject Marks
   const handleApproveSubject = async (subject: any) => {
+    if (subject.review_status !== 'submitted') {
+      const ok = window.confirm(
+        `${subject.subject_name} was never formally submitted by its teacher. ` +
+        `Approve the entered marks as they stand?`
+      );
+      if (!ok) return;
+    }
+
     try {
       await examinationService.approveMarks(selectedExamId, subject.subject_id || subject.id, currentUserId);
       toast.success(`Marks for ${subject.subject_name} approved successfully.`);
+      await loadSubjectsWithMarks();
       onRefreshData?.();
     } catch (err: any) {
       toast.error('Approval failed: ' + (err.message || 'Error'));
@@ -504,6 +551,7 @@ export default function ResultProcessingView({
                     const isSubLocked = sub.locked || sub.review_status === 'locked';
                     const isSubApproved = sub.review_status === 'approved';
                     const isSubSubmitted = sub.review_status === 'submitted';
+                    const canApproveSub = isApprovableSubject(sub);
 
                     return (
                       <tr key={sub.id} className="hover:bg-slate-50/60 transition-colors">
@@ -548,20 +596,28 @@ export default function ResultProcessingView({
                             </button>
 
                             {/* Actions mirror the server-side state machine:
-                                submitted -> approve | return
-                                approved  -> lock | return
-                                locked    -> unlock
-                                Anything still with the teacher offers no action. */}
-                            {isSubSubmitted && (
+                                has marks (submitted or not) -> approve | return
+                                approved                     -> lock | return
+                                locked                       -> unlock
+                                A subject with no marks at all offers no action. */}
+                            {canApproveSub && (
                               <button
                                 onClick={() => handleApproveSubject(sub)}
-                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-xs"
+                                title={isSubSubmitted
+                                  ? 'Approve the marks submitted by the teacher'
+                                  : 'Not submitted by the teacher — approving accepts the entered marks as-is'}
+                                className={cn(
+                                  "px-2.5 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-xs",
+                                  isSubSubmitted
+                                    ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                                    : "bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300"
+                                )}
                               >
-                                Approve
+                                {isSubSubmitted ? 'Approve' : 'Approve (unsubmitted)'}
                               </button>
                             )}
 
-                            {(isSubSubmitted || isSubApproved) && !isSubLocked && (
+                            {(canApproveSub || isSubApproved) && !isSubLocked && (
                               <button
                                 onClick={() => {
                                   setReturnModalSubject(sub);
@@ -573,9 +629,9 @@ export default function ResultProcessingView({
                               </button>
                             )}
 
-                            {!isSubSubmitted && !isSubApproved && !isSubLocked && (
+                            {!canApproveSub && !isSubApproved && !isSubLocked && (
                               <span className="px-2 py-1 text-[11px] font-semibold text-slate-400 italic">
-                                Awaiting teacher submission
+                                No marks entered yet
                               </span>
                             )}
 

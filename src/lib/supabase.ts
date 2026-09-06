@@ -105,6 +105,89 @@ async function diagnoseBlock(url: string, headers: HeadersInit | undefined, meth
     + `there); if it works, disable your extensions for this site.`;
 }
 
+/**
+ * Re-sends a blocked UPDATE/DELETE as a POST to the rest_write() function.
+ *
+ * When a network filters out PATCH and DELETE, the request never reaches the
+ * server and there is nothing to fix server-side. POST does get through, so
+ * the same write is expressed as an RPC. rest_write is SECURITY INVOKER, so
+ * row level security applies exactly as it would to the PATCH -- this changes
+ * the transport, never the caller's authority.
+ *
+ * Only plain `column=eq.value` filters are translated. Anything else returns
+ * null and the original network error stands, rather than guessing at a
+ * different set of rows than the caller asked for.
+ */
+async function writeViaRpc(url: string, init: RequestInit | undefined, method: string): Promise<Response | null> {
+  let parsed: URL;
+  try { parsed = new URL(url); } catch { return null; }
+
+  const m = parsed.pathname.match(/\/rest\/v1\/([A-Za-z0-9_]+)$/);
+  if (!m) return null;
+  const table = m[1];
+  if (table === 'rpc') return null;
+
+  const match: Record<string, string> = {};
+  let wantsRepresentation = false;
+  for (const [key, value] of parsed.searchParams.entries()) {
+    if (key === 'select') { wantsRepresentation = true; continue; }
+    if (key === 'order' || key === 'limit' || key === 'offset') continue;
+    if (!value.startsWith('eq.')) return null;      // unsupported operator
+    match[key] = value.slice(3);
+  }
+  if (Object.keys(match).length === 0) return null;  // never rewrite an unfiltered write
+
+  const headers = new Headers(init?.headers as HeadersInit);
+  if ((headers.get('Prefer') || '').includes('return=representation')) wantsRepresentation = true;
+  const wantsSingle = (headers.get('Accept') || '').includes('vnd.pgrst.object+json');
+
+  let patch: unknown = {};
+  if (method === 'PATCH') {
+    try { patch = JSON.parse(String(init?.body ?? '{}')); } catch { return null; }
+  }
+
+  headers.set('Content-Type', 'application/json');
+  headers.set('Accept', 'application/json');
+  headers.delete('Prefer');
+
+  const res = await fetch(`${parsed.origin}/rest/v1/rpc/rest_write`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      _table: table,
+      _op: method === 'DELETE' ? 'delete' : 'update',
+      _match: match,
+      _patch: patch,
+    }),
+  });
+
+  if (!res.ok) return res;                           // let the caller surface the real error
+
+  const rows = await res.json().catch(() => []);
+  const list = Array.isArray(rows) ? rows : [];
+
+  const reply = (body: string | null, status: number) =>
+    new Response(body, {
+      status,
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+  if (wantsSingle) {
+    if (list.length !== 1) {
+      // Same shape PostgREST uses when .single() does not match exactly one row.
+      return reply(JSON.stringify({
+        code: 'PGRST116',
+        message: `JSON object requested, multiple (or no) rows returned`,
+        details: `Results contain ${list.length} rows`,
+        hint: null,
+      }), 406);
+    }
+    return reply(JSON.stringify(list[0]), 200);
+  }
+  if (wantsRepresentation) return reply(JSON.stringify(list), 200);
+  return reply(null, 204);
+}
+
 const resilientFetch: typeof fetch = async (input, init) => {
   const method = (init?.method ?? 'GET').toUpperCase();
   const attempts = IDEMPOTENT.has(method) ? 3 : 1;
@@ -126,6 +209,14 @@ const resilientFetch: typeof fetch = async (input, init) => {
   const url = typeof input === 'string' ? input
     : input instanceof URL ? input.href
     : (input as Request).url;
+
+  // PATCH/DELETE filtered out by the network: send the same write over POST.
+  if (method === 'PATCH' || method === 'DELETE') {
+    try {
+      const viaRpc = await writeViaRpc(url, init, method);
+      if (viaRpc) return viaRpc;
+    } catch { /* fall through to the diagnosed error below */ }
+  }
 
   let verdict = '';
   try {

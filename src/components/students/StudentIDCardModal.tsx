@@ -50,10 +50,26 @@ export default function StudentIDCardModal({ isOpen, onClose, student, medical, 
     if (old) old.remove();
     const s   = document.createElement('style');
     s.id      = id;
+    // The wrapper sits deep inside #root, so hiding body's direct children hid
+    // its own ancestor and printed a blank page. Hide by visibility instead --
+    // that leaves the element renderable -- then lift it onto the sheet.
     s.innerHTML = `
       @media print {
-        body > *:not(#__id-print-wrap) { display:none !important; }
-        #__id-print-wrap { display:flex !important; gap:12px; padding:16px; justify-content:center; }
+        body * { visibility: hidden !important; }
+        #__id-print-wrap, #__id-print-wrap * { visibility: visible !important; }
+        #__id-print-wrap {
+          position: fixed !important;
+          inset: 0 !important;
+          display: flex !important;
+          flex-wrap: nowrap !important;
+          gap: 12px;
+          padding: 0 !important;
+          align-items: center;
+          justify-content: center;
+          overflow: visible !important;
+          max-height: none !important;
+          background: #fff !important;
+        }
         @page { size: A6 landscape; margin: 8mm; }
       }
     `;
@@ -214,10 +230,13 @@ export default function StudentIDCardModal({ isOpen, onClose, student, medical, 
           initial={{ opacity: 0, scale: 0.95, y: 10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95 }}
-          className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden border border-slate-200 flex flex-col"
+          /* max-w-3xl fits both 320px cards on one row (320+320+20 gap+48 padding
+             = 708px); at 2xl they wrapped into a ~950px-tall stack. max-h caps
+             the dialog to the viewport so nothing is clipped on a laptop screen. */
+          className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl max-h-[92vh] overflow-hidden border border-slate-200 flex flex-col"
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
+          <div className="shrink-0 flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-xl bg-[#1a73e8] text-white flex items-center justify-center">
                 <GraduationCap size={18} />
@@ -233,7 +252,9 @@ export default function StudentIDCardModal({ isOpen, onClose, student, medical, 
           </div>
 
           {/* Cards preview */}
-          <div id="__id-print-wrap" className="p-6 flex flex-wrap gap-5 items-start justify-center bg-slate-100/70">
+          {/* Only this region scrolls, so Close / Print / Download stay reachable
+              however short the viewport is. */}
+          <div id="__id-print-wrap" className="flex-1 min-h-0 overflow-y-auto p-6 flex flex-wrap gap-5 items-start justify-center bg-slate-100/70">
             <div className="flex flex-col items-center gap-1.5">
               <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Front</span>
               <CardFront />
@@ -245,7 +266,7 @@ export default function StudentIDCardModal({ isOpen, onClose, student, medical, 
           </div>
 
           {/* Actions */}
-          <div className="px-6 py-4 bg-white border-t border-slate-100 flex items-center justify-between">
+          <div className="shrink-0 px-6 py-4 bg-white border-t border-slate-100 flex items-center justify-between">
             <button onClick={onClose} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-xs font-bold text-slate-700 transition-colors">
               Close
             </button>

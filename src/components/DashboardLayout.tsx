@@ -212,6 +212,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
         { label: 'My Classes', path: '/dashboard/teaching/classes', permission: 'academics.teach' },
         { label: 'Lesson Plans', path: '/dashboard/teaching/lessons', permission: 'academics.teach' },
         { label: 'Homework & Assignments', path: '/dashboard/teaching/work', permission: 'academics.teach' },
+        { label: 'Marks Entry', path: '/dashboard/teaching/marks', permission: 'academics.teach' },
         { label: 'Syllabus Progress', path: '/dashboard/teaching/syllabus', permission: 'academics.teach' },
       ]
     },
@@ -250,12 +251,20 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       icon: ClipboardList,
       permission: 'results.view',
       items: [
+        { label: 'Dashboard', path: '/dashboard/examination?tab=dashboard', permission: 'results.view' },
         { label: 'Exams & Assessments', path: '/dashboard/examination?tab=exams', permission: 'results.publish' },
-        { label: 'CBSE Marks Entry', path: '/dashboard/examination?tab=marks', permission: 'results.view' },
-        { label: 'Result Processing & Publish', path: '/dashboard/examination?tab=results', permission: 'results.publish' },
-        { label: 'Report Cards Hub', path: '/dashboard/examination?tab=reports', permission: 'results.view' },
-        { label: 'Schedule & Admit Cards', path: '/dashboard/examination?tab=schedule', permission: 'results.view' },
-        { label: 'Performance Analytics', path: '/dashboard/examination?tab=analytics', permission: 'results.view' }
+        { label: 'Exam Schedule', path: '/dashboard/examination?tab=schedule', permission: 'results.view' },
+        { label: 'Admit Cards', path: '/dashboard/examination?tab=admit-cards', permission: 'results.view' },
+        { label: 'Seating Plan', path: '/dashboard/examination?tab=seating-plan', permission: 'results.view' },
+        { label: 'Invigilation', path: '/dashboard/examination?tab=invigilation', permission: 'results.view' },
+        { label: 'Exam Attendance', path: '/dashboard/examination?tab=exam-attendance', permission: 'results.view' },
+        { label: 'Marks Entry', path: '/dashboard/examination?tab=marks-entry', permission: 'results.view' },
+        { label: 'Marks Verification', path: '/dashboard/examination?tab=marks-verification', permission: 'results.publish' },
+        { label: 'Result Processing', path: '/dashboard/examination?tab=result-processing', permission: 'results.publish' },
+        { label: 'Report Cards', path: '/dashboard/examination?tab=report-cards', permission: 'results.view' },
+        { label: 'Result Publishing', path: '/dashboard/examination?tab=result-publishing', permission: 'results.publish' },
+        { label: 'Performance Analytics', path: '/dashboard/examination?tab=analytics', permission: 'results.view' },
+        { label: 'Examination Settings', path: '/dashboard/examination?tab=settings', permission: 'results.publish' }
       ]
     },
     {
@@ -970,13 +979,17 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
                     {roleLabel}
                   </div>
                 </div>
-                <div className="w-8 h-8 rounded-full border border-violet-100 p-0.5 shadow-2xs overflow-hidden bg-slate-50 shrink-0 group-hover:ring-2 group-hover:ring-blue-500/20 transition-all">
-                  <img 
-                    src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.email || 'admin'}`} 
-                    className="w-full h-full rounded-full object-cover"
-                    referrerPolicy="no-referrer"
-                    alt="User avatar"
-                  />
+                {/*
+                  Drawn locally from the user's initial. This used to request a
+                  cartoon from api.dicebear.com with the signed-in user's email
+                  address in the query string, sending every staff member's email
+                  to a third party on every page load.
+                */}
+                <div
+                  className="w-8 h-8 rounded-full border border-violet-100 shadow-2xs overflow-hidden shrink-0 bg-linear-to-br from-blue-500 to-violet-600 text-white flex items-center justify-center text-[11px] font-black uppercase select-none group-hover:ring-2 group-hover:ring-blue-500/20 transition-all"
+                  aria-label="User avatar"
+                >
+                  {(user?.email?.trim()?.charAt(0) || 'U').toUpperCase()}
                 </div>
               </button>
 

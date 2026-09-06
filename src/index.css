@@ -199,9 +199,18 @@ h1, h2, h3, h4 {
 /* ==========================================
    🖨️ PROFESSIONAL ENTERPRISE PRINTING RULES
    ========================================== */
+
+/* Letterheads and other paper-only blocks stay out of the on-screen layout. */
+[data-print-only] {
+  display: none;
+}
+
 @media print {
-  #root, 
-  .toast, 
+  /* The app mounts into #root, so hiding it printed a blank sheet from every
+     print button in the app — and the #print-receipt-portal-root it revealed
+     instead does not exist anywhere in the DOM. Only the toasts are hidden
+     outright now; page content is scoped with [data-print-region] below. */
+  .toast,
   [role="status"],
   div[class*="toast"],
   div[class*="toaster"] {
@@ -209,23 +218,41 @@ h1, h2, h3, h4 {
     visibility: hidden !important;
   }
 
-  #print-receipt-portal-root, 
-  #print-receipt-portal-root * {
-    display: block !important;
+  /* Region-scoped printing. display:none cannot be undone on a descendant, so
+     the scoping is done with visibility, which is inheritable and reversible.
+     printRegion() in src/lib/printRegion.ts toggles the body class. */
+  body.print-region-active * {
+    visibility: hidden !important;
+  }
+
+  body.print-region-active [data-print-region],
+  body.print-region-active [data-print-region] * {
     visibility: visible !important;
   }
 
-  #print-receipt-portal-root {
+  body.print-region-active [data-print-region] {
+    /* previews are rendered at a UI zoom; paper gets them at 1:1 */
+    transform: none !important;
     position: absolute !important;
     left: 0 !important;
     top: 0 !important;
-    width: 210mm !important;
-    height: 297mm !important;
+    width: 100% !important;
     margin: 0 !important;
-    padding: 10mm !important;
-    box-sizing: border-box !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
     background: #ffffff !important;
     color: #0f172a !important;
+  }
+
+  body.print-region-active [data-print-region] [data-print-hide],
+  body.print-region-active [data-print-region] [data-print-hide] * {
+    display: none !important;
+  }
+
+  /* Shown only on paper — the letterhead a printed datesheet needs. */
+  [data-print-only] {
+    display: block !important;
   }
 
   body {

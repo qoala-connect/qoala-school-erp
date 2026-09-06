@@ -154,7 +154,20 @@ export function isSameClass(classA: string | undefined | null, classB: string | 
 export function formatClassDisplay(className: string | undefined | null): string {
   if (!className) return 'N/A';
   const norm = normalizeClassName(className);
-  return norm ? `Class ${norm}` : className;
+  if (!norm) return className;
+
+  // normalizeClassName lowercases so comparisons match, which is fine for
+  // numeric grades but turned every named class into "Class lkg". Named
+  // classes keep whatever casing the school entered.
+  if (/^d+$/.test(norm)) return `Class ${norm}`;
+
+  const asEntered = className
+    .toString()
+    .trim()
+    .replace(/^(class|grade)s*/i, '')
+    .trim();
+
+  return `Class ${asEntered || norm}`;
 }
 
 /**

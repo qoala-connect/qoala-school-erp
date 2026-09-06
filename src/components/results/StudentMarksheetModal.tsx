@@ -345,16 +345,26 @@ export default function StudentMarksheetModal({
                       </div>
                     </div>
 
-                    <div className="w-[62px] h-[72px] shrink-0 border border-slate-700 bg-slate-100 p-0.5 flex items-center justify-center">
-                      <img
-                        src={student.photo_url || `https://images.unsplash.com/photo-1544717305-2782549b5136?w=150&auto=format&fit=crop&q=80`}
-                        alt={studentName}
-                        crossOrigin="anonymous"
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=150&auto=format&fit=crop&q=80';
-                        }}
-                      />
+                    {/*
+                      No photo on file falls back to the student's initial, never
+                      to a stock image. This previously loaded an Unsplash photo of
+                      an unrelated real person, and the onError handler substituted
+                      the same stranger when a genuine photo failed to load -- a
+                      face that is not the candidate's has no place on a marksheet.
+                    */}
+                    <div className="relative w-[62px] h-[72px] shrink-0 border border-slate-700 bg-slate-100 p-0.5 flex items-center justify-center overflow-hidden">
+                      <span className="absolute inset-0 flex items-center justify-center text-xl font-black text-slate-400 select-none">
+                        {(studentName || '?').charAt(0).toUpperCase()}
+                      </span>
+                      {student.photo_url && (
+                        <img
+                          src={student.photo_url}
+                          alt={studentName}
+                          crossOrigin="anonymous"
+                          className="relative w-full h-full object-cover"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                        />
+                      )}
                     </div>
                   </div>
                 </div>

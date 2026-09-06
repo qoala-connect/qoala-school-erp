@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { printRegion } from '@/lib/printRegion';
 import { supabase } from '@/lib/supabase';
 import { jsPDF } from 'jspdf';
 import html2canvasSafe from '../../lib/html2canvasSafe';
@@ -57,6 +58,7 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
   const [exams, setExams] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
+  const [classesList, setClassesList] = useState<any[]>([]);
   const [studentMarks, setStudentMarks] = useState<any[]>([]);
   const [examResult, setExamResult] = useState<any | null>(null);
   const [attendanceSummary, setAttendanceSummary] = useState<{ total_days: number; present_days: number; percentage: number } | null>(null);
@@ -81,10 +83,11 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
   const fetchBaseContext = async () => {
     setIsLoading(true);
     try {
-      const [examsRes, subjectsRes, studentsRes] = await Promise.all([
+      const [examsRes, subjectsRes, studentsRes, classesRes] = await Promise.all([
         supabase.from('exams').select('*').order('created_at', { ascending: false }),
         supabase.from('subjects').select('*').order('subject_name'),
-        supabase.from('students').select('*').eq('status', 'active').order('name')
+        supabase.from('students').select('*').eq('status', 'active').order('name'),
+        supabase.from('classes').select('*').order('display_order', { ascending: true })
       ]);
 
       const examList = examsRes.data || [];
@@ -92,6 +95,7 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
       setExams(examList);
       setSubjects(subjectsRes.data || []);
       setStudents(studentList);
+      setClassesList(classesRes.data || []);
 
       if (examList.length > 0 && !selectedExamId) {
         setSelectedExamId(examList[0].id);
@@ -291,9 +295,15 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
               className="bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs font-bold text-slate-700 outline-none h-[36px] cursor-pointer focus:border-violet-500 focus:bg-white"
             >
               <option value="All">All Classes</option>
-              {['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'].map(c => (
-                <option key={c} value={c}>{formatClassDisplay(c)}</option>
-              ))}
+              {classesList.length > 0 ? (
+                classesList.map(c => (
+                  <option key={c.id} value={c.class_name}>{formatClassDisplay(c.class_name)}</option>
+                ))
+              ) : (
+                ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', 'LKG'].map(c => (
+                  <option key={c} value={c}>{formatClassDisplay(c)}</option>
+                ))
+              )}
             </select>
           </div>
 
@@ -406,8 +416,8 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
             </button>
             <button 
               onClick={() => {
-                window.print();
-                toast.success(`Printing CBSE Report Card for ${activeStudent?.name}`);
+                const ok = printRegion('student-report-print', `Report Card — ${activeStudent?.name || 'Student'}`);
+                if (!ok) toast.error('Open a student report card before printing.');
               }}
               className="flex items-center gap-1.5 px-4 h-[36px] bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-violet-500/15 cursor-pointer"
             >
@@ -481,6 +491,7 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
         /* 3. Official CBSE Report Card Document Matrix */
         <div 
           ref={reportRef}
+          id="student-report-print"
           style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}
           className="space-y-6 transition-transform duration-200 relative"
         >
