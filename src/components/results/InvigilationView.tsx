@@ -25,6 +25,7 @@ import { supabase } from '@/lib/supabase';
 import { examinationService, ExamRecord } from '@/services/examinationService';
 import { useAuth } from '@/context/AuthContext';
 import { useExamScope } from '@/lib/useExamScope';
+import { formatClassDisplay } from '@/lib/cbseExamUtils';
 import { SchoolCrest } from '@/components/SchoolLogo';
 
 interface InvigilationViewProps {
@@ -264,7 +265,7 @@ export default function InvigilationView({ exams, teachers, selectedYearId }: In
           >
             <option value="all">All Exam Terms</option>
             {exams.map(e => (
-              <option key={e.id} value={e.id}>{e.exam_name} (Class {e.class})</option>
+              <option key={e.id} value={e.id}>{e.exam_name} ({formatClassDisplay(e.class)})</option>
             ))}
           </select>
 
@@ -361,7 +362,7 @@ export default function InvigilationView({ exams, teachers, selectedYearId }: In
                     {d.subject_name}
                   </td>
                   <td className="py-3.5 px-4 font-bold text-slate-700">
-                    Class {d.exams?.class}
+                    {formatClassDisplay(d.exams?.class)}
                   </td>
                   <td className="py-3.5 px-4">
                     <span className="px-2.5 py-1 bg-slate-100 text-slate-800 rounded-md font-bold font-mono text-[11px]">

@@ -71,12 +71,19 @@ export default function TeacherMarksView({
       setTasks(workload as Task[]);
 
       // Narrow the exam list and each exam's subject list to this teacher's own
-      // streams, so the grid's own pickers cannot wander outside their board.
+      // streams (both explicitly assigned teacher_id and timetable-mapped),
+      // so the grid's own pickers cannot wander outside their board.
+      const taskExamIds = new Set((workload as Task[]).map(t => t.exam_id));
+      const taskSubjectExamKeys = new Set((workload as Task[]).map(t => `${t.exam_id}_${t.subject_id}`));
+
       setExams(
         (allExams as any[])
+          .filter(ex => taskExamIds.has(ex.id))
           .map(ex => ({
             ...ex,
-            exam_subjects: (ex.exam_subjects ?? []).filter((es: any) => es.teacher_id === teacherId),
+            exam_subjects: (ex.exam_subjects ?? []).filter(
+              (es: any) => es.teacher_id === teacherId || taskSubjectExamKeys.has(`${ex.id}_${es.subject_id}`)
+            ),
           }))
           .filter(ex => ex.exam_subjects.length > 0),
       );

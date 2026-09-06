@@ -76,12 +76,12 @@ export function AdminStatCard({
       {/* Top subtle micro-accent bar */}
       <div className={cn("absolute top-0 left-0 right-0 h-[2.5px] opacity-80 group-hover:opacity-100 transition-opacity", styles.topBar)} />
 
-      <div className="flex items-center justify-between gap-2 mb-3">
-        <span className="text-xs font-semibold font-sans text-slate-500 truncate tracking-tight">
+      <div className="flex items-start justify-between gap-1.5 mb-2.5">
+        <span className="text-[11px] font-bold font-sans text-slate-500 tracking-tight leading-tight line-clamp-1">
           {label}
         </span>
-        <div className={cn("p-2 rounded-xl border shrink-0 transition-transform duration-200 group-hover:scale-105", styles.iconBg)}>
-          <Icon size={16} />
+        <div className={cn("p-1.5 sm:p-2 rounded-xl border shrink-0 transition-transform duration-200 group-hover:scale-105", styles.iconBg)}>
+          <Icon size={15} />
         </div>
       </div>
 

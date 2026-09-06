@@ -47,12 +47,13 @@ export default function ResultPublishingView({
 }: ResultPublishingViewProps) {
   const { user, can } = useAuth();
 
-  const [selectedExamId, setSelectedExamId] = useState<string>(exams[0]?.id || 'all');
+  const [selectedExamId, setSelectedExamId] = useState<string>('all');
   const [selectedClassId, setSelectedClassId] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all'); // all | published | unpublished
   const [searchQuery, setSearchQuery] = useState('');
 
   const [results, setResults] = useState<StudentExamResult[]>([]);
+  const [allSessionResults, setAllSessionResults] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [activeExamsList, setActiveExamsList] = useState<ExamRecord[]>(exams);
 
@@ -72,6 +73,7 @@ export default function ResultPublishingView({
   const fetchResults = async () => {
     setIsLoading(true);
     try {
+      // 1. Fetch filtered results for the active view
       let query = supabase
         .from('exam_results')
         .select('*, students:student_id(name, roll_number, admission_number, class, section, father_name), exams:exam_id(exam_name, short_name, class, is_published, academic_year)')
@@ -81,14 +83,19 @@ export default function ResultPublishingView({
         query = query.eq('exam_id', selectedExamId);
       }
       if (selectedClassId && selectedClassId !== 'all') {
-        // exam_results is keyed by class_id; there is no class_name column, and
-        // filtering on one made PostgREST reject the whole request.
         query = query.eq('class_id', selectedClassId);
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
-      setResults(data || []);
+      const [filteredRes, allRes] = await Promise.all([
+        query,
+        supabase
+          .from('exam_results')
+          .select('id, result_status, exam_id, is_published')
+      ]);
+
+      if (filteredRes.error) throw filteredRes.error;
+      setResults(filteredRes.data || []);
+      setAllSessionResults(allRes.data || []);
 
       // Also refresh exam list to have latest is_published status
       const updatedExams = await examinationService.getExams({ academicYearId: selectedYearId });
@@ -130,18 +137,22 @@ export default function ResultPublishingView({
     const totalExams = activeExamsList.length;
     const publishedExams = activeExamsList.filter(e => e.is_published).length;
     const pendingExams = totalExams - publishedExams;
-    const totalProcessedResults = results.length;
-    const passCount = results.filter(r => r.result_status === 'PASS').length;
-    const passPercentage = totalProcessedResults > 0 ? Math.round((passCount / totalProcessedResults) * 100) : 0;
+    
+    // Use session-wide results if viewing all, or filtered results if viewing single exam
+    const dataset = (selectedExamId !== 'all' || selectedClassId !== 'all') ? results : allSessionResults;
+    const totalProcessedResults = dataset.length;
+    const passCount = dataset.filter(r => r.result_status === 'PASS').length;
+    const passPercentage = totalProcessedResults > 0 ? Math.round((passCount / totalProcessedResults) * 100) : null;
 
     return {
       totalExams,
       publishedExams,
       pendingExams,
       totalProcessedResults,
+      passCount,
       passPercentage
     };
-  }, [activeExamsList, results]);
+  }, [activeExamsList, results, allSessionResults, selectedExamId, selectedClassId]);
 
   // Handle Publish Execution
   const handleConfirmPublish = async () => {
@@ -192,7 +203,7 @@ export default function ResultPublishingView({
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {/* 1. Header & Quick Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="p-4 bg-white border border-slate-200/80 rounded-2xl shadow-2xs">
@@ -242,8 +253,14 @@ export default function ResultPublishingView({
             </div>
           </div>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-black text-indigo-600">{stats.passPercentage}%</span>
-            <span className="text-[11px] text-slate-400 font-medium">{stats.totalProcessedResults} results</span>
+            <span className="text-2xl font-black text-indigo-600">
+              {stats.passPercentage !== null ? `${stats.passPercentage}%` : '—'}
+            </span>
+            <span className="text-[11px] text-slate-400 font-medium">
+              {stats.totalProcessedResults > 0 
+                ? `${stats.passCount}/${stats.totalProcessedResults} passed` 
+                : 'No results processed'}
+            </span>
           </div>
         </div>
       </div>

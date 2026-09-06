@@ -22,6 +22,7 @@ import { printRegion } from '@/lib/printRegion';
 import { supabase } from '@/lib/supabase';
 import { examinationService, ExamRecord } from '@/services/examinationService';
 import { useAuth } from '@/context/AuthContext';
+import { formatClassDisplay } from '@/lib/cbseExamUtils';
 
 interface ExamAttendanceViewProps {
   exams: ExamRecord[];
@@ -204,7 +205,7 @@ export default function ExamAttendanceView({
               className="text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 font-bold text-slate-800"
             >
               {exams.map(e => (
-                <option key={e.id} value={e.id}>{e.exam_name} (Class {e.class})</option>
+                <option key={e.id} value={e.id}>{e.exam_name} ({formatClassDisplay(e.class)})</option>
               ))}
             </select>
           </div>
@@ -307,7 +308,7 @@ export default function ExamAttendanceView({
           <h2 className="text-xl font-black uppercase text-slate-900">ST. JOSEPH'S SCHOOL, BARHALGANJ</h2>
           <p className="text-xs text-slate-600">Official Examination Hall Attendance Sheet</p>
           <p className="text-[11px] text-slate-500 mt-1 font-mono">
-            {activeExam?.exam_name} • Class {activeExam?.class} • Subject: {examSubjectsList.find(s => s.subject_id === selectedSubjectId)?.subject_name}
+            {activeExam?.exam_name} • {formatClassDisplay(activeExam?.class)} • Subject: {examSubjectsList.find(s => s.subject_id === selectedSubjectId)?.subject_name}
           </p>
         </div>
 
@@ -344,7 +345,7 @@ export default function ExamAttendanceView({
                     {s.admission_number}
                   </td>
                   <td className="py-3 px-4 font-bold text-slate-700">
-                    {s.class}-{s.section}
+                    {formatClassDisplay(s.class)}-{s.section}
                   </td>
                   <td className="py-3 px-4 text-center">
                     <div className="inline-flex items-center gap-1 bg-slate-100 p-1 rounded-xl print:bg-transparent">

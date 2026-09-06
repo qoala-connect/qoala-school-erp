@@ -106,20 +106,18 @@ export default function AnalyticsView() {
     const activeResults = results.filter(r => studentIds.has(r.student_id));
 
     // Aggregate score calculation
-    let totalScoreSum = 0;
-    let totalMaxSum = 0;
+    let totalPercentageSum = 0;
     let scoredStudentsCount = 0;
     let passedCount = 0;
 
     activeResults.forEach(r => {
-      totalScoreSum += Number(r.total_marks) || 0;
-      totalMaxSum += 500; // standard 5 subjects
+      totalPercentageSum += Number(r.percentage) || 0;
       scoredStudentsCount++;
-      if (r.result_status === 'pass') passedCount++;
+      if ((r.result_status || '').toUpperCase() === 'PASS') passedCount++;
     });
 
     const averagePercentage = scoredStudentsCount > 0
-      ? Math.round((totalScoreSum / (scoredStudentsCount * 500)) * 100)
+      ? Math.round(totalPercentageSum / scoredStudentsCount)
       : 0;
 
     const passRate = scoredStudentsCount > 0
@@ -145,18 +143,27 @@ export default function AnalyticsView() {
 
     const gradeData = Object.entries(gradeCounts).map(([name, count]) => ({ name, students: count }));
 
-    // Subject Performance breakdown — real averages only; a subject with no
-    // marks recorded yet shows 0 rather than a plausible-looking random score.
+    // Subject Performance breakdown — calculated strictly from real marks in database
     const subjectData = subjects.slice(0, 6).map(sub => {
       const subMarks = activeMarks.filter(m => m.subject_id === sub.id && !m.is_absent);
       const subAvg = subMarks.length > 0
         ? Math.round(subMarks.reduce((sum, m) => sum + Number(m.obtained_marks || 0), 0) / subMarks.length)
         : 0;
 
+      const passedSubCount = subMarks.filter(m => {
+        const max = Number(m.max_marks) || 100;
+        const passMin = Number(m.pass_marks) || Math.round(max * 0.33);
+        return Number(m.obtained_marks || 0) >= passMin;
+      }).length;
+
+      const subPassRate = subMarks.length > 0
+        ? Math.round((passedSubCount / subMarks.length) * 100)
+        : 0;
+
       return {
         subject: sub.subject_name,
         average: subAvg,
-        passRate: subMarks.length > 0 ? (subAvg >= 33 ? Math.min(100, subAvg + 15) : 40) : 0
+        passRate: subPassRate
       };
     });
 

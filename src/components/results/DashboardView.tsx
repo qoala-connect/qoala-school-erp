@@ -19,11 +19,13 @@ import {
   Sparkles,
   Loader2,
   Printer,
-  ChevronRight
+  ChevronRight,
+  Plus
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { examinationService, ExamRecord } from '@/services/examinationService';
 import AdminStatCard from '@/components/common/AdminStatCard';
+import { formatClassDisplay } from '@/lib/cbseExamUtils';
 import { Link } from 'react-router-dom';
 
 interface DashboardViewProps {
@@ -86,7 +88,7 @@ export default function DashboardView({ onNavigateTab, academicYears, selectedYe
 
   if (isLoading) {
     return (
-      <div className="py-20 flex flex-col items-center justify-center space-y-3">
+      <div className="py-24 flex flex-col items-center justify-center space-y-3">
         <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
         <p className="text-xs font-bold text-slate-500">Loading live examination metrics...</p>
       </div>
@@ -100,29 +102,32 @@ export default function DashboardView({ onNavigateTab, academicYears, selectedYe
   const failPct = totalEvaluated > 0 ? Math.round((passStats.fail / totalEvaluated) * 100) : 0;
 
   return (
-    <div className="space-y-6">
-      {/* 1. Primary Live KPI Stats Bar */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+    <div className="space-y-5">
+      {/* 1. Primary Live KPI Stats Bar (6 Responsive Cards) */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
         <AdminStatCard
           label="Total Exams"
           value={exams.length}
           icon={ClipboardList}
           variant="primary"
           subtext="Configured terms"
+          onClick={() => onNavigateTab('exams')}
         />
         <AdminStatCard
-          label="Upcoming Exams"
+          label="Upcoming"
           value={upcomingExams.length}
           icon={Calendar}
           variant="primary"
           subtext="Scheduled dates"
+          onClick={() => onNavigateTab('schedule')}
         />
         <AdminStatCard
           label="Candidates"
-          value={analytics?.totalCandidates || 0}
+          value={analytics?.totalCandidates ?? 0}
           icon={Users}
           variant="emerald"
           subtext="Enrolled students"
+          onClick={() => onNavigateTab('admit-cards')}
         />
         <AdminStatCard
           label="Marks Pending"
@@ -130,6 +135,7 @@ export default function DashboardView({ onNavigateTab, academicYears, selectedYe
           icon={Clock}
           variant="amber"
           subtext="Awaiting entry"
+          onClick={() => onNavigateTab('marks-verification')}
         />
         <AdminStatCard
           label="Results Ready"
@@ -137,50 +143,53 @@ export default function DashboardView({ onNavigateTab, academicYears, selectedYe
           icon={Trophy}
           variant="violet"
           subtext="Processed"
+          onClick={() => onNavigateTab('result-processing')}
         />
         <AdminStatCard
-          label="Published"
+          label="Live Published"
           value={publishedExams.length}
           icon={CheckCircle2}
           variant="emerald"
           subtext="Active in portals"
+          onClick={() => onNavigateTab('result-publishing')}
         />
       </div>
 
       {/* 2. Quick Action Workflow Shortcuts */}
-      <div className="p-4 bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 rounded-2xl text-white shadow-md">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="px-2.5 py-0.5 bg-blue-500/20 text-blue-200 border border-blue-400/30 rounded-full text-[10px] font-bold uppercase tracking-wider">
+      <div className="p-4 sm:p-5 bg-gradient-to-r from-slate-900 via-[#0a2540] to-slate-900 rounded-2xl text-white shadow-xs border border-slate-800">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className="px-2.5 py-0.5 bg-blue-500/20 text-blue-300 border border-blue-400/30 rounded-full text-[10px] font-extrabold uppercase tracking-wider">
                 Exam Workflow Pipeline
               </span>
             </div>
-            <h3 className="text-base font-bold text-white">Central Examination Operations</h3>
-            <p className="text-xs text-blue-200/80">Manage the complete exam lifecycle from term scheduling to result publication.</p>
+            <h3 className="text-base font-extrabold text-white tracking-tight">Central Examination Operations</h3>
+            <p className="text-xs text-slate-300">Manage the complete exam lifecycle from term scheduling to result publication.</p>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
+
+          <div className="flex items-center gap-2 flex-wrap shrink-0">
             <button
               onClick={() => onNavigateTab('exams')}
-              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
+              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1.5 active:scale-95"
             >
-              <ClipboardList size={14} /> Create / Manage Exam
+              <ClipboardList size={14} /> Create Exam
             </button>
             <button
               onClick={() => onNavigateTab('marks-entry')}
-              className="px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+              className="px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white border border-white/15 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
             >
               <FileText size={14} /> Enter Marks
             </button>
             <button
               onClick={() => onNavigateTab('result-processing')}
-              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
+              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1.5 active:scale-95"
             >
               <Trophy size={14} /> Process Results
             </button>
             <button
               onClick={() => onNavigateTab('admit-cards')}
-              className="px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+              className="px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white border border-white/15 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
             >
               <IdCard size={14} /> Admit Cards
             </button>
@@ -189,22 +198,22 @@ export default function DashboardView({ onNavigateTab, academicYears, selectedYe
       </div>
 
       {/* 3. Operational Stage Status Overview & Visual Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Left 2 Cols: Pipeline Tracking & Class Performance */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-5">
           {/* Exam Lifecycle Pipeline Cards */}
-          <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
+          <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-2xs">
             <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
               <div>
-                <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <h4 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
                   <Layers className="w-4 h-4 text-blue-600" />
                   Examination Pipeline Status
                 </h4>
-                <p className="text-xs text-slate-500">Live breakdown of all configured examinations by lifecycle phase.</p>
+                <p className="text-xs text-slate-500 font-medium">Live breakdown of all configured examinations by lifecycle phase.</p>
               </div>
               <button
                 onClick={() => onNavigateTab('exams')}
-                className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer"
               >
                 View all <ChevronRight size={13} />
               </button>
@@ -213,14 +222,14 @@ export default function DashboardView({ onNavigateTab, academicYears, selectedYe
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div 
                 onClick={() => onNavigateTab('exams')}
-                className="p-3.5 bg-slate-50 hover:bg-blue-50/50 border border-slate-200/70 rounded-xl cursor-pointer transition-all"
+                className="p-3.5 bg-slate-50 hover:bg-blue-50/50 border border-slate-200/70 hover:border-blue-200 rounded-xl cursor-pointer transition-all"
               >
-                <div className="flex items-center justify-between text-xs font-bold text-slate-500 mb-1">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-600 mb-1">
                   <span>Scheduled</span>
-                  <Calendar size={13} className="text-blue-500" />
+                  <Calendar size={14} className="text-blue-500" />
                 </div>
-                <span className="text-2xl font-black text-slate-800">{upcomingExams.length}</span>
-                <span className="text-[10px] text-slate-400 block mt-0.5">Ready for testing</span>
+                <span className="text-2xl font-black text-slate-900 font-mono">{upcomingExams.length}</span>
+                <span className="text-[10px] text-slate-400 block mt-0.5 font-medium">Ready for testing</span>
               </div>
 
               <div 
@@ -229,10 +238,10 @@ export default function DashboardView({ onNavigateTab, academicYears, selectedYe
               >
                 <div className="flex items-center justify-between text-xs font-bold text-amber-700 mb-1">
                   <span>Awaiting Marks</span>
-                  <Clock size={13} className="text-amber-500" />
+                  <Clock size={14} className="text-amber-500" />
                 </div>
-                <span className="text-2xl font-black text-amber-900">{awaitingMarks.length}</span>
-                <span className="text-[10px] text-amber-600/80 block mt-0.5">Faculty entry pending</span>
+                <span className="text-2xl font-black text-amber-900 font-mono">{awaitingMarks.length}</span>
+                <span className="text-[10px] text-amber-600/80 block mt-0.5 font-medium">Faculty entry pending</span>
               </div>
 
               <div 
@@ -241,10 +250,10 @@ export default function DashboardView({ onNavigateTab, academicYears, selectedYe
               >
                 <div className="flex items-center justify-between text-xs font-bold text-indigo-700 mb-1">
                   <span>Pending Review</span>
-                  <ShieldCheck size={13} className="text-indigo-500" />
+                  <ShieldCheck size={14} className="text-indigo-500" />
                 </div>
-                <span className="text-2xl font-black text-indigo-900">{pendingVerification.length}</span>
-                <span className="text-[10px] text-indigo-600/80 block mt-0.5">Submitted by teachers</span>
+                <span className="text-2xl font-black text-indigo-900 font-mono">{pendingVerification.length}</span>
+                <span className="text-[10px] text-indigo-600/80 block mt-0.5 font-medium">Submitted by teachers</span>
               </div>
 
               <div 
@@ -253,27 +262,27 @@ export default function DashboardView({ onNavigateTab, academicYears, selectedYe
               >
                 <div className="flex items-center justify-between text-xs font-bold text-emerald-700 mb-1">
                   <span>Published</span>
-                  <CheckCircle2 size={13} className="text-emerald-500" />
+                  <CheckCircle2 size={14} className="text-emerald-500" />
                 </div>
-                <span className="text-2xl font-black text-emerald-900">{publishedExams.length}</span>
-                <span className="text-[10px] text-emerald-600/80 block mt-0.5">Visible to parents</span>
+                <span className="text-2xl font-black text-emerald-900 font-mono">{publishedExams.length}</span>
+                <span className="text-[10px] text-emerald-600/80 block mt-0.5 font-medium">Visible to parents</span>
               </div>
             </div>
           </div>
 
           {/* Class Average Performance Bar Chart */}
-          <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
+          <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-2xs">
             <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
               <div>
-                <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <h4 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
                   <BarChart3 className="w-4 h-4 text-indigo-600" />
                   Class-Wise Academic Average
                 </h4>
-                <p className="text-xs text-slate-500">Mean percentage scored across all processed terms in this session.</p>
+                <p className="text-xs text-slate-500 font-medium">Mean percentage scored across all processed terms in this session.</p>
               </div>
               <button
                 onClick={() => onNavigateTab('analytics')}
-                className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
+                className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 cursor-pointer"
               >
                 Full Analytics <ChevronRight size={13} />
               </button>
@@ -284,7 +293,7 @@ export default function DashboardView({ onNavigateTab, academicYears, selectedYe
                 {analytics.classAverages.map((c: any) => (
                   <div key={c.className} className="space-y-1">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="font-bold text-slate-700">Class {c.className}</span>
+                      <span className="font-bold text-slate-700">{formatClassDisplay(c.className)}</span>
                       <span className="font-mono font-bold text-slate-900">{c.average}% ({c.count} evaluated)</span>
                     </div>
                     <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
@@ -312,10 +321,10 @@ export default function DashboardView({ onNavigateTab, academicYears, selectedYe
         </div>
 
         {/* Right Col: Performance Breakdown & Quick Actions */}
-        <div className="space-y-6">
+        <div className="space-y-5">
           {/* Pass / Compartment / Fail Distribution */}
-          <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs space-y-4">
-            <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-3">
+          <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-2xs space-y-4">
+            <h4 className="text-sm font-extrabold text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-3">
               <Award className="w-4 h-4 text-emerald-600" />
               Overall Progression Metrics
             </h4>
@@ -323,25 +332,25 @@ export default function DashboardView({ onNavigateTab, academicYears, selectedYe
             {totalEvaluated > 0 ? (
               <div className="space-y-4">
                 <div className="grid grid-cols-3 gap-2 text-center">
-                  <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200/60">
+                  <div className="p-3 bg-emerald-50/80 rounded-xl border border-emerald-200/60">
                     <span className="text-[10px] font-bold text-emerald-700 uppercase block">Pass Rate</span>
-                    <span className="text-xl font-black text-emerald-800">{passPct}%</span>
-                    <span className="text-[10px] text-emerald-600 font-mono">{passStats.pass} students</span>
+                    <span className="text-xl font-black text-emerald-800 font-mono">{passPct}%</span>
+                    <span className="text-[10px] text-emerald-600 font-mono block mt-0.5">{passStats.pass} students</span>
                   </div>
-                  <div className="p-3 bg-amber-50 rounded-xl border border-amber-200/60">
+                  <div className="p-3 bg-amber-50/80 rounded-xl border border-amber-200/60">
                     <span className="text-[10px] font-bold text-amber-700 uppercase block">Compartment</span>
-                    <span className="text-xl font-black text-amber-800">{compPct}%</span>
-                    <span className="text-[10px] text-amber-600 font-mono">{passStats.compartment} students</span>
+                    <span className="text-xl font-black text-amber-800 font-mono">{compPct}%</span>
+                    <span className="text-[10px] text-amber-600 font-mono block mt-0.5">{passStats.compartment} students</span>
                   </div>
-                  <div className="p-3 bg-rose-50 rounded-xl border border-rose-200/60">
+                  <div className="p-3 bg-rose-50/80 rounded-xl border border-rose-200/60">
                     <span className="text-[10px] font-bold text-rose-700 uppercase block">Repeat</span>
-                    <span className="text-xl font-black text-rose-800">{failPct}%</span>
-                    <span className="text-[10px] text-rose-600 font-mono">{passStats.fail} students</span>
+                    <span className="text-xl font-black text-rose-800 font-mono">{failPct}%</span>
+                    <span className="text-[10px] text-rose-600 font-mono block mt-0.5">{passStats.fail} students</span>
                   </div>
                 </div>
 
                 {/* Progress bar split */}
-                <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden flex">
+                <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden flex">
                   <div style={{ width: `${passPct}%` }} className="bg-emerald-500 h-full" title={`Pass: ${passPct}%`} />
                   <div style={{ width: `${compPct}%` }} className="bg-amber-500 h-full" title={`Compartment: ${compPct}%`} />
                   <div style={{ width: `${failPct}%` }} className="bg-rose-500 h-full" title={`Fail: ${failPct}%`} />
@@ -354,7 +363,7 @@ export default function DashboardView({ onNavigateTab, academicYears, selectedYe
             {/* CBSE 8-Point Grade Distribution */}
             <div className="pt-3 border-t border-slate-100">
               <span className="text-xs font-bold text-slate-800 block mb-2">CBSE Grade Distribution</span>
-              <div className="grid grid-cols-4 gap-2 text-center">
+              <div className="grid grid-cols-4 gap-1.5 text-center">
                 {Object.entries(analytics?.gradeDistribution || {}).map(([grade, count]) => (
                   <div key={grade} className="p-2 bg-slate-50 border border-slate-200/70 rounded-lg">
                     <span className="text-[10px] font-black text-blue-700 block">{grade}</span>
@@ -366,15 +375,15 @@ export default function DashboardView({ onNavigateTab, academicYears, selectedYe
           </div>
 
           {/* Upcoming Schedule Widget */}
-          <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
+          <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-2xs">
             <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
-              <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <h4 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-blue-600" />
                 Upcoming Examinations
               </h4>
               <button
                 onClick={() => onNavigateTab('schedule')}
-                className="text-xs font-bold text-blue-600 hover:text-blue-700"
+                className="text-xs font-bold text-blue-600 hover:text-blue-700 cursor-pointer"
               >
                 Schedule
               </button>
@@ -400,6 +409,7 @@ export default function DashboardView({ onNavigateTab, academicYears, selectedYe
           </div>
         </div>
       </div>
+
     </div>
   );
 }

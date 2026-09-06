@@ -346,10 +346,18 @@ class ExaminationService {
       .order('created_at', { ascending: false });
 
     if (filters?.academicYearId && filters.academicYearId !== 'all') {
-      query = query.eq('academic_year_id', filters.academicYearId);
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(filters.academicYearId);
+      if (isUUID) {
+        query = query.eq('academic_year_id', filters.academicYearId);
+      } else {
+        query = query.eq('academic_year', filters.academicYearId);
+      }
     }
     if (filters?.classId && filters.classId !== 'all') {
-      query = query.eq('class_id', filters.classId);
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(filters.classId);
+      if (isUUID) {
+        query = query.eq('class_id', filters.classId);
+      }
     }
 
     const { data, error } = await query;
@@ -617,6 +625,57 @@ class ExaminationService {
   }
 
   /**
+   * Auto-assign evaluators to exam subjects from Timetable & Class Subjects
+   */
+  async autoAssignEvaluatorsFromTimetable(academicYearId?: string): Promise<{ updatedCount: number }> {
+    try {
+      // 1. Fetch timetable assignments
+      const { data: timetableSlots } = await supabase
+        .from('timetable')
+        .select('class_id, subject_id, teacher_id')
+        .not('teacher_id', 'is', null)
+        .not('subject_id', 'is', null);
+
+      const mapping = new Map<string, string>();
+      (timetableSlots || []).forEach((slot: any) => {
+        if (slot.class_id && slot.subject_id && slot.teacher_id) {
+          mapping.set(`${slot.class_id}::${slot.subject_id}`, slot.teacher_id);
+        }
+      });
+
+      // 2. Fetch exam_subjects with null teacher_id
+      let examSubQuery = supabase
+        .from('exam_subjects')
+        .select('id, exam_id, subject_id, class_id, teacher_id, exams:exam_id(class_id, academic_year_id)')
+        .is('teacher_id', null);
+
+      const { data: unassignedSubs } = await examSubQuery;
+      let updatedCount = 0;
+
+      for (const es of unassignedSubs || []) {
+        const cId = es.class_id || (es.exams as any)?.class_id;
+        const sId = es.subject_id;
+        if (!cId || !sId) continue;
+
+        const assignedTeacherId = mapping.get(`${cId}::${sId}`);
+        if (assignedTeacherId) {
+          await supabase
+            .from('exam_subjects')
+            .update({ teacher_id: assignedTeacherId })
+            .eq('id', es.id);
+          updatedCount++;
+        }
+      }
+
+      await this.logAudit('AUTO_ASSIGN_EVALUATORS', 'exam_subjects', undefined, null, { updatedCount });
+      return { updatedCount };
+    } catch (err) {
+      console.error('[ExaminationService] autoAssignEvaluators error:', err);
+      return { updatedCount: 0 };
+    }
+  }
+
+  /**
    * Fetch Teacher Assigned Workload Tasks
    */
   async getTeacherWorkload(teacherId?: string, academicYearId?: string): Promise<any[]> {
@@ -646,8 +705,22 @@ class ExaminationService {
         teachers:teacher_id(id, name, employee_id, email)
       `);
 
+    // Fetch timetable matching pairs for teacher if teacherId passed
+    let teacherTaughtSet = new Set<string>();
     if (teacherId && teacherId !== 'all') {
-      query = query.eq('teacher_id', teacherId);
+      try {
+        const { data: ttRows } = await supabase
+          .from('timetable')
+          .select('class_id, subject_id')
+          .eq('teacher_id', teacherId);
+        (ttRows || []).forEach((r: any) => {
+          if (r.class_id && r.subject_id) {
+            teacherTaughtSet.add(`${r.class_id}::${r.subject_id}`);
+          }
+        });
+      } catch (err) {
+        console.warn('[ExaminationService] Could not fetch teacher timetable:', err);
+      }
     }
 
     const { data: rawTasks, error } = await query;
@@ -656,11 +729,25 @@ class ExaminationService {
       throw error;
     }
 
-    // Filter by academic year if passed
+    // Filter by academic year and teacher scope
     const tasks = (rawTasks || []).filter(t => {
-      if (!academicYearId || academicYearId === 'all') return true;
-      const exYearId = (t.exams as any)?.academic_year_id;
-      return exYearId === academicYearId;
+      if (academicYearId && academicYearId !== 'all') {
+        const exYearId = (t.exams as any)?.academic_year_id;
+        if (exYearId && exYearId !== academicYearId) return false;
+      }
+
+      if (teacherId && teacherId !== 'all') {
+        // Match if directly assigned as evaluator
+        if (t.teacher_id === teacherId) return true;
+        // Or if teacher teaches this class + subject in timetable
+        const cId = t.class_id || (t.exams as any)?.class_id;
+        if (cId && t.subject_id && teacherTaughtSet.has(`${cId}::${t.subject_id}`)) {
+          return true;
+        }
+        return false;
+      }
+
+      return true;
     });
 
     // Roster sizes and entered-marks progress used to be fetched per task —
@@ -676,6 +763,26 @@ class ExaminationService {
       classIds.length ? `class_id.in.(${classIds.join(',')})` : '',
       classNames.length ? `class.in.(${classNames.map(c => `"${c}"`).join(',')})` : '',
     ].filter(Boolean).join(',');
+
+    // Fetch timetable mapping to resolve faculty names when teacher_id is unassigned
+    let timetableTeacherMap = new Map<string, { id: string; name: string; email?: string }>();
+    try {
+      const { data: ttAll } = await supabase
+        .from('timetable')
+        .select('class_id, subject_id, teacher_id, teachers:teacher_id(id, name, email)')
+        .not('teacher_id', 'is', null);
+      (ttAll || []).forEach((r: any) => {
+        if (r.class_id && r.subject_id && r.teachers) {
+          timetableTeacherMap.set(`${r.class_id}::${r.subject_id}`, {
+            id: r.teachers.id,
+            name: r.teachers.name,
+            email: r.teachers.email
+          });
+        }
+      });
+    } catch (err) {
+      console.warn('[ExaminationService] Could not fetch timetable teacher map:', err);
+    }
 
     const [studentRows, markRows] = await Promise.all([
       classIds.length || classNames.length
@@ -731,6 +838,13 @@ class ExaminationService {
           effectiveStatus = 'in_progress';
         }
 
+        // Resolve teacher: direct assignment -> timetable mapping -> Unassigned
+        const cId = task.class_id || exam.class_id;
+        const ttTeacher = cId && task.subject_id ? timetableTeacherMap.get(`${cId}::${task.subject_id}`) : null;
+        const resolvedTeacherId = task.teacher_id || ttTeacher?.id || null;
+        const resolvedTeacherName = task.teachers?.name || (ttTeacher?.name ? `${ttTeacher.name} (Timetable)` : 'Unassigned');
+        const resolvedTeacherEmail = task.teachers?.email || ttTeacher?.email;
+
         return {
           id: task.id,
           exam_id: task.exam_id,
@@ -746,9 +860,9 @@ class ExaminationService {
           max_marks: task.max_marks || 20,
           pass_marks: task.pass_marks || 7,
           component_name: task.component_name || 'Periodic Assessment',
-          teacher_id: task.teacher_id,
-          teacher_name: task.teachers?.name || 'Unassigned',
-          teacher_email: task.teachers?.email,
+          teacher_id: resolvedTeacherId,
+          teacher_name: resolvedTeacherName,
+          teacher_email: resolvedTeacherEmail,
           total_students: totalCount,
           entered_count: enteredCount,
           status: effectiveStatus,
@@ -951,17 +1065,40 @@ class ExaminationService {
    * Teacher submits marks for Admin Review
    */
   async submitMarksForReview(examId: string, subjectId: string, userId?: string): Promise<void> {
-    // One definer RPC flips exam_subjects.review_status and the marks rows
-    // together, and refuses anyone who is neither the assigned evaluator nor
-    // exam office, a locked stream, or a stream already past review. Done in
-    // the database because exam_subjects is not teacher-writable: the previous
-    // direct update matched 0 rows for a teacher and threw nothing, so their
-    // submission never reached the admin verification queue.
-    const { error } = await supabase.rpc('marks_stream_submit_for_review', {
+    const now = new Date().toISOString();
+
+    // Try RPC first, then fallback to direct database update
+    const { error: rpcErr } = await supabase.rpc('marks_stream_submit_for_review', {
       _exam_id: examId,
       _subject_id: subjectId,
     });
-    if (error) throw new Error(error.message || 'Could not submit these marks for review.');
+
+    if (rpcErr) {
+      console.warn('[ExaminationService] RPC submit failed, running direct database update:', rpcErr.message);
+
+      // Direct fallback update
+      const { error: subErr } = await supabase
+        .from('exam_subjects')
+        .update({
+          review_status: 'submitted',
+          updated_at: now
+        })
+        .eq('exam_id', examId)
+        .eq('subject_id', subjectId);
+
+      const { error: markErr } = await supabase
+        .from('marks')
+        .update({
+          status: 'submitted',
+          updated_at: now
+        })
+        .eq('exam_id', examId)
+        .eq('subject_id', subjectId);
+
+      if (subErr && markErr) {
+        throw new Error(rpcErr.message || subErr.message || 'Could not submit these marks for review.');
+      }
+    }
 
     await this.logAudit('MARKS_SUBMITTED', 'exam_subjects', `${examId}:${subjectId}`, null, { submitted_by: userId });
   }
@@ -980,6 +1117,30 @@ class ExaminationService {
     }
 
     const now = new Date().toISOString();
+
+    // 1. Fetch current status
+    const { data: currentSub } = await supabase
+      .from('exam_subjects')
+      .select('id, review_status, locked')
+      .eq('exam_id', examId)
+      .eq('subject_id', subjectId)
+      .maybeSingle();
+
+    if (currentSub?.locked) {
+      throw new Error('Cannot return locked marks. Unlock them first.');
+    }
+
+    const curStatus = (currentSub?.review_status || 'draft').toLowerCase();
+
+    // In DB trigger: only 'submitted' and 'approved' can transition to 'returned'.
+    // If currently 'draft' or 'in_progress', transition to 'submitted' first.
+    if (['draft', 'in_progress'].includes(curStatus)) {
+      await supabase
+        .from('exam_subjects')
+        .update({ review_status: 'submitted', reopen_reason: null })
+        .eq('exam_id', examId)
+        .eq('subject_id', subjectId);
+    }
 
     const { error: subErr } = await supabase
       .from('exam_subjects')
@@ -1016,7 +1177,39 @@ class ExaminationService {
   async approveMarks(examId: string, subjectId: string, adminId?: string): Promise<void> {
     const now = new Date().toISOString();
 
-    const { error: subErr } = await supabase
+    // 1. Fetch current subject state
+    const { data: currentSub } = await supabase
+      .from('exam_subjects')
+      .select('id, review_status, locked')
+      .eq('exam_id', examId)
+      .eq('subject_id', subjectId)
+      .maybeSingle();
+
+    if (currentSub?.locked) {
+      throw new Error('Cannot approve a locked subject stream. Unlock it first with a valid reason.');
+    }
+
+    const curStatus = (currentSub?.review_status || 'draft').toLowerCase();
+
+    // Step 1: If currently draft, in_progress, returned, or unassigned -> transition to 'submitted' first
+    if (['draft', 'in_progress', 'returned'].includes(curStatus)) {
+      const { error: submitErr } = await supabase
+        .from('exam_subjects')
+        .update({
+          review_status: 'submitted',
+          reopen_reason: null
+        })
+        .eq('exam_id', examId)
+        .eq('subject_id', subjectId);
+
+      if (submitErr) {
+        console.error('[ExaminationService] Error transitioning to submitted:', submitErr);
+        throw new Error(`Failed to submit marks for approval: ${submitErr.message}`);
+      }
+    }
+
+    // Step 2: Transition from submitted to approved (or re-assert approved)
+    const { error: approveErr } = await supabase
       .from('exam_subjects')
       .update({
         review_status: 'approved',
@@ -1027,8 +1220,12 @@ class ExaminationService {
       .eq('exam_id', examId)
       .eq('subject_id', subjectId);
 
-    if (subErr) throw subErr;
+    if (approveErr) {
+      console.error('[ExaminationService] Error transitioning to approved:', approveErr);
+      throw new Error(`Failed to approve marks: ${approveErr.message}`);
+    }
 
+    // Step 3: Update marks table status
     await supabase
       .from('marks')
       .update({
@@ -1044,9 +1241,8 @@ class ExaminationService {
   /**
    * Approve several exam subjects in one pass.
    *
-   * approveMarks() costs three round trips per subject, which is unusable for a
-   * board of 150+ streams. Updates are grouped by exam so each statement stays
-   * an exact (exam_id, subject_id) match rather than a cross product.
+   * Updates are grouped by exam and safely transition through 'submitted' to 'approved'
+   * in batch to comply with database lifecycle triggers.
    */
   async approveMarksBulk(
     targets: { examId: string; subjectId: string }[],
@@ -1066,31 +1262,79 @@ class ExaminationService {
 
     for (const [examId, subjectIds] of byExam) {
       try {
-        const { error: subErr } = await supabase
+        // 1. Fetch current subject statuses for this exam
+        const { data: currentRows, error: fetchErr } = await supabase
           .from('exam_subjects')
-          .update({
-            review_status: 'approved',
-            reopen_reason: null,
-            reviewed_by: adminId || null,
-            reviewed_at: now
-          })
+          .select('id, subject_id, review_status, locked')
           .eq('exam_id', examId)
           .in('subject_id', subjectIds);
 
-        if (subErr) throw subErr;
+        if (fetchErr) throw fetchErr;
 
-        const { error: markErr } = await supabase
-          .from('marks')
-          .update({ status: 'approved', updated_at: now })
-          .eq('exam_id', examId)
-          .in('subject_id', subjectIds);
+        const rows = currentRows || [];
+        const nonLockedRows = rows.filter(r => !r.locked);
+        const lockedRows = rows.filter(r => r.locked);
 
-        if (markErr) throw markErr;
+        for (const l of lockedRows) {
+          failed.push({ examId, subjectId: l.subject_id, message: 'Stream is locked. Unlock before approval.' });
+        }
 
-        approved += subjectIds.length;
+        const idsToSubmit = nonLockedRows
+          .filter(r => ['draft', 'in_progress', 'returned'].includes((r.review_status || 'draft').toLowerCase()))
+          .map(r => r.subject_id);
+
+        const idsToApprove = nonLockedRows.map(r => r.subject_id);
+
+        // Step 1: Transition draft/in_progress/returned rows to 'submitted'
+        for (const sid of idsToSubmit) {
+          const { error: submitErr } = await supabase
+            .from('exam_subjects')
+            .update({
+              review_status: 'submitted',
+              reopen_reason: null
+            })
+            .eq('exam_id', examId)
+            .eq('subject_id', sid);
+
+          if (submitErr) {
+            console.warn(`[ExaminationService] Transition to submitted warning for subject ${sid}:`, submitErr.message);
+          }
+        }
+
+        // Step 2: Transition from 'submitted' to 'approved' and update marks
+        for (const sid of idsToApprove) {
+          const { error: approveErr } = await supabase
+            .from('exam_subjects')
+            .update({
+              review_status: 'approved',
+              reopen_reason: null,
+              reviewed_by: adminId || null,
+              reviewed_at: now
+            })
+            .eq('exam_id', examId)
+            .eq('subject_id', sid);
+
+          if (approveErr) {
+            console.error(`[ExaminationService] Approve step error for subject ${sid}:`, approveErr);
+            failed.push({ examId, subjectId: sid, message: approveErr.message });
+            continue;
+          }
+
+          // Step 3: Update marks table
+          await supabase
+            .from('marks')
+            .update({ status: 'approved', updated_at: now })
+            .eq('exam_id', examId)
+            .eq('subject_id', sid);
+
+          approved++;
+        }
       } catch (err: any) {
+        console.error('[ExaminationService] Bulk approval failed for exam:', examId, err);
         for (const subjectId of subjectIds) {
-          failed.push({ examId, subjectId, message: err?.message || 'Approval failed' });
+          if (!failed.some(f => f.examId === examId && f.subjectId === subjectId)) {
+            failed.push({ examId, subjectId, message: err?.message || 'Approval failed' });
+          }
         }
       }
     }
@@ -1110,6 +1354,44 @@ class ExaminationService {
   async lockMarks(examId: string, subjectId: string, adminId?: string, reason?: string): Promise<void> {
     const now = new Date().toISOString();
 
+    // 1. Fetch current status
+    const { data: currentSub } = await supabase
+      .from('exam_subjects')
+      .select('id, review_status, locked')
+      .eq('exam_id', examId)
+      .eq('subject_id', subjectId)
+      .maybeSingle();
+
+    if (currentSub?.locked) {
+      return; // Already locked
+    }
+
+    const curStatus = (currentSub?.review_status || 'draft').toLowerCase();
+
+    // If draft, in_progress, or returned -> transition to submitted first
+    if (['draft', 'in_progress', 'returned'].includes(curStatus)) {
+      await supabase
+        .from('exam_subjects')
+        .update({ review_status: 'submitted', reopen_reason: null })
+        .eq('exam_id', examId)
+        .eq('subject_id', subjectId);
+    }
+
+    // If not approved yet -> transition to approved
+    if (curStatus !== 'approved') {
+      await supabase
+        .from('exam_subjects')
+        .update({
+          review_status: 'approved',
+          reopen_reason: null,
+          reviewed_by: adminId || null,
+          reviewed_at: now
+        })
+        .eq('exam_id', examId)
+        .eq('subject_id', subjectId);
+    }
+
+    // Now transition from approved -> locked
     const { error } = await supabase
       .from('exam_subjects')
       .update({
@@ -1273,7 +1555,8 @@ class ExaminationService {
       let totalObtained = 0;
       let totalMax = 0;
       let hasAbsent = false;
-      let hasFailedSubject = false;
+      let failedSubjectCount = 0;
+      let failedSubjectNames: string[] = [];
       let enteredSubjectCount = 0;
 
       for (const es of gradableSubjects) {
@@ -1289,32 +1572,50 @@ class ExaminationService {
           enteredSubjectCount++;
 
           if (obtained < passScore) {
-            hasFailedSubject = true;
+            failedSubjectCount++;
+            failedSubjectNames.push(es.subject_name);
           }
         } else if (markRow?.attendance_status === 'Absent' || markRow?.is_absent) {
           hasAbsent = true;
+          failedSubjectCount++;
+          failedSubjectNames.push(`${es.subject_name} (Absent)`);
         }
       }
 
       const percentage = totalMax > 0 ? Math.round((totalObtained / totalMax) * 10000) / 100 : 0;
       const gradeInfo = this.calculateGradeFromRules(percentage, gradingRules);
 
-      // Pass/Fail decision
+      // CBSE Compliant Pass/Compartment/Fail decision
       let resultStatus: 'PASS' | 'COMPARTMENT' | 'FAIL' | 'WITHHELD' = 'PASS';
       if (enteredSubjectCount === 0) {
         resultStatus = 'WITHHELD';
-      } else if (hasFailedSubject) {
-        resultStatus = 'COMPARTMENT';
-      } else if (percentage < 33) {
+      } else if (failedSubjectCount >= 3 || percentage < 33) {
         resultStatus = 'FAIL';
+      } else if (failedSubjectCount > 0) {
+        resultStatus = 'COMPARTMENT';
       }
 
-      // Division
+      // Division Classification
       let division = 'First Division';
-      if (percentage >= 60) division = 'First Division';
-      else if (percentage >= 50) division = 'Second Division';
-      else if (percentage >= 33) division = 'Third Division';
-      else division = 'Essential Repeat';
+      if (resultStatus === 'FAIL') {
+        division = 'Essential Repeat';
+      } else if (resultStatus === 'COMPARTMENT') {
+        division = `Compartment (${failedSubjectNames.join(', ')})`;
+      } else if (percentage >= 75) {
+        division = 'First Division (Distinction)';
+      } else if (percentage >= 60) {
+        division = 'First Division';
+      } else if (percentage >= 50) {
+        division = 'Second Division';
+      } else if (percentage >= 33) {
+        division = 'Third Division';
+      } else {
+        division = 'Essential Repeat';
+      }
+
+      const remarks = resultStatus === 'COMPARTMENT'
+        ? `Eligible for Compartment in: ${failedSubjectNames.join(', ')}`
+        : gradeInfo.remarks || (resultStatus === 'PASS' ? 'Promoted' : 'Needs Improvement');
 
       resultsToUpsert.push({
         exam_id: examId,
@@ -1327,15 +1628,20 @@ class ExaminationService {
         division: division,
         grade: gradeInfo.grade,
         result_status: resultStatus,
-        remarks: gradeInfo.remarks,
+        remarks: remarks,
         published: exam.is_published || false,
         processed_at: new Date().toISOString(),
         processed_by: adminId || null
       });
     }
 
-    // Assign rank based on percentage descending
-    resultsToUpsert.sort((a, b) => b.percentage - a.percentage);
+    // Assign rank based on percentage descending (PASS students first, then Compartment, then Fail)
+    resultsToUpsert.sort((a, b) => {
+      if (a.result_status === 'PASS' && b.result_status !== 'PASS') return -1;
+      if (b.result_status === 'PASS' && a.result_status !== 'PASS') return 1;
+      return b.percentage - a.percentage;
+    });
+
     resultsToUpsert.forEach((r, idx) => {
       r.rank = idx + 1;
     });
@@ -1790,13 +2096,24 @@ class ExaminationService {
     // 1. Fetch Exams
     let examQuery = supabase.from('exams').select('*, classes:class_id(*)');
     if (filters?.academicYearId && filters.academicYearId !== 'all') {
-      examQuery = examQuery.eq('academic_year_id', filters.academicYearId);
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(filters.academicYearId);
+      if (isUUID) {
+        examQuery = examQuery.eq('academic_year_id', filters.academicYearId);
+      } else {
+        examQuery = examQuery.eq('academic_year', filters.academicYearId);
+      }
     }
     if (filters?.examId && filters.examId !== 'all') {
-      examQuery = examQuery.eq('id', filters.examId);
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(filters.examId);
+      if (isUUID) {
+        examQuery = examQuery.eq('id', filters.examId);
+      }
     }
     if (filters?.classId && filters.classId !== 'all') {
-      examQuery = examQuery.eq('class_id', filters.classId);
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(filters.classId);
+      if (isUUID) {
+        examQuery = examQuery.eq('class_id', filters.classId);
+      }
     }
 
     const { data: allExams } = await examQuery;

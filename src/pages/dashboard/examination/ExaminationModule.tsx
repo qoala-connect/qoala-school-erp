@@ -146,6 +146,18 @@ export default function ExaminationModule({ view: propView }: ExaminationModuleP
     setSearchParams({ tab: tabName, ...extraParams });
   };
 
+  // Auto-scroll active workspace tab into center view on mount and tab change
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const activeTabId = currentTab === 'overview' ? 'dashboard' : currentTab;
+      const el = document.getElementById(`exam-tab-${activeTabId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      }
+    }, 80);
+    return () => clearTimeout(timer);
+  }, [currentTab]);
+
   // Sub-modes within tabs
   const [reportSubMode, setReportSubMode] = useState<'final' | 'coscholastic'>('final');
   const [scheduleSubMode, setScheduleSubMode] = useState<'datesheet' | 'admitCard'>(() => {
@@ -271,8 +283,8 @@ export default function ExaminationModule({ view: propView }: ExaminationModuleP
 
       // Fallback Academic Years if table is empty
       const finalYears = loadedYears.length > 0 ? loadedYears : [
-        { id: '2026-27', name: '2026-27', start_date: '2026-04-01', end_date: '2027-03-31', is_current: true, status: 'active' },
-        { id: '2025-26', name: '2025-26', start_date: '2025-04-01', end_date: '2026-03-31', is_current: false, status: 'completed' }
+        { id: '22222222-2222-2222-2222-222222222222', name: '2026-27', start_date: '2026-04-01', end_date: '2027-03-31', is_current: true, status: 'active' },
+        { id: '25d97037-3e78-4f1a-b2d9-795008ee69b9', name: '2025-26', start_date: '2025-04-01', end_date: '2026-03-31', is_current: false, status: 'completed' }
       ];
 
       setAcademicYears(finalYears);
@@ -552,42 +564,76 @@ export default function ExaminationModule({ view: propView }: ExaminationModuleP
       />
 
       {/* 3. Workspace Navigation Tabs */}
-      <div className="bg-slate-100/90 p-1.5 rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
-        <nav className="flex items-center gap-1 overflow-x-auto no-scrollbar scroll-smooth py-0.5 px-0.5">
-          {[
-            { id: 'dashboard', label: 'Dashboard', icon: Trophy },
-            { id: 'exams', label: 'Exams & Assessments', icon: Layers, permission: 'results.publish' },
-            { id: 'schedule', label: 'Exam Schedule', icon: Calendar },
-            { id: 'admit-cards', label: 'Admit Cards', icon: IdCard },
-            { id: 'seating-plan', label: 'Seating Plan', icon: Sparkles },
-            { id: 'invigilation', label: 'Invigilation', icon: ShieldCheck },
-            { id: 'exam-attendance', label: 'Exam Attendance', icon: UserCheck },
-            { id: 'marks-entry', label: 'Marks Entry', icon: ClipboardList },
-            { id: 'marks-verification', label: 'Marks Verification', icon: CheckCircle2, permission: 'results.publish' },
-            { id: 'result-processing', label: 'Result Processing', icon: Award, permission: 'results.publish' },
-            { id: 'report-cards', label: 'Report Cards', icon: FileText },
-            { id: 'result-publishing', label: 'Result Publishing', icon: Send, permission: 'results.publish' },
-            { id: 'analytics', label: 'Performance Analytics', icon: BarChart3 },
-            { id: 'settings', label: 'Examination Settings', icon: Settings, permission: 'results.publish' }
-          ].filter(tab => !tab.permission || can(tab.permission)).map(tab => {
-            const isActive = currentTab === tab.id || (tab.id === 'dashboard' && currentTab === 'overview');
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setTab(tab.id)}
-                className={cn(
-                  "flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer select-none",
-                  isActive 
-                    ? "bg-white text-slate-900 shadow-xs border border-slate-200/80" 
-                    : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
-                )}
-              >
-                <tab.icon size={13.5} className={isActive ? "text-blue-600" : "text-slate-400"} />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
-        </nav>
+      <div className="relative group bg-slate-100/90 p-1 rounded-2xl border border-slate-200/80 shadow-2xs">
+        <div className="flex items-center">
+          <button
+            type="button"
+            onClick={() => {
+              const nav = document.getElementById('exam-module-tabs-nav');
+              if (nav) nav.scrollBy({ left: -200, behavior: 'smooth' });
+            }}
+            className="hidden md:flex p-1.5 text-slate-400 hover:text-slate-800 hover:bg-white rounded-xl transition-all shrink-0 cursor-pointer"
+            title="Scroll left"
+          >
+            <ChevronRight size={14} className="rotate-180" />
+          </button>
+
+          <nav 
+            id="exam-module-tabs-nav"
+            className="flex items-center gap-1 overflow-x-auto no-scrollbar scroll-smooth py-0.5 px-1 flex-1"
+          >
+            {[
+              { id: 'dashboard', label: 'Dashboard', icon: Trophy },
+              { id: 'exams', label: 'Exams & Assessments', icon: Layers, permission: 'results.publish' },
+              { id: 'schedule', label: 'Exam Schedule', icon: Calendar },
+              { id: 'admit-cards', label: 'Admit Cards', icon: IdCard },
+              { id: 'seating-plan', label: 'Seating Plan', icon: Sparkles },
+              { id: 'invigilation', label: 'Invigilation', icon: ShieldCheck },
+              { id: 'exam-attendance', label: 'Exam Attendance', icon: UserCheck },
+              { id: 'marks-entry', label: 'Marks Entry', icon: ClipboardList },
+              { id: 'marks-verification', label: 'Marks Verification', icon: CheckCircle2, permission: 'results.publish' },
+              { id: 'result-processing', label: 'Result Processing', icon: Award, permission: 'results.publish' },
+              { id: 'report-cards', label: 'Report Cards', icon: FileText },
+              { id: 'result-publishing', label: 'Result Publishing', icon: Send, permission: 'results.publish' },
+              { id: 'analytics', label: 'Performance Analytics', icon: BarChart3 },
+              { id: 'settings', label: 'Examination Settings', icon: Settings, permission: 'results.publish' }
+            ].filter(tab => !tab.permission || can(tab.permission)).map(tab => {
+              const isActive = currentTab === tab.id || (tab.id === 'dashboard' && currentTab === 'overview');
+              return (
+                <button
+                  key={tab.id}
+                  id={`exam-tab-${tab.id}`}
+                  onClick={() => {
+                    setTab(tab.id);
+                    const el = document.getElementById(`exam-tab-${tab.id}`);
+                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                  }}
+                  className={cn(
+                    "flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer select-none",
+                    isActive 
+                      ? "bg-white text-slate-900 shadow-xs border border-slate-200/80" 
+                      : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
+                  )}
+                >
+                  <tab.icon size={13} className={isActive ? "text-blue-600" : "text-slate-400"} />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+
+          <button
+            type="button"
+            onClick={() => {
+              const nav = document.getElementById('exam-module-tabs-nav');
+              if (nav) nav.scrollBy({ left: 200, behavior: 'smooth' });
+            }}
+            className="hidden md:flex p-1.5 text-slate-400 hover:text-slate-800 hover:bg-white rounded-xl transition-all shrink-0 cursor-pointer"
+            title="Scroll right"
+          >
+            <ChevronRight size={14} />
+          </button>
+        </div>
       </div>
 
       {/* 4. Tab Workspace Content */}
@@ -603,7 +649,7 @@ export default function ExaminationModule({ view: propView }: ExaminationModuleP
           {(currentTab === 'dashboard' || currentTab === 'overview') && (
             <DashboardView
               academicYears={academicYears}
-              selectedYearId={academicYears.find(y => y.is_current)?.id || academicYears[0]?.id || '2026-27'}
+              selectedYearId={academicYears.find(y => y.is_current)?.id || academicYears[0]?.id || ''}
               onNavigateTab={(targetTab, extra) => setTab(targetTab, extra)}
             />
           )}
@@ -615,7 +661,7 @@ export default function ExaminationModule({ view: propView }: ExaminationModuleP
               classes={classes}
               subjects={subjects}
               teachers={teachers}
-              selectedYearId={academicYears.find(y => y.is_current)?.id || academicYears[0]?.id || '2026-27'}
+              selectedYearId={academicYears.find(y => y.is_current)?.id || academicYears[0]?.id || ''}
               onNavigateTab={(targetTab, extra) => setTab(targetTab, extra)}
             />
           )}
@@ -640,7 +686,7 @@ export default function ExaminationModule({ view: propView }: ExaminationModuleP
             <InvigilationView
               exams={exams}
               teachers={teachers}
-              selectedYearId={academicYears.find(y => y.is_current)?.id || academicYears[0]?.id || '2026-27'}
+              selectedYearId={academicYears.find(y => y.is_current)?.id || academicYears[0]?.id || ''}
             />
           )}
 
@@ -727,7 +773,7 @@ export default function ExaminationModule({ view: propView }: ExaminationModuleP
             <ResultPublishingView
               exams={exams}
               classes={classes}
-              selectedYearId={academicYears.find(y => y.is_current)?.id || academicYears[0]?.id || '2026-27'}
+              selectedYearId={academicYears.find(y => y.is_current)?.id || academicYears[0]?.id || ''}
               onNavigateTab={(targetTab, extra) => setTab(targetTab, extra)}
             />
           )}

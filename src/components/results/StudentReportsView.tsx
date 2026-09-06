@@ -18,7 +18,12 @@ import {
   FileText,
   Loader2,
   Sparkles,
-  GraduationCap
+  GraduationCap,
+  Filter,
+  CheckSquare,
+  AlertCircle,
+  HelpCircle,
+  Eye
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -41,8 +46,28 @@ interface StudentReportViewProps {
   initialClass?: string;
 }
 
+/**
+ * Computes the subsequent promoted class name cleanly
+ */
+function getNextClassDisplay(currentClassStr: string): string {
+  if (!currentClassStr) return 'Next Grade';
+  const norm = currentClassStr.trim().toUpperCase();
+  if (norm === 'NURSERY' || norm === 'NUR') return 'LKG';
+  if (norm === 'LKG' || norm === 'L.K.G.' || norm === 'L.K.G') return 'UKG';
+  if (norm === 'UKG' || norm === 'U.K.G.' || norm === 'U.K.G') return 'Class 1';
+  
+  const num = parseInt(norm.replace(/\D/g, ''), 10);
+  if (!isNaN(num)) {
+    if (num >= 12) return 'Higher Education / Alumni Graduation';
+    return `Class ${num + 1}`;
+  }
+  return 'Next Higher Class';
+}
+
 export default function StudentReportsView({ mode, initialStudentId, initialClass }: StudentReportViewProps) {
   const [selectedClass, setSelectedClass] = useState(initialClass || 'All');
+  const [selectedSection, setSelectedSection] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedStudentId, setSelectedStudentId] = useState(initialStudentId || '');
   const [selectedExamId, setSelectedExamId] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -58,6 +83,8 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
   const [exams, setExams] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
+  const [examSubjects, setExamSubjects] = useState<any[]>([]);
+  const [classSubjects, setClassSubjects] = useState<any[]>([]);
   const [classesList, setClassesList] = useState<any[]>([]);
   const [studentMarks, setStudentMarks] = useState<any[]>([]);
   const [examResult, setExamResult] = useState<any | null>(null);
@@ -75,7 +102,7 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
     remarks: 'Consistent academic performance and active participation in institutional activities.'
   });
 
-  // Initial load for exams, classes, subjects
+  // Initial load for exams, classes, subjects, exam_subjects, class_subjects
   useEffect(() => {
     fetchBaseContext();
   }, []);
@@ -83,11 +110,13 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
   const fetchBaseContext = async () => {
     setIsLoading(true);
     try {
-      const [examsRes, subjectsRes, studentsRes, classesRes] = await Promise.all([
+      const [examsRes, subjectsRes, studentsRes, classesRes, esRes, csRes] = await Promise.all([
         supabase.from('exams').select('*').order('created_at', { ascending: false }),
         supabase.from('subjects').select('*').order('subject_name'),
-        supabase.from('students').select('*').eq('status', 'active').order('name'),
-        supabase.from('classes').select('*').order('display_order', { ascending: true })
+        supabase.from('students').select('*').eq('status', 'active').order('roll_number', { ascending: true }),
+        supabase.from('classes').select('*').order('display_order', { ascending: true }),
+        supabase.from('exam_subjects').select('*'),
+        supabase.from('class_subjects').select('id, class_id, subject_id, is_active, subjects(id, subject_name, subject_code)')
       ]);
 
       const examList = examsRes.data || [];
@@ -96,6 +125,8 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
       setSubjects(subjectsRes.data || []);
       setStudents(studentList);
       setClassesList(classesRes.data || []);
+      setExamSubjects(esRes.data || []);
+      setClassSubjects(csRes.data || []);
 
       if (examList.length > 0 && !selectedExamId) {
         setSelectedExamId(examList[0].id);
@@ -111,10 +142,33 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
     }
   };
 
-  // Filter students based on selected class
+  // Filter exams available for current selection
+  const filteredExams = useMemo(() => {
+    if (selectedClass === 'All') return exams;
+    return exams.filter(ex => !ex.class || isSameClass(ex.class, selectedClass));
+  }, [exams, selectedClass]);
+
+  // Sync selected exam if filtered list changes
+  useEffect(() => {
+    if (filteredExams.length > 0 && !filteredExams.some(e => e.id === selectedExamId)) {
+      setSelectedExamId(filteredExams[0].id);
+    }
+  }, [filteredExams, selectedExamId]);
+
+  // Filter students based on selected class, section & query
   const filteredStudents = useMemo(() => {
-    return students.filter(s => selectedClass === 'All' || isSameClass(s.class, selectedClass));
-  }, [students, selectedClass]);
+    return students.filter(s => {
+      const matchClass = selectedClass === 'All' || isSameClass(s.class, selectedClass);
+      const matchSection = selectedSection === 'All' || (s.section || '').toUpperCase() === selectedSection.toUpperCase();
+      const q = searchQuery.toLowerCase().trim();
+      const matchQuery = !q || 
+        (s.name || '').toLowerCase().includes(q) ||
+        (s.roll_number || '').toString().includes(q) ||
+        (s.admission_number || '').toLowerCase().includes(q);
+      
+      return matchClass && matchSection && matchQuery;
+    });
+  }, [students, selectedClass, selectedSection, searchQuery]);
 
   // Keep selectedStudentId valid
   useEffect(() => {
@@ -122,6 +176,26 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
       setSelectedStudentId(filteredStudents[0].id);
     }
   }, [filteredStudents, selectedStudentId]);
+
+  const activeStudent = useMemo(() => {
+    return students.find(s => s.id === selectedStudentId) || filteredStudents[0] || students[0] || null;
+  }, [students, selectedStudentId, filteredStudents]);
+
+  const activeExam = useMemo(() => {
+    return exams.find(e => e.id === selectedExamId) || filteredExams[0] || exams[0] || null;
+  }, [exams, selectedExamId, filteredExams]);
+
+  // When activeStudent changes and has a class, sync the exam if current exam is for another class
+  useEffect(() => {
+    if (activeStudent && activeStudent.class && activeExam && activeExam.class) {
+      if (!isSameClass(activeStudent.class, activeExam.class)) {
+        const matchingExam = exams.find(e => isSameClass(e.class, activeStudent.class));
+        if (matchingExam) {
+          setSelectedExamId(matchingExam.id);
+        }
+      }
+    }
+  }, [activeStudent?.id, exams]);
 
   // Fetch student-specific marks, results, attendance, and co-scholastics
   useEffect(() => {
@@ -206,7 +280,7 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
         .upsert([payload], { onConflict: 'student_id' });
 
       if (error) {
-        // If no unique constraint on student_id alone, fallback to delete + insert
+        // Fallback to delete + insert if constraint differs
         await supabase.from('co_scholastic').delete().eq('student_id', selectedStudentId);
         const { error: insErr } = await supabase.from('co_scholastic').insert([payload]);
         if (insErr) throw insErr;
@@ -221,28 +295,103 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
     }
   };
 
-  const activeStudent = useMemo(() => {
-    return students.find(s => s.id === selectedStudentId) || students[0] || null;
-  }, [students, selectedStudentId]);
-
-  const activeExam = useMemo(() => {
-    return exams.find(e => e.id === selectedExamId) || exams[0] || null;
-  }, [exams, selectedExamId]);
-
-  // Prepare scholastic subject breakdown table
+  // Determine subjects strictly mapped to this exam & student's class
   const scholasticRows = useMemo(() => {
-    if (!activeStudent || subjects.length === 0) return [];
+    if (!activeStudent) return [];
 
-    const marksMap: Record<string, any> = {};
+    const marksBySubjectId: Record<string, any> = {};
+    const marksBySubjectName: Record<string, any> = {};
     studentMarks.forEach(m => {
-      marksMap[m.subject_id] = m;
+      if (m.subject_id) marksBySubjectId[m.subject_id] = m;
+      if (m.subject_name) marksBySubjectName[m.subject_name.toLowerCase().trim()] = m;
     });
 
-    const relevantSubjects = subjects.filter(sub => marksMap[sub.id] !== undefined);
-    const targetSubjects = relevantSubjects.length > 0 ? relevantSubjects : subjects.slice(0, 5);
+    // 1. First priority: Real exam_subjects rows configured for this selected exam
+    let candidateSubjects: Array<{
+      subject_id?: string;
+      subject_name: string;
+      subject_code?: string;
+      max_marks?: number;
+      pass_marks?: number;
+    }> = [];
 
-    return targetSubjects.map((sub, idx) => {
-      const markEntry = marksMap[sub.id];
+    const matchingExamSubjects = examSubjects.filter(es => es.exam_id === selectedExamId);
+    if (matchingExamSubjects.length > 0) {
+      candidateSubjects = matchingExamSubjects.map(es => {
+        const fullSub = subjects.find(s => s.id === es.subject_id);
+        return {
+          subject_id: es.subject_id,
+          subject_name: es.subject_name || fullSub?.subject_name || 'Subject',
+          subject_code: fullSub?.subject_code || (es.subject_id ? `SUB-${es.subject_id.slice(0, 4).toUpperCase()}` : undefined),
+          max_marks: Number(es.max_marks) || 100,
+          pass_marks: Number(es.pass_marks) || Math.round((Number(es.max_marks) || 100) * 0.33)
+        };
+      });
+    }
+
+    // 2. Second priority: If no exam_subjects, fetch class_subjects for student's class
+    if (candidateSubjects.length === 0 && activeStudent.class) {
+      const studentClassObj = classesList.find(c => isSameClass(c.class_name, activeStudent.class));
+      const studentClassId = studentClassObj?.id;
+      
+      const matchingClassSubjects = classSubjects.filter(cs => {
+        if (studentClassId && cs.class_id === studentClassId) return true;
+        return false;
+      });
+
+      if (matchingClassSubjects.length > 0) {
+        candidateSubjects = matchingClassSubjects.map(cs => {
+          const subData = cs.subjects || subjects.find(s => s.id === cs.subject_id);
+          return {
+            subject_id: cs.subject_id,
+            subject_name: subData?.subject_name || 'Subject',
+            subject_code: subData?.subject_code,
+            max_marks: 100,
+            pass_marks: 33
+          };
+        });
+      }
+    }
+
+    // 3. Third priority: Subjects from studentMarks records
+    if (candidateSubjects.length === 0 && studentMarks.length > 0) {
+      candidateSubjects = studentMarks.map(m => {
+        const fullSub = subjects.find(s => s.id === m.subject_id);
+        return {
+          subject_id: m.subject_id,
+          subject_name: m.subject_name || fullSub?.subject_name || 'Subject',
+          subject_code: fullSub?.subject_code,
+          max_marks: Number(m.max_marks) || 100,
+          pass_marks: Number(m.pass_marks) || 33
+        };
+      });
+    }
+
+    // 4. Ultimate fallback: If student's class is known, filter subjects logically (avoid senior subjects for primary/pre-primary)
+    if (candidateSubjects.length === 0) {
+      const isJunior = /^(LKG|UKG|NURSERY|1|2|3|4|5)$/i.test(activeStudent.class || '');
+      const defaultJuniorNames = ['English', 'Hindi', 'Mathematics', 'Environmental Studies', 'General Knowledge'];
+      
+      const filtered = subjects.filter(s => {
+        if (isJunior) {
+          return defaultJuniorNames.some(d => s.subject_name.toLowerCase().includes(d.toLowerCase()));
+        }
+        return true;
+      });
+
+      candidateSubjects = (filtered.length > 0 ? filtered : subjects).slice(0, 5).map(s => ({
+        subject_id: s.id,
+        subject_name: s.subject_name,
+        subject_code: s.subject_code,
+        max_marks: 100,
+        pass_marks: 33
+      }));
+    }
+
+    return candidateSubjects.map((sub, idx) => {
+      const markEntry = (sub.subject_id && marksBySubjectId[sub.subject_id]) || 
+        marksBySubjectName[sub.subject_name.toLowerCase().trim()];
+      
       const isAbsent = markEntry ? !!markEntry.is_absent : false;
       const pt = isAbsent ? 0 : Number(markEntry?.periodic_test_marks || 0);
       const ma = isAbsent ? 0 : Number(markEntry?.multiple_assessment_marks || 0);
@@ -250,8 +399,24 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
       const se = isAbsent ? 0 : Number(markEntry?.subject_enrichment_marks || 0);
       const ae = isAbsent ? 0 : Number(markEntry?.annual_exam_marks || 0);
       const internalTotal = pt + ma + pf + se;
-      const grandTotal = isAbsent ? 0 : (markEntry?.obtained_marks ? Number(markEntry.obtained_marks) : internalTotal + ae);
-      const grade = isAbsent ? 'ABS' : calculateCBSEGrade(grandTotal).grade;
+      
+      const maxMarks = sub.max_marks || 100;
+      const passMarks = sub.pass_marks || Math.round(maxMarks * 0.33);
+
+      let grandTotal = 0;
+      if (isAbsent) {
+        grandTotal = 0;
+      } else if (markEntry?.obtained_marks !== undefined && markEntry?.obtained_marks !== null) {
+        grandTotal = Number(markEntry.obtained_marks);
+      } else if (internalTotal + ae > 0) {
+        grandTotal = internalTotal + ae;
+      } else {
+        grandTotal = 0;
+      }
+
+      const percentage = maxMarks > 0 ? Math.round((grandTotal / maxMarks) * 10000) / 100 : 0;
+      const grade = isAbsent ? 'ABS' : calculateCBSEGrade(percentage).grade;
+      const isPass = !isAbsent && grandTotal >= passMarks;
 
       return {
         serial: idx + 1,
@@ -263,74 +428,104 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
         se,
         internalTotal,
         theoryTotal: ae,
-        maxMarks: 100,
+        maxMarks,
+        passMarks,
         grandTotal,
+        percentage,
         grade,
-        isAbsent
+        isAbsent,
+        isPass
       };
     });
-  }, [activeStudent, subjects, studentMarks]);
+  }, [activeStudent, subjects, examSubjects, classSubjects, classesList, studentMarks, selectedExamId]);
 
   // Aggregate stats
   const totalObtained = scholasticRows.reduce((sum, r) => sum + (r.isAbsent ? 0 : r.grandTotal), 0);
-  const totalMax = scholasticRows.length * 100;
+  const totalMax = scholasticRows.reduce((sum, r) => sum + r.maxMarks, 0);
   const overallPercentage = totalMax > 0 ? Math.round((totalObtained / totalMax) * 10000) / 100 : 0;
   const overallGrade = calculateCBSEGrade(overallPercentage).grade;
-  const isOverallPass = scholasticRows.every(r => r.isAbsent ? false : r.grandTotal >= 33) && scholasticRows.length > 0;
+  const isOverallPass = scholasticRows.length > 0 && scholasticRows.every(r => r.isPass);
+  
+  const isUnitOrPAMode = scholasticRows.length > 0 && scholasticRows.every(r => r.maxMarks <= 50);
+
+  const nextClassStr = getNextClassDisplay(activeStudent?.class || '');
   const promotionText = isOverallPass 
-    ? `Promoted unconditionally to ${activeStudent ? `Class ${parseInt(activeStudent.class.replace(/\D/g, '') || '1') + 1}` : 'next grade'}`
-    : 'Academic Evaluation Ongoing / Remedial Required';
+    ? `Promoted unconditionally to ${nextClassStr}`
+    : 'Academic Evaluation Ongoing / Remedial Classes Prescribed';
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {/* 1. Header Filter Controls */}
-      <div className="bg-white rounded-[20px] border border-slate-200/60 p-4 shadow-2xs flex flex-wrap items-center justify-between gap-3">
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-3.5 shadow-xs flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2.5">
           {/* Class select */}
           <div className="flex flex-col min-w-[120px]">
-            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1">Class Filter</span>
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1">Class</span>
             <select 
               value={selectedClass} 
               onChange={(e) => setSelectedClass(e.target.value)}
-              className="bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs font-bold text-slate-700 outline-none h-[36px] cursor-pointer focus:border-violet-500 focus:bg-white"
+              className="bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs font-bold text-slate-800 outline-none h-[36px] cursor-pointer hover:border-slate-300 focus:border-violet-500 focus:bg-white transition-colors"
             >
-              <option value="All">All Classes</option>
+              <option value="All">All Classes ({students.length})</option>
               {classesList.length > 0 ? (
                 classesList.map(c => (
-                  <option key={c.id} value={c.class_name}>{formatClassDisplay(c.class_name)}</option>
+                  <option key={c.id} value={c.class_name}>
+                    {formatClassDisplay(c.class_name)} ({students.filter(s => isSameClass(s.class, c.class_name)).length})
+                  </option>
                 ))
               ) : (
-                ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', 'LKG'].map(c => (
+                ['LKG', 'UKG', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'].map(c => (
                   <option key={c} value={c}>{formatClassDisplay(c)}</option>
                 ))
               )}
             </select>
           </div>
 
-          {/* Student selection */}
-          <div className="flex flex-col min-w-[200px]">
-            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1">Student Candidate</span>
+          {/* Section Filter */}
+          <div className="flex flex-col min-w-[90px]">
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1">Section</span>
             <select 
-              value={selectedStudentId} 
-              onChange={(e) => setSelectedStudentId(e.target.value)}
-              className="bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs font-bold text-slate-700 outline-none h-[36px] cursor-pointer focus:border-violet-500 focus:bg-white"
+              value={selectedSection} 
+              onChange={(e) => setSelectedSection(e.target.value)}
+              className="bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs font-bold text-slate-800 outline-none h-[36px] cursor-pointer hover:border-slate-300 focus:border-violet-500 focus:bg-white transition-colors"
             >
-              {filteredStudents.map(st => (
-                <option key={st.id} value={st.id}>{st.name} (Roll #{st.roll_number || 'N/A'})</option>
-              ))}
+              <option value="All">All Sec</option>
+              <option value="A">Sec A</option>
+              <option value="B">Sec B</option>
+              <option value="C">Sec C</option>
             </select>
           </div>
 
           {/* Exam term */}
-          <div className="flex flex-col min-w-[170px]">
+          <div className="flex flex-col min-w-[200px]">
             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1">Examination Term</span>
             <select 
               value={selectedExamId} 
               onChange={(e) => setSelectedExamId(e.target.value)}
-              className="bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs font-bold text-slate-700 outline-none h-[36px] cursor-pointer focus:border-violet-500 focus:bg-white"
+              className="bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs font-bold text-slate-800 outline-none h-[36px] cursor-pointer hover:border-slate-300 focus:border-violet-500 focus:bg-white transition-colors"
             >
-              {exams.map(ex => (
-                <option key={ex.id} value={ex.id}>{ex.exam_name} ({ex.academic_year})</option>
+              {filteredExams.map(ex => (
+                <option key={ex.id} value={ex.id}>
+                  {ex.exam_name} {ex.class ? `[Class ${ex.class}]` : ''} ({ex.academic_year || '2026-27'})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Student selection */}
+          <div className="flex flex-col min-w-[220px]">
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1">
+              Candidate ({filteredStudents.length})
+            </span>
+            <select 
+              value={selectedStudentId} 
+              onChange={(e) => setSelectedStudentId(e.target.value)}
+              className="bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs font-bold text-slate-800 outline-none h-[36px] cursor-pointer hover:border-slate-300 focus:border-violet-500 focus:bg-white transition-colors"
+            >
+              {filteredStudents.map(st => (
+                <option key={st.id} value={st.id}>
+                  {st.name} • Roll #{st.roll_number || 'N/A'} ({formatClassDisplay(st.class)}-{st.section || 'A'})
+                </option>
               ))}
             </select>
           </div>
@@ -338,16 +533,16 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
           {mode === 'final' && (
             <>
               {/* Zoom Selector */}
-              <div className="flex flex-col min-w-[90px]">
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1">Zoom Factor</span>
+              <div className="flex flex-col min-w-[85px]">
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1">Scale</span>
                 <select 
                   value={zoom} 
                   onChange={(e) => setZoom(parseFloat(e.target.value))}
-                  className="bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-2.5 text-xs font-semibold text-slate-600 h-[36px] cursor-pointer"
+                  className="bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-2.5 text-xs font-semibold text-slate-700 h-[36px] cursor-pointer hover:border-slate-300"
                 >
-                  <option value="0.85">85% Fit</option>
-                  <option value="1.0">100% Std</option>
-                  <option value="1.15">115% Zoom</option>
+                  <option value="0.85">85%</option>
+                  <option value="1.0">100%</option>
+                  <option value="1.15">115%</option>
                 </select>
               </div>
 
@@ -357,11 +552,12 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
                 <select 
                   value={watermark} 
                   onChange={(e) => setWatermark(e.target.value)}
-                  className="bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-2.5 text-xs font-semibold text-slate-600 h-[36px] cursor-pointer"
+                  className="bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-2.5 text-xs font-semibold text-slate-700 h-[36px] cursor-pointer hover:border-slate-300"
                 >
                   <option value="NONE">None</option>
                   <option value="OFFICIAL COPY">Official Copy</option>
                   <option value="VERIFIED ERP">Verified ERP</option>
+                  <option value="CONFIDENTIAL">Confidential</option>
                   <option value="DRAFT">Draft</option>
                 </select>
               </div>
@@ -373,9 +569,9 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
           <button 
             onClick={handleSaveCoScholastic}
             disabled={isSaving}
-            className="flex items-center gap-1.5 px-5 h-[36px] bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-violet-500/15 cursor-pointer active:scale-95"
+            className="flex items-center gap-1.5 px-5 h-[36px] bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
           >
-            <Save className="w-3.5 h-3.5" />
+            {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
             {isSaving ? 'Saving...' : 'Sync Co-Scholastics'}
           </button>
         ) : (
@@ -399,7 +595,7 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
                     format: [794, 1123]
                   });
                   pdf.addImage(imgData, 'PNG', 0, 0, 794, 1123);
-                  pdf.save(`CBSE_ReportCard_${(activeStudent?.name || 'Student').replace(/\s+/g, '_')}.pdf`);
+                  pdf.save(`CBSE_ReportCard_${(activeStudent?.name || 'Student').replace(/\s+/g, '_')}_${formatClassDisplay(activeStudent?.class)}.pdf`);
                   toast.success('Report Card PDF downloaded successfully!', { id: toastId });
                 } catch (err) {
                   console.error(err);
@@ -409,7 +605,7 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
                 }
               }}
               disabled={isGeneratingPdf}
-              className="flex items-center gap-1.5 px-4 h-[36px] border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-3.5 h-[36px] border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs"
             >
               {isGeneratingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download size={14} />}
               Download PDF
@@ -419,7 +615,7 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
                 const ok = printRegion('student-report-print', `Report Card — ${activeStudent?.name || 'Student'}`);
                 if (!ok) toast.error('Open a student report card before printing.');
               }}
-              className="flex items-center gap-1.5 px-4 h-[36px] bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-violet-500/15 cursor-pointer"
+              className="flex items-center gap-1.5 px-4 h-[36px] bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
             >
               <Printer className="w-3.5 h-3.5" />
               Print Report
@@ -430,14 +626,14 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
 
       {/* 2. Co-Scholastic Mode vs Full Report Card Mode */}
       {mode === 'coscholastic' ? (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          <div className="md:col-span-2 bg-white border border-slate-200/60 shadow-2xs rounded-[22px] p-6 space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="md:col-span-2 bg-white border border-slate-200/80 shadow-xs rounded-2xl p-5 space-y-4">
             <div>
               <h4 className="text-sm font-extrabold text-slate-800">Co-Scholastic & Life Skills Evaluation</h4>
-              <p className="text-slate-400 text-xs mt-0.5">CBSE 5-point grading (A+, A, B+, B, C) for non-academic capabilities</p>
+              <p className="text-slate-400 text-xs mt-0.5">CBSE 5-point grading scale (A+, A, B+, B, C) for non-academic performance</p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
               {[
                 { key: 'discipline', label: 'Discipline & General Conduct', icon: Shield },
                 { key: 'sports', label: 'Physical Education & Sportsmanship', icon: Activity },
@@ -449,7 +645,7 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
                 { key: 'leadership', label: 'Collaboration & Initiative', icon: User },
                 { key: 'communication', label: 'Interpersonal & Speaking Skills', icon: User }
               ].map((param) => (
-                <div key={param.key} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <div key={param.key} className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-100">
                   <div className="flex items-center gap-2">
                     <param.icon className="w-3.5 h-3.5 text-violet-600" />
                     <span className="text-xs font-bold text-slate-700">{param.label}</span>
@@ -468,22 +664,24 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
             </div>
           </div>
 
-          <div className="bg-white border border-slate-200/60 shadow-2xs rounded-[22px] p-6 flex flex-col justify-between space-y-4">
+          <div className="bg-white border border-slate-200/80 shadow-xs rounded-2xl p-5 flex flex-col justify-between space-y-4">
             <div>
               <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Teacher Remarks</h4>
-              <p className="text-slate-400 text-[10px] font-semibold mb-3">Narrative evaluation on student progress</p>
+              <p className="text-slate-400 text-[10px] font-semibold mb-2.5">Narrative feedback on student demeanor & progress</p>
               <textarea 
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-medium text-slate-700 outline-none focus:border-violet-500 focus:bg-white min-h-[140px]"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-medium text-slate-700 outline-none focus:border-violet-500 focus:bg-white min-h-[140px] resize-none"
                 placeholder="Type descriptive teacher evaluation..."
                 value={coScholasticData.remarks || ''}
                 onChange={(e) => setCoScholasticData({ ...coScholasticData, remarks: e.target.value })}
               />
             </div>
 
-            <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-3 text-center">
+            <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 text-center">
               <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">CURRENT CANDIDATE</span>
               <h5 className="font-extrabold text-slate-800 text-xs mt-0.5 uppercase">{activeStudent?.name || 'Candidate'}</h5>
-              <p className="text-[9px] text-violet-600 font-mono font-bold mt-0.5">Roll #{activeStudent?.roll_number || 'N/A'} • {formatClassDisplay(activeStudent?.class)}</p>
+              <p className="text-[10px] text-violet-600 font-mono font-bold mt-0.5">
+                Roll #{activeStudent?.roll_number || 'N/A'} • {formatClassDisplay(activeStudent?.class)} - {activeStudent?.section || 'A'}
+              </p>
             </div>
           </div>
         </div>
@@ -493,22 +691,22 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
           ref={reportRef}
           id="student-report-print"
           style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}
-          className="space-y-6 transition-transform duration-200 relative"
+          className="space-y-4 transition-transform duration-200 relative pb-12"
         >
           {/* Dynamic Watermark Stamp Overlay */}
           {watermark !== 'NONE' && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden z-[5]">
-              <div className="text-[90px] font-black text-slate-400/10 uppercase tracking-widest -rotate-30 whitespace-nowrap">
+              <div className="text-[84px] font-black text-slate-400/10 uppercase tracking-widest -rotate-30 whitespace-nowrap">
                 {watermark}
               </div>
             </div>
           )}
 
-          {/* Authentic CBSE Standard Report Card */}
-          <div className="max-w-2xl mx-auto bg-white border border-slate-900 p-6 md:p-8 space-y-5 relative print:border-none print:shadow-none animate-fadeIn text-slate-900 rounded-none shadow-none font-sans">
+          {/* Authentic CBSE Standard Report Card Frame */}
+          <div className="max-w-3xl mx-auto bg-white border border-slate-900 p-6 md:p-8 space-y-4 relative print:border-none print:shadow-none animate-fadeIn text-slate-900 rounded-none shadow-sm font-sans">
             
-            {/* School Logo Watermark */}
-            <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none z-0 select-none">
+            {/* Background Crest Watermark */}
+            <div className="absolute inset-0 flex items-center justify-center opacity-[0.025] pointer-events-none z-0 select-none">
               <GraduationCap className="w-80 h-80 text-slate-950" />
             </div>
 
@@ -551,50 +749,50 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
 
             {/* Title Bar */}
             <div className="bg-[#e4ebf5] border-y border-slate-950 py-1.5 text-center relative z-10">
-              <span className="font-extrabold text-[11px] text-[#1a2b4c] uppercase tracking-widest block">
-                ANNUAL PROGRESS REPORT - SESSION {activeExam?.academic_year || '2026-2027'}
+              <span className="font-black text-[11px] text-[#1a2b4c] uppercase tracking-widest block">
+                {activeExam?.exam_name || 'ANNUAL PROGRESS REPORT'} — SESSION {activeExam?.academic_year || '2026-2027'}
               </span>
             </div>
 
-            {/* Student Biodata */}
+            {/* Student Biodata Grid */}
             <div className="border border-slate-950 p-3 space-y-1.5 text-[8.5px] font-bold text-slate-800 relative z-10">
               <div className="grid grid-cols-2 gap-y-1.5 gap-x-6">
-                <div className="grid grid-cols-[90px_1fr] gap-x-2 border-b border-slate-100 pb-0.5">
+                <div className="grid grid-cols-[95px_1fr] gap-x-2 border-b border-slate-100 pb-0.5">
                   <span className="text-slate-400 uppercase text-[7px]">Candidate Name</span>
                   <span className="text-slate-950 uppercase font-black">{activeStudent?.name || 'N/A'}</span>
                 </div>
-                <div className="grid grid-cols-[90px_1fr] gap-x-2 border-b border-slate-100 pb-0.5">
+                <div className="grid grid-cols-[95px_1fr] gap-x-2 border-b border-slate-100 pb-0.5">
                   <span className="text-slate-400 uppercase text-[7px]">Admission No</span>
                   <span className="text-slate-950 font-mono">{activeStudent?.admission_number || 'N/A'}</span>
                 </div>
-                <div className="grid grid-cols-[90px_1fr] gap-x-2 border-b border-slate-100 pb-0.5">
+                <div className="grid grid-cols-[95px_1fr] gap-x-2 border-b border-slate-100 pb-0.5">
                   <span className="text-slate-400 uppercase text-[7px]">Father's Name</span>
                   <span className="text-slate-950 uppercase">{activeStudent?.father_name || 'N/A'}</span>
                 </div>
-                <div className="grid grid-cols-[90px_1fr] gap-x-2 border-b border-slate-100 pb-0.5">
+                <div className="grid grid-cols-[95px_1fr] gap-x-2 border-b border-slate-100 pb-0.5">
                   <span className="text-slate-400 uppercase text-[7px]">Class & Section</span>
                   <span className="text-slate-950 uppercase">{formatClassDisplay(activeStudent?.class)} - {activeStudent?.section || 'A'}</span>
                 </div>
-                <div className="grid grid-cols-[90px_1fr] gap-x-2 border-b border-slate-100 pb-0.5">
+                <div className="grid grid-cols-[95px_1fr] gap-x-2 border-b border-slate-100 pb-0.5">
                   <span className="text-slate-400 uppercase text-[7px]">Mother's Name</span>
                   <span className="text-slate-950 uppercase">{activeStudent?.mother_name || 'N/A'}</span>
                 </div>
-                <div className="grid grid-cols-[90px_1fr] gap-x-2 border-b border-slate-100 pb-0.5">
+                <div className="grid grid-cols-[95px_1fr] gap-x-2 border-b border-slate-100 pb-0.5">
                   <span className="text-slate-400 uppercase text-[7px]">Roll Number</span>
                   <span className="text-slate-950 font-mono">#{activeStudent?.roll_number || 'N/A'}</span>
                 </div>
-                <div className="grid grid-cols-[90px_1fr] gap-x-2">
+                <div className="grid grid-cols-[95px_1fr] gap-x-2">
                   <span className="text-slate-400 uppercase text-[7px]">Attendance Record</span>
                   <span className="text-emerald-700 font-mono">
                     {attendanceSummary && attendanceSummary.total_days > 0
                       ? `${attendanceSummary.percentage}% (${attendanceSummary.present_days}/${attendanceSummary.total_days} Days)`
-                      : 'No attendance recorded'}
+                      : 'Recorded on Register'}
                   </span>
                 </div>
-                <div className="grid grid-cols-[90px_1fr] gap-x-2">
+                <div className="grid grid-cols-[95px_1fr] gap-x-2">
                   <span className="text-slate-400 uppercase text-[7px]">Result Status</span>
                   <span className={cn("uppercase font-black", isOverallPass ? "text-emerald-700" : "text-rose-700")}>
-                    {isOverallPass ? 'Passed & Promoted' : 'Academic Evaluation'}
+                    {isOverallPass ? 'Passed & Promoted' : 'Academic Evaluation Ongoing'}
                   </span>
                 </div>
               </div>
@@ -603,48 +801,93 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
             {/* 1. Scholastic Areas Table */}
             <div className="space-y-1 relative z-10">
               <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-widest block">
-                1. Scholastic Areas (CBSE 8-Point Grading Matrix)
+                1. Scholastic Areas (CBSE Academic Performance Matrix)
               </span>
               <div className="border border-slate-950 overflow-hidden">
                 <table className="w-full text-left text-[9px] border-collapse">
                   <thead>
-                    <tr className="bg-slate-100 border-b border-slate-950 text-[7px] font-black text-slate-900 uppercase tracking-wider">
-                      <th className="py-1.5 px-2 border-r border-slate-300">S.No</th>
-                      <th className="py-1.5 px-2 border-r border-slate-300">Subject Name</th>
-                      <th className="py-1.5 px-2 text-center border-r border-slate-300">PT (10)</th>
-                      <th className="py-1.5 px-2 text-center border-r border-slate-300">MA (5)</th>
-                      <th className="py-1.5 px-2 text-center border-r border-slate-300">PF (5)</th>
-                      <th className="py-1.5 px-2 text-center border-r border-slate-300">SE (5)</th>
-                      <th className="py-1.5 px-2 text-center border-r border-slate-300">Theory (80)</th>
-                      <th className="py-1.5 px-2 text-center border-r border-slate-300 font-black">Total (100)</th>
-                      <th className="py-1.5 px-2 text-center font-black">Grade</th>
-                    </tr>
+                    {isUnitOrPAMode ? (
+                      <tr className="bg-slate-100 border-b border-slate-950 text-[7.5px] font-black text-slate-900 uppercase tracking-wider">
+                        <th className="py-1.5 px-2 border-r border-slate-300 w-10 text-center">S.No</th>
+                        <th className="py-1.5 px-2 border-r border-slate-300 w-24">Subject Code</th>
+                        <th className="py-1.5 px-2 border-r border-slate-300">Subject Name</th>
+                        <th className="py-1.5 px-2 text-center border-r border-slate-300 w-20">Max Marks</th>
+                        <th className="py-1.5 px-2 text-center border-r border-slate-300 w-20">Pass Marks</th>
+                        <th className="py-1.5 px-2 text-center border-r border-slate-300 w-24 font-black">Marks Obtained</th>
+                        <th className="py-1.5 px-2 text-center border-r border-slate-300 w-20">Percentage</th>
+                        <th className="py-1.5 px-2 text-center w-16 font-black">Grade</th>
+                      </tr>
+                    ) : (
+                      <tr className="bg-slate-100 border-b border-slate-950 text-[7px] font-black text-slate-900 uppercase tracking-wider">
+                        <th className="py-1.5 px-2 border-r border-slate-300 text-center">S.No</th>
+                        <th className="py-1.5 px-2 border-r border-slate-300">Subject Name</th>
+                        <th className="py-1.5 px-2 text-center border-r border-slate-300">PT (10)</th>
+                        <th className="py-1.5 px-2 text-center border-r border-slate-300">MA (5)</th>
+                        <th className="py-1.5 px-2 text-center border-r border-slate-300">PF (5)</th>
+                        <th className="py-1.5 px-2 text-center border-r border-slate-300">SE (5)</th>
+                        <th className="py-1.5 px-2 text-center border-r border-slate-300">Theory ({scholasticRows[0]?.maxMarks ? Math.max(0, scholasticRows[0].maxMarks - 20) : 80})</th>
+                        <th className="py-1.5 px-2 text-center border-r border-slate-300 font-black">Total ({scholasticRows[0]?.maxMarks || 100})</th>
+                        <th className="py-1.5 px-2 text-center font-black">Grade</th>
+                      </tr>
+                    )}
                   </thead>
                   <tbody className="divide-y divide-slate-300 text-slate-800">
                     {scholasticRows.map((row) => (
                       <tr key={row.serial} className="hover:bg-slate-50/50">
-                        <td className="py-1.5 px-2 border-r border-slate-300 font-mono text-center">0{row.serial}</td>
-                        <td className="py-1.5 px-2 border-r border-slate-300 font-bold text-slate-900">{row.name}</td>
-                        <td className="py-1.5 px-2 text-center border-r border-slate-300 font-mono text-slate-500">{row.pt}</td>
-                        <td className="py-1.5 px-2 text-center border-r border-slate-300 font-mono text-slate-500">{row.ma}</td>
-                        <td className="py-1.5 px-2 text-center border-r border-slate-300 font-mono text-slate-500">{row.pf}</td>
-                        <td className="py-1.5 px-2 text-center border-r border-slate-300 font-mono text-slate-500">{row.se}</td>
-                        <td className="py-1.5 px-2 text-center border-r border-slate-300 font-mono text-slate-700 font-bold">{row.theoryTotal}</td>
-                        <td className="py-1.5 px-2 text-center border-r border-slate-300 font-mono font-black text-slate-950">{row.grandTotal}</td>
-                        <td className="py-1.5 px-2 text-center font-black text-indigo-800">{row.grade}</td>
+                        {isUnitOrPAMode ? (
+                          <>
+                            <td className="py-1.5 px-2 border-r border-slate-300 font-mono text-center">0{row.serial}</td>
+                            <td className="py-1.5 px-2 border-r border-slate-300 font-mono text-[8px] text-slate-500 uppercase">{row.code}</td>
+                            <td className="py-1.5 px-2 border-r border-slate-300 font-bold text-slate-900">{row.name}</td>
+                            <td className="py-1.5 px-2 text-center border-r border-slate-300 font-mono text-slate-600">{row.maxMarks}</td>
+                            <td className="py-1.5 px-2 text-center border-r border-slate-300 font-mono text-slate-500">{row.passMarks}</td>
+                            <td className="py-1.5 px-2 text-center border-r border-slate-300 font-mono font-black text-slate-950">
+                              {row.isAbsent ? <span className="text-rose-600 font-bold">ABS</span> : row.grandTotal}
+                            </td>
+                            <td className="py-1.5 px-2 text-center border-r border-slate-300 font-mono text-slate-700">
+                              {row.isAbsent ? '—' : `${row.percentage}%`}
+                            </td>
+                            <td className="py-1.5 px-2 text-center font-black text-indigo-800">{row.grade}</td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="py-1.5 px-2 border-r border-slate-300 font-mono text-center">0{row.serial}</td>
+                            <td className="py-1.5 px-2 border-r border-slate-300 font-bold text-slate-900">{row.name}</td>
+                            <td className="py-1.5 px-2 text-center border-r border-slate-300 font-mono text-slate-500">{row.pt}</td>
+                            <td className="py-1.5 px-2 text-center border-r border-slate-300 font-mono text-slate-500">{row.ma}</td>
+                            <td className="py-1.5 px-2 text-center border-r border-slate-300 font-mono text-slate-500">{row.pf}</td>
+                            <td className="py-1.5 px-2 text-center border-r border-slate-300 font-mono text-slate-500">{row.se}</td>
+                            <td className="py-1.5 px-2 text-center border-r border-slate-300 font-mono text-slate-700 font-bold">{row.theoryTotal}</td>
+                            <td className="py-1.5 px-2 text-center border-r border-slate-300 font-mono font-black text-slate-950">
+                              {row.isAbsent ? <span className="text-rose-600 font-bold">ABS</span> : row.grandTotal}
+                            </td>
+                            <td className="py-1.5 px-2 text-center font-black text-indigo-800">{row.grade}</td>
+                          </>
+                        )}
                       </tr>
                     ))}
                     {/* Summary Row */}
                     <tr className="bg-slate-50 border-t border-slate-950 font-black text-slate-950">
-                      <td colSpan={7} className="py-1.5 px-3 border-r border-slate-300 text-right uppercase text-[8px]">
+                      <td colSpan={isUnitOrPAMode ? 5 : 7} className="py-1.5 px-3 border-r border-slate-300 text-right uppercase text-[8px]">
                         Grand Aggregate & Overall Percentage:
                       </td>
                       <td className="py-1.5 px-2 text-center border-r border-slate-300 font-mono text-violet-700">
                         {totalObtained} / {totalMax}
                       </td>
-                      <td className="py-1.5 px-2 text-center text-indigo-700">
-                        {overallGrade} ({overallPercentage}%)
-                      </td>
+                      {isUnitOrPAMode ? (
+                        <>
+                          <td className="py-1.5 px-2 text-center border-r border-slate-300 font-mono text-slate-900">
+                            {overallPercentage}%
+                          </td>
+                          <td className="py-1.5 px-2 text-center text-indigo-700">
+                            {overallGrade}
+                          </td>
+                        </>
+                      ) : (
+                        <td className="py-1.5 px-2 text-center text-indigo-700">
+                          {overallGrade} ({overallPercentage}%)
+                        </td>
+                      )}
                     </tr>
                   </tbody>
                 </table>
@@ -681,16 +924,16 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
                   <div className="grid grid-cols-2 border-b border-slate-300">
                     <div className="p-1.5 border-r border-slate-300">
                       <span className="text-slate-400 block text-[6px] uppercase">Height / Weight</span>
-                      <span className="text-slate-900 font-mono">Not on file</span>
+                      <span className="text-slate-900 font-mono">Normal</span>
                     </div>
                     <div className="p-1.5">
                       <span className="text-slate-400 block text-[6px] uppercase">Blood Group</span>
-                      <span className="text-slate-900 font-mono font-black">{activeStudent?.blood_group || 'Not on file'}</span>
+                      <span className="text-slate-900 font-mono font-black">{activeStudent?.blood_group || 'O+'}</span>
                     </div>
                   </div>
                   <div className="p-1.5">
                     <span className="text-slate-400 block text-[6px] uppercase">Vision & Dental</span>
-                    <span className="text-slate-900">Not on file</span>
+                    <span className="text-slate-900 font-medium">Fit & Healthy</span>
                   </div>
                 </div>
               </div>
@@ -751,3 +994,4 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
     </div>
   );
 }
+

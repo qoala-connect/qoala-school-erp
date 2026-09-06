@@ -202,6 +202,24 @@ export default function ExamsView({
     }
   };
 
+  const [isAutoAssigning, setIsAutoAssigning] = useState(false);
+
+  const handleAutoAssignEvaluators = async () => {
+    if (!window.confirm('This will automatically link exam subjects to faculty members based on the active school timetable and teacher assignments. Proceed?')) {
+      return;
+    }
+    setIsAutoAssigning(true);
+    try {
+      const res = await examinationService.autoAssignEvaluatorsFromTimetable(selectedYearId);
+      toast.success(`Evaluators mapped: ${res.updatedCount} subject streams linked with teachers from timetable.`);
+      fetchExamsAndTypes();
+    } catch (err: any) {
+      toast.error('Auto-assign failed: ' + (err.message || 'Error'));
+    } finally {
+      setIsAutoAssigning(false);
+    }
+  };
+
   const handleDeleteExam = async (id: string, name: string) => {
     if (!window.confirm(`Are you sure you want to delete exam "${name}"? All associated marks and results will be permanently removed.`)) {
       return;
@@ -346,14 +364,27 @@ export default function ExamsView({
           </select>
         </div>
 
-        {can('results.publish') && (
-          <button
-            onClick={handleOpenCreateModal}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
-          >
-            <Plus size={14} /> Create Examination Term
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {can('results.publish') && (
+            <>
+              <button
+                onClick={handleAutoAssignEvaluators}
+                disabled={isAutoAssigning}
+                title="Automatically map exam subjects to faculty members based on active school timetable"
+                className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shrink-0 disabled:opacity-60"
+              >
+                {isAutoAssigning ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+                <span>Auto-Map Evaluators</span>
+              </button>
+              <button
+                onClick={handleOpenCreateModal}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+              >
+                <Plus size={14} /> Create Examination Term
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Main Exams Grid */}

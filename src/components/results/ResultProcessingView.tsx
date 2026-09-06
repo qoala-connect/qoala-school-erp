@@ -21,7 +21,8 @@ import {
   ChevronRight,
   Eye,
   RefreshCw,
-  Award
+  Award,
+  TrendingUp
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -315,6 +316,54 @@ export default function ResultProcessingView({
     });
   }, [examResultsList, searchQuery]);
 
+  // Enterprise Merit Summary Statistics
+  const meritStats = useMemo(() => {
+    if (examResultsList.length === 0) {
+      return { topper: null, averagePct: 0, passRatePct: 0, passCount: 0, total: 0 };
+    }
+    const topper = examResultsList[0] || null;
+    const totalScore = examResultsList.reduce((acc, r) => acc + Number(r.percentage || 0), 0);
+    const averagePct = Math.round((totalScore / examResultsList.length) * 10) / 10;
+    const passCount = examResultsList.filter(r => r.result_status === 'PASS').length;
+    const passRatePct = Math.round((passCount / examResultsList.length) * 100);
+    return { topper, averagePct, passRatePct, passCount, total: examResultsList.length };
+  }, [examResultsList]);
+
+  const handleExportCSV = () => {
+    if (filteredResults.length === 0) {
+      toast.error('No results to export');
+      return;
+    }
+    const headers = ['Rank,Student Name,Admission No,Roll No,Class,Section,Total Marks,Max Marks,Percentage,Grade,Division,Status'];
+    const rows = filteredResults.map(r => [
+      r.rank || '',
+      `"${(r.students?.name || '').replace(/"/g, '""')}"`,
+      r.students?.admission_number || '',
+      r.students?.roll_number || '',
+      r.students?.class || '',
+      r.students?.section || '',
+      r.total_marks,
+      r.max_total_marks || 100,
+      `${r.percentage}%`,
+      r.grade,
+      r.division,
+      r.result_status
+    ].join(','));
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers, ...rows].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `CBSE_Merit_Roster_${(currentExam?.exam_name || 'Exam').replace(/\s+/g, '_')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success('Merit Roster CSV exported successfully');
+  };
+
+  const handlePrintRoster = () => {
+    window.print();
+  };
+
   return (
     <div className="space-y-6">
       {/* 1. Header Metrics Ribbon */}
@@ -438,52 +487,56 @@ export default function ResultProcessingView({
         </div>
 
         {/* Exam & Class Selection Bar */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-1">
           <div>
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1 pl-1">
               Select Examination Term
             </label>
             <select
               value={selectedExamId}
-              onChange={e => setSelectedExamId(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-blue-500"
+              onChange={e => {
+                setSelectedExamId(e.target.value);
+                const ex = exams.find(x => x.id === e.target.value);
+                if (ex?.class_id) setSelectedClassId(ex.class_id);
+              }}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 h-[36px] text-xs font-bold text-slate-800 outline-none hover:border-slate-300 focus:bg-white focus:border-blue-500 cursor-pointer transition-colors"
             >
               {exams.map(ex => (
                 <option key={ex.id} value={ex.id}>
-                  {ex.short_name || ex.exam_name} ({ex.academic_year}) - Class {ex.classes?.class_name || ex.class}
+                  {ex.short_name || ex.exam_name} ({ex.academic_year}) - {formatClassDisplay(ex.classes?.class_name || ex.class)}
                 </option>
               ))}
             </select>
           </div>
 
           <div>
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1 pl-1">
               Filter by Class
             </label>
             <select
               value={selectedClassId}
               onChange={e => setSelectedClassId(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-blue-500"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 h-[36px] text-xs font-bold text-slate-800 outline-none hover:border-slate-300 focus:bg-white focus:border-blue-500 cursor-pointer transition-colors"
             >
               <option value="all">All Assigned Classes</option>
               {classes.map(c => (
-                <option key={c.id} value={c.id}>Class {c.class_name}</option>
+                <option key={c.id} value={c.id}>{formatClassDisplay(c.class_name)}</option>
               ))}
             </select>
           </div>
 
           <div className="md:col-span-2">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1 pl-1">
               Search Result Records
             </label>
             <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
               <input
                 type="text"
                 placeholder="Search candidate name, roll number, admission..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-800 outline-none focus:bg-white focus:border-blue-500"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 h-[36px] text-xs font-medium text-slate-800 outline-none hover:border-slate-300 focus:bg-white focus:border-blue-500 transition-colors"
               />
             </div>
           </div>
@@ -520,10 +573,13 @@ export default function ResultProcessingView({
       {activeSubTab === 'verification' && (
         <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-2xs">
           <div className="px-5 py-3.5 bg-slate-50 border-b border-slate-200/80 flex items-center justify-between">
-            <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
-              Faculty Marks Submissions &amp; Verification Board
-            </h4>
-            <span className="text-xs text-slate-400 font-medium">
+            <div className="flex items-center gap-2">
+              <ShieldCheck size={16} className="text-blue-600" />
+              <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
+                Faculty Marks Submissions &amp; Verification Board
+              </h4>
+            </div>
+            <span className="text-xs text-slate-500 font-bold bg-white px-2.5 py-0.5 rounded-full border border-slate-200">
               {examSubjectsList.length} subject workload(s)
             </span>
           </div>
@@ -538,11 +594,11 @@ export default function ResultProcessingView({
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="bg-slate-50/70 border-b border-slate-200/70 text-[10px] font-black uppercase text-slate-500 tracking-wider">
-                    <th className="py-3 px-4">Subject</th>
-                    <th className="py-3 px-4">Evaluator Faculty</th>
-                    <th className="py-3 px-4 text-center">Marks Scheme</th>
-                    <th className="py-3 px-4 text-center">Status</th>
-                    <th className="py-3 px-4 text-right">Verification Actions</th>
+                    <th className="py-3 px-4 min-w-[160px]">Subject</th>
+                    <th className="py-3 px-4 min-w-[200px]">Evaluator Faculty</th>
+                    <th className="py-3 px-4 text-center min-w-[140px]">Marks Scheme</th>
+                    <th className="py-3 px-4 text-center min-w-[130px]">Review Status</th>
+                    <th className="py-3 px-4 text-right min-w-[220px]">Verification Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium">
@@ -556,50 +612,52 @@ export default function ResultProcessingView({
                     return (
                       <tr key={sub.id} className="hover:bg-slate-50/60 transition-colors">
                         <td className="py-3 px-4 font-bold text-slate-900">
-                          {sub.subject_name}
-                          <span className="text-[10px] text-slate-400 block font-normal">
+                          <div className="font-extrabold text-slate-900 text-xs">{sub.subject_name}</div>
+                          <span className="text-[10px] text-slate-400 font-normal">
                             {sub.component_name || 'Periodic Assessment'}
                           </span>
                         </td>
 
                         <td className="py-3 px-4">
-                          <span className="font-bold text-slate-800">
+                          <span className={cn(
+                            "font-bold text-xs block",
+                            sub.teachers?.name ? "text-slate-800" : "text-slate-500 italic"
+                          )}>
                             {sub.teachers?.name || 'Unassigned'}
                           </span>
-                          <span className="text-[10px] text-slate-400 block">
-                            {sub.teachers?.email || 'No email'}
+                          <span className="text-[10px] text-slate-400 block font-mono truncate max-w-[200px]">
+                            {sub.teachers?.email || 'No email assigned'}
                           </span>
-                        </td>
-
-                        <td className="py-3 px-4 text-center font-mono">
-                          Max: <strong>{sub.max_marks}</strong> | Pass: {sub.pass_marks}
                         </td>
 
                         <td className="py-3 px-4 text-center">
-                          <span className={cn("px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border", badge.color)}>
-                            {badge.label}
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 border border-slate-200/80 rounded-lg text-xs font-mono font-bold text-slate-700 whitespace-nowrap">
+                            <span>Max: <strong>{sub.max_marks}</strong></span>
+                            <span className="text-slate-300">|</span>
+                            <span>Pass: {sub.pass_marks}</span>
                           </span>
-                          {isSubLocked && (
-                            <span className="text-[10px] text-purple-700 font-bold block mt-0.5">
-                              🔒 Locked
-                            </span>
-                          )}
+                        </td>
+
+                        <td className="py-3 px-4 text-center">
+                          <span className={cn(
+                            "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border whitespace-nowrap",
+                            badge.color
+                          )}>
+                            {isSubLocked && <Lock size={10} className="shrink-0" />}
+                            <span>{isSubLocked ? 'Locked' : badge.label}</span>
+                          </span>
                         </td>
 
                         <td className="py-3 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                          <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
                             <button
                               onClick={() => onOpenMarksEntry(selectedExamId, sub.subject_id || sub.id, currentExam?.class_id)}
-                              className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                              className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-bold transition-colors cursor-pointer inline-flex items-center gap-1"
                             >
-                              <Eye size={12} className="inline mr-1" /> Review Marks
+                              <Eye size={12} />
+                              <span>Review</span>
                             </button>
 
-                            {/* Actions mirror the server-side state machine:
-                                has marks (submitted or not) -> approve | return
-                                approved                     -> lock | return
-                                locked                       -> unlock
-                                A subject with no marks at all offers no action. */}
                             {canApproveSub && (
                               <button
                                 onClick={() => handleApproveSubject(sub)}
@@ -607,13 +665,14 @@ export default function ResultProcessingView({
                                   ? 'Approve the marks submitted by the teacher'
                                   : 'Not submitted by the teacher — approving accepts the entered marks as-is'}
                                 className={cn(
-                                  "px-2.5 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-xs",
+                                  "px-2.5 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-xs inline-flex items-center gap-1",
                                   isSubSubmitted
                                     ? "bg-emerald-600 hover:bg-emerald-700 text-white"
                                     : "bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300"
                                 )}
                               >
-                                {isSubSubmitted ? 'Approve' : 'Approve (unsubmitted)'}
+                                <CheckCircle2 size={12} />
+                                <span>{isSubSubmitted ? 'Approve' : 'Approve (unsubmitted)'}</span>
                               </button>
                             )}
 
@@ -623,14 +682,15 @@ export default function ResultProcessingView({
                                   setReturnModalSubject(sub);
                                   setReturnReason('');
                                 }}
-                                className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                                className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition-colors cursor-pointer inline-flex items-center gap-1"
                               >
-                                Return
+                                <RotateCcw size={12} />
+                                <span>Return</span>
                               </button>
                             )}
 
                             {!canApproveSub && !isSubApproved && !isSubLocked && (
-                              <span className="px-2 py-1 text-[11px] font-semibold text-slate-400 italic">
+                              <span className="px-2 py-1 text-[11px] font-medium text-slate-400 italic">
                                 No marks entered yet
                               </span>
                             )}
@@ -669,40 +729,128 @@ export default function ResultProcessingView({
 
       {/* SUBTAB 2: PROCESSED RESULTS PREVIEW */}
       {activeSubTab === 'processing' && (
-        <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-2xs">
-          <div className="px-5 py-3.5 bg-slate-50 border-b border-slate-200/80 flex items-center justify-between">
-            <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
-              Class Merit Roster &amp; Calculated Performance
-            </h4>
-            <span className="text-xs text-slate-400 font-medium">
-              {filteredResults.length} candidate(s) listed
-            </span>
-          </div>
+        <div className="space-y-4">
+          {/* Top Merit KPI Ribbon */}
+          {examResultsList.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent border border-amber-200/80 rounded-2xl p-4 flex items-center gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-sm">
+                  <Trophy size={20} />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-[10px] font-black uppercase text-amber-700 tracking-wider block">Class Topper (Rank #1)</span>
+                  <div className="text-xs font-black text-slate-900 truncate">
+                    {meritStats.topper?.students?.name || '—'}
+                  </div>
+                  <div className="text-[11px] font-bold text-amber-600">
+                    {meritStats.topper?.percentage}% • Grade {meritStats.topper?.grade}
+                  </div>
+                </div>
+              </div>
 
-          {filteredResults.length === 0 ? (
-            <div className="p-12 text-center text-slate-400 space-y-3">
-              <Sparkles size={36} className="mx-auto text-slate-300" />
-              <h4 className="text-sm font-bold text-slate-700">No Processed Results Available</h4>
-              <p className="text-xs max-w-sm mx-auto text-slate-500">
-                Click <strong>Run Result Calculation</strong> above to aggregate all approved marks and generate student merit standings.
-              </p>
+              <div className="bg-gradient-to-br from-blue-500/10 via-blue-500/5 to-transparent border border-blue-200/80 rounded-2xl p-4 flex items-center gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                  <TrendingUp size={20} />
+                </div>
+                <div>
+                  <span className="text-[10px] font-black uppercase text-blue-700 tracking-wider block">Batch Mean Average</span>
+                  <div className="text-xl font-black text-slate-900">
+                    {meritStats.averagePct}%
+                  </div>
+                  <div className="text-[10px] text-slate-500 font-medium">
+                    Across {meritStats.total} evaluated candidates
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent border border-emerald-200/80 rounded-2xl p-4 flex items-center gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                  <CheckCircle2 size={20} />
+                </div>
+                <div>
+                  <span className="text-[10px] font-black uppercase text-emerald-700 tracking-wider block">Pass Efficiency Rate</span>
+                  <div className="text-xl font-black text-emerald-700">
+                    {meritStats.passRatePct}%
+                  </div>
+                  <div className="text-[10px] text-slate-500 font-medium">
+                    {meritStats.passCount} of {meritStats.total} passed unconditionally
+                  </div>
+                </div>
+              </div>
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="bg-slate-50/70 border-b border-slate-200/70 text-[10px] font-black uppercase text-slate-500 tracking-wider">
-                    <th className="py-3 px-4 w-[60px] text-center">Rank</th>
-                    <th className="py-3 px-4 w-[240px]">Student Candidate</th>
-                    <th className="py-3 px-4 w-[110px]">Admission No</th>
-                    <th className="py-3 px-4 text-center">Total Score</th>
-                    <th className="py-3 px-4 text-center">Percentage</th>
-                    <th className="py-3 px-4 text-center">CBSE Grade</th>
-                    <th className="py-3 px-4 text-center">Division</th>
-                    <th className="py-3 px-4 text-right">Result Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 font-medium">
+          )}
+
+          {/* Table Container */}
+          <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-2xs">
+            <div className="p-3.5 bg-slate-50 border-b border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2 flex-1 min-w-[240px]">
+                <div className="relative flex-1 max-w-xs">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    placeholder="Filter by student name, roll no, adm..."
+                    className="w-full pl-8 pr-7 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:border-blue-500 outline-none"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
+                <span className="text-xs text-slate-500 font-bold">
+                  {filteredResults.length} candidate(s)
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleExportCSV}
+                  disabled={filteredResults.length === 0}
+                  className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-40"
+                >
+                  <Download size={13} />
+                  <span>Export CSV</span>
+                </button>
+                <button
+                  onClick={handlePrintRoster}
+                  disabled={filteredResults.length === 0}
+                  className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-40"
+                >
+                  <Printer size={13} />
+                  <span>Print Gazette</span>
+                </button>
+              </div>
+            </div>
+
+            {filteredResults.length === 0 ? (
+              <div className="p-12 text-center text-slate-400 space-y-3">
+                <Sparkles size={36} className="mx-auto text-slate-300" />
+                <h4 className="text-sm font-bold text-slate-700">No Processed Results Available</h4>
+                <p className="text-xs max-w-sm mx-auto text-slate-500">
+                  Click <strong>Run Result Calculation</strong> above to aggregate all approved marks and generate student merit standings.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-50/70 border-b border-slate-200/70 text-[10px] font-black uppercase text-slate-500 tracking-wider">
+                      <th className="py-3 px-4 w-[60px] text-center">Rank</th>
+                      <th className="py-3 px-4 w-[240px]">Student Candidate</th>
+                      <th className="py-3 px-4 w-[110px]">Admission No</th>
+                      <th className="py-3 px-4 text-center">Total Score</th>
+                      <th className="py-3 px-4 text-center">Percentage</th>
+                      <th className="py-3 px-4 text-center">CBSE Grade</th>
+                      <th className="py-3 px-4 text-center">Division</th>
+                      <th className="py-3 px-4 text-right">Result Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-medium">
                   {filteredResults.map(res => (
                     <tr key={res.id} className="hover:bg-slate-50/60 transition-colors">
                       <td className="py-3 px-4 text-center font-mono font-extrabold text-slate-800">
@@ -748,6 +896,7 @@ export default function ResultProcessingView({
               </table>
             </div>
           )}
+          </div>
         </div>
       )}
 

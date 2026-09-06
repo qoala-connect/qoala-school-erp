@@ -97,13 +97,17 @@ const PremiumStatCard = ({ label, value, trend, trendValue, icon: Icon, gradient
       </div>
       {!isLoading && (
         <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-          <div className={cn(
-            "flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-semibold",
-            trend === 'up' ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
-          )}>
-            {trend === 'up' ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
-            {trendValue}
-          </div>
+          {trendValue && (
+            <div className={cn(
+              "flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-semibold",
+              trend === 'up' ? "bg-emerald-50 text-emerald-600"
+                : trend === 'down' ? "bg-rose-50 text-rose-600"
+                : "bg-slate-100 text-slate-600"
+            )}>
+              {trend === 'up' ? <ArrowUpRight size={12} /> : trend === 'down' ? <ArrowDownRight size={12} /> : null}
+              {trendValue}
+            </div>
+          )}
           {onClick && (
             <div className="text-violet-600 opacity-0 group-hover:opacity-100 translate-x-[-4px] group-hover:translate-x-0 transition-all duration-200 hidden sm:block">
               <ChevronRight size={14} className="stroke-[2.5]" />
@@ -121,7 +125,7 @@ const PremiumStatCard = ({ label, value, trend, trendValue, icon: Icon, gradient
         ) : (
           <div className="text-lg sm:text-2xl font-bold text-slate-900 leading-tight truncate">{value}</div>
         )}
-        <div className="hidden sm:block shrink-0">
+        <div className={cn("shrink-0", sparkData?.length ? "hidden sm:block" : "hidden")}>
           <MiniSparkline color={sparkColor} data={sparkData} />
         </div>
       </div>
@@ -1290,9 +1294,9 @@ export default function Analytics() {
           </div>
           <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="max-w-xl">
-              <div className="flex items-center gap-2 mb-1.5">
+              <div className="flex flex-wrap items-center gap-2 mb-1.5">
                 <span className="bg-white/10 text-white px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider">
-                  Faculty Command
+                  Session 2026-27
                 </span>
                 {teacher?.employee_id && (
                   <span className="bg-blue-400/20 text-blue-200 px-2 py-0.5 rounded-md text-[9px] font-mono font-semibold">
@@ -1309,16 +1313,24 @@ export default function Analytics() {
                 Welcome Back, {teacher?.name || 'Faculty Member'}! 👋
               </h2>
               <p className="text-white/70 text-xs mt-1 font-semibold">
-                {teacher?.designation || 'Academic Instructor'} • Manage your daily lecture schedule, mark classroom attendance, and enter CBSE marks.
+                {teacher?.designation || 'Academic Instructor'} • {todayString}
               </p>
             </div>
             <div className="flex items-center gap-2 self-start sm:self-auto">
               <button
-                onClick={() => navigate('/dashboard/academics/timetable')}
-                className="px-3.5 py-1.5 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                onClick={() => navigate('/dashboard/teaching/today')}
+                className="px-3.5 py-1.5 bg-white text-[#10345e] hover:bg-white/90 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
               >
-                <Calendar className="w-3.5 h-3.5" />
-                <span>My Weekly Matrix</span>
+                <BookOpen className="w-3.5 h-3.5" />
+                <span>My Teaching</span>
+              </button>
+              <button
+                onClick={fetchMetrics}
+                title="Refresh your dashboard"
+                aria-label="Refresh your dashboard"
+                className="p-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg transition-all flex items-center justify-center cursor-pointer"
+              >
+                <RefreshCcw className={cn("w-3.5 h-3.5", isLoading && "animate-spin")} />
               </button>
             </div>
           </div>
@@ -1329,45 +1341,32 @@ export default function Analytics() {
           <PremiumStatCard 
             label="Today's Lectures" 
             value={`${todaySlots.length} Periods`} 
-            trend={todaySlots.length > 0 ? "up" : "down"} 
-            trendValue={isSunday ? "Monday Preview" : "Scheduled"} 
+            trendValue={isSunday ? "Monday preview" : "Scheduled"} 
             icon={Calendar} 
             gradient="bg-gradient-to-tr from-blue-600 to-indigo-700" 
-            sparkColor="#1a73e8" 
-            sparkData={[2, 3, 4, Math.max(1, todaySlots.length), 3, todaySlots.length]} 
-            onClick={() => navigate('/dashboard/academics/timetable')}
+            onClick={() => navigate('/dashboard/teaching/today')}
           />
           <PremiumStatCard 
             label="Assigned Classes" 
             value={`${assignedClasses.length} Sections`} 
-            trend="up" 
-            trendValue="Active" 
             icon={BookOpen} 
             gradient="bg-gradient-to-tr from-sky-600 to-blue-600" 
-            sparkColor="#0284c7" 
-            sparkData={[assignedClasses.length, assignedClasses.length, assignedClasses.length]} 
-            onClick={() => navigate('/dashboard/students')}
+            onClick={() => navigate('/dashboard/teaching/classes')}
           />
           <PremiumStatCard 
             label="My Enrolled Students" 
             value={`${totalStudents} Pupils`} 
-            trend="up" 
-            trendValue="Total SIS" 
             icon={Users} 
             gradient="bg-gradient-to-tr from-emerald-500 to-teal-600" 
-            sparkColor="#10B981" 
-            sparkData={[totalStudents, totalStudents, totalStudents]} 
             onClick={() => navigate('/dashboard/students')}
           />
           <PremiumStatCard 
             label="Today's Attendance" 
             value={todayAttendanceRate !== null ? `${todayAttendanceRate}%` : "Pending Entry"} 
-            trend={todayAttendanceRate !== null && todayAttendanceRate >= 75 ? "up" : "down"} 
-            trendValue={todayAttendanceRate !== null ? "Marked" : "Needs Action"} 
+            trend={todayAttendanceRate === null ? "down" : undefined} 
+            trendValue={todayAttendanceRate !== null ? "Marked" : "Needs action"} 
             icon={CheckCircle} 
             gradient="bg-gradient-to-tr from-amber-500 to-orange-500" 
-            sparkColor="#F59E0B" 
-            sparkData={[88, 90, 92, todayAttendanceRate || 85]} 
             onClick={() => navigate('/dashboard/attendance')}
           />
         </div>
@@ -1377,10 +1376,10 @@ export default function Analytics() {
           <h3 className="text-base font-display font-black text-slate-900 mb-2.5">Academic Shortcuts</h3>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 sm:gap-4">
             {[
-              { label: 'My Weekly Timetable', icon: Calendar, color: 'text-blue-600 bg-blue-50 hover:bg-blue-100', path: '/dashboard/academics/timetable' },
+              { label: 'Marks Entry', icon: Award, color: 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100', path: '/dashboard/teaching/marks' },
+              { label: 'Homework & Assignments', icon: FileText, color: 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100', path: '/dashboard/teaching/work' },
               { label: 'Register Daily Attendance', icon: CheckCircle, color: 'text-violet-600 bg-violet-50 hover:bg-violet-100', path: '/dashboard/attendance' },
-              { label: 'CBSE Marks Entry', icon: Award, color: 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100', path: '/dashboard/examination?tab=marks' },
-              { label: 'Student SIS Directory', icon: Users, color: 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100', path: '/dashboard/students' }
+              { label: 'My Weekly Timetable', icon: Calendar, color: 'text-blue-600 bg-blue-50 hover:bg-blue-100', path: '/dashboard/academics/timetable' }
             ].map((act) => (
               <button 
                 key={act.label}
@@ -1466,7 +1465,7 @@ export default function Analytics() {
                           Attendance
                         </button>
                         <button
-                          onClick={() => navigate('/dashboard/examination?tab=marks')}
+                          onClick={() => navigate('/dashboard/teaching/marks')}
                           className="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-md text-[10px] font-bold transition-all cursor-pointer"
                           title="Enter marks for this subject"
                         >
@@ -1514,7 +1513,7 @@ export default function Analytics() {
                       <div className="text-right shrink-0">
                         <div className="text-xs font-black text-blue-600">{cls.student_count} Students</div>
                         <button
-                          onClick={() => navigate('/dashboard/students')}
+                          onClick={() => navigate('/dashboard/teaching/classes')}
                           className="text-[9px] text-slate-400 hover:text-blue-600 font-bold transition-colors cursor-pointer mt-0.5 block"
                         >
                           View Roster →
@@ -1920,11 +1919,11 @@ export default function Analytics() {
 
   return (
     <div className="space-y-5 max-w-7xl mx-auto pb-16 font-sans antialiased">
-      {/* 1. Master Page Header Banner */}
+      {/* 1. Master Page Header Banner — teachers have their own banner below */}
+      {role !== 'teacher' && (
       <AdminHeader
         title={
           role === 'admin' ? "Administrative & Executive Overview" :
-          role === 'teacher' ? "Faculty Command Center" :
           (parentMode ? "Guardian Portal" : "Student Command Center")
         }
         subtitle={`Real-time institutional metrics, performance intelligence, and quick operational shortcuts. Today is ${todayString}.`}
@@ -1944,6 +1943,7 @@ export default function Analytics() {
           </button>
         }
       />
+      )}
 
       {/* 2. Role Conditional Rendering */}
       {role === 'admin' && renderAdminDashboard()}

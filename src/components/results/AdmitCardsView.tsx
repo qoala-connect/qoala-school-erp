@@ -275,66 +275,78 @@ export default function AdmitCardsView() {
   const verificationUrl = `https://sjsbarhalganj.edu.in/verify/admit-card?adm=${activeStudent?.admission_number}&roll=${activeStudent?.roll_number}&session=2026-2027`;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {/* 1. Header & Role Access Overview */}
-      <div className="bg-white rounded-[22px] border border-slate-200/80 p-4 shadow-2xs space-y-3.5">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-700">
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+          <div className="flex items-start sm:items-center gap-3.5">
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white shadow-xs shrink-0">
               <IdCard className="w-5 h-5" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-black uppercase text-slate-900 tracking-wide font-display">
-                  CBSE Examination Admit Cards & Hall Tickets
-                </h3>
-                <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-blue-100 text-blue-800">
-                  Role: {roleLabel || role || 'Staff'}
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+                  Admit Cards & Hall Tickets
+                </h2>
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200/60">
+                  Role: {roleLabel || role || 'Admin'}
+                </span>
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                  CBSE Affiliated
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500 font-medium">
-                Official St. Joseph's School Hall Ticket generation, bulk export, verification, and print center.
+              <p className="text-xs text-slate-500 mt-0.5 font-normal">
+                Generate official CBSE hall tickets, export multi-page class bundles, and manage student exam credentials.
               </p>
             </div>
           </div>
 
-          {/* Mode Switcher */}
-          <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+          {/* View Mode Switcher */}
+          <div className="flex items-center bg-slate-100/90 p-1 rounded-xl border border-slate-200/80 self-start md:self-auto shrink-0">
             <button
+              type="button"
               onClick={() => setViewMode('roster')}
               className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer",
+                "flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer",
                 viewMode === 'roster' 
-                  ? "bg-white text-blue-900 shadow-xs" 
+                  ? "bg-white text-slate-900 shadow-xs font-bold" 
                   : "text-slate-600 hover:text-slate-900"
               )}
             >
-              <Users size={13} /> Class Roster & Bulk Export ({filteredStudents.length})
+              <Users className="w-3.5 h-3.5 text-blue-600" />
+              <span>Class Roster</span>
+              <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                {filteredStudents.length}
+              </span>
             </button>
             <button
+              type="button"
               onClick={() => setViewMode('preview')}
               className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer",
+                "flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer",
                 viewMode === 'preview' 
-                  ? "bg-white text-blue-900 shadow-xs" 
+                  ? "bg-white text-slate-900 shadow-xs font-bold" 
                   : "text-slate-600 hover:text-slate-900"
               )}
             >
-              <Eye size={13} /> Official Document Preview
+              <Eye className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Document Preview</span>
             </button>
           </div>
         </div>
 
-        {/* 2. Filters & Batch Action Row */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2.5">
+        {/* 2. Unified Filter & Action Toolbar */}
+        <div className="pt-4 flex flex-col lg:flex-row lg:items-end justify-between gap-3.5">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 flex-1 max-w-4xl">
             {/* Class Filter */}
-            <div className="flex flex-col min-w-[110px]">
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1">Class Filter</span>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                Class
+              </label>
               <select 
                 value={selectedClass} 
                 onChange={(e) => setSelectedClass(e.target.value)}
-                className="bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs font-bold text-slate-700 outline-none h-[36px] cursor-pointer focus:border-blue-500 focus:bg-white"
+                className="w-full bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-3 text-xs font-medium text-slate-800 outline-none h-[38px] cursor-pointer transition-colors focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100"
               >
                 <option value="All">All Classes</option>
                 {classesList.length > 0 ? (
@@ -350,14 +362,16 @@ export default function AdmitCardsView() {
             </div>
 
             {/* Section Filter */}
-            <div className="flex flex-col min-w-[85px]">
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1">Section</span>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                Section
+              </label>
               <select 
                 value={selectedSection} 
                 onChange={(e) => setSelectedSection(e.target.value)}
-                className="bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-2.5 text-xs font-bold text-slate-700 outline-none h-[36px] cursor-pointer focus:border-blue-500 focus:bg-white"
+                className="w-full bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-3 text-xs font-medium text-slate-800 outline-none h-[38px] cursor-pointer transition-colors focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100"
               >
-                <option value="All">All Sec</option>
+                <option value="All">All Sections</option>
                 <option value="A">Section A</option>
                 <option value="B">Section B</option>
                 <option value="C">Section C</option>
@@ -365,12 +379,14 @@ export default function AdmitCardsView() {
             </div>
 
             {/* Assessment Term selection */}
-            <div className="flex flex-col min-w-[170px]">
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1">Assessment Term</span>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                Assessment Term
+              </label>
               <select 
                 value={selectedExamId} 
                 onChange={(e) => setSelectedExamId(e.target.value)}
-                className="bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs font-bold text-slate-700 outline-none h-[36px] cursor-pointer focus:border-blue-500 focus:bg-white"
+                className="w-full bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-3 text-xs font-medium text-slate-800 outline-none h-[38px] cursor-pointer transition-colors focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 truncate"
               >
                 {exams.map(ex => (
                   <option key={ex.id} value={ex.id}>{ex.exam_name} ({ex.academic_year})</option>
@@ -379,33 +395,40 @@ export default function AdmitCardsView() {
             </div>
 
             {/* Candidate Search Box */}
-            <div className="flex flex-col min-w-[200px]">
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1">Search Candidate</span>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                Search Candidate
+              </label>
               <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
                 <input 
                   type="text" 
-                  placeholder="Name, Roll No, Scholar No..."
+                  placeholder="Name, Roll No, Adm..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 pl-8 pr-3 text-xs text-slate-800 outline-none h-[36px] focus:border-blue-500 focus:bg-white"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8.5 pr-3 text-xs text-slate-800 outline-none h-[38px] transition-colors focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100"
                 />
               </div>
             </div>
           </div>
 
-          {/* Quick Batch Download Actions */}
-          <div className="flex items-center gap-2">
+          {/* Quick Batch Actions */}
+          <div className="flex items-center gap-2 pt-1 lg:pt-0 shrink-0">
             {selectedStudentIds.length > 0 && (
-              <span className="text-xs font-black text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-1.5 rounded-xl">
-                {selectedStudentIds.length} Selected
-              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedStudentIds([])}
+                className="text-xs font-semibold text-slate-600 hover:text-slate-900 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                Clear ({selectedStudentIds.length})
+              </button>
             )}
 
             <button
+              type="button"
               onClick={() => handleDownloadBatchPDF()}
               disabled={isGeneratingBatchPdf || filteredStudents.length === 0}
-              className="flex items-center gap-1.5 px-3.5 h-[36px] bg-gradient-to-r from-blue-700 to-indigo-700 hover:from-blue-800 hover:to-indigo-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs disabled:opacity-50 cursor-pointer"
+              className="flex items-center gap-2 px-4 h-[38px] bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs hover:shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shrink-0"
             >
               {isGeneratingBatchPdf ? (
                 <>
@@ -414,7 +437,7 @@ export default function AdmitCardsView() {
                 </>
               ) : (
                 <>
-                  <Download size={14} />
+                  <Download className="w-3.5 h-3.5" />
                   <span>
                     {selectedStudentIds.length > 0 
                       ? `Download Selected (${selectedStudentIds.length}) PDF`
@@ -429,49 +452,53 @@ export default function AdmitCardsView() {
 
       {/* 3. ROSTER / TABLE VIEW MODE */}
       {viewMode === 'roster' && (
-        <div className="bg-white rounded-[22px] border border-slate-200/80 p-4 shadow-2xs space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+          {/* Table Header Bar */}
+          <div className="px-5 py-3 bg-slate-50/75 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
               <button
+                type="button"
                 onClick={handleSelectAllFiltered}
-                className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200/90 rounded-lg text-xs font-semibold transition-colors cursor-pointer shadow-2xs"
               >
                 {selectedStudentIds.length === filteredStudents.length && filteredStudents.length > 0 ? (
-                  <CheckSquare size={13} className="text-blue-600" />
+                  <CheckSquare className="w-3.5 h-3.5 text-blue-600" />
                 ) : (
-                  <Square size={13} className="text-slate-400" />
+                  <Square className="w-3.5 h-3.5 text-slate-400" />
                 )}
                 <span>Select All ({filteredStudents.length})</span>
               </button>
-              <span className="text-xs text-slate-400 font-medium">
-                • Showing verified students eligible for {activeExam?.exam_name || 'CBSE Examinations'}
+              <span className="text-xs text-slate-500 font-medium">
+                • Showing candidates eligible for <strong className="text-slate-800">{activeExam?.exam_name || 'CBSE Examinations'}</strong>
               </span>
             </div>
 
-            <div className="text-xs font-bold text-slate-500">
-              Exam Centre: <span className="text-blue-900 font-black">St. Joseph's Senior Wing (Barhalganj)</span>
+            <div className="text-xs text-slate-600 font-medium flex items-center gap-1.5">
+              <MapPin className="w-3.5 h-3.5 text-slate-400" />
+              <span>Exam Centre:</span>
+              <span className="text-slate-900 font-bold">St. Joseph's Senior Wing (Barhalganj)</span>
             </div>
           </div>
 
-          <div className="overflow-x-auto border border-slate-200 rounded-xl">
+          <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-600 uppercase tracking-wider">
-                  <th className="py-2.5 px-3 w-10 text-center">
+                <tr className="bg-slate-100/70 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                  <th className="py-3 px-4 w-12 text-center">
                     <input 
                       type="checkbox" 
                       checked={selectedStudentIds.length === filteredStudents.length && filteredStudents.length > 0}
                       onChange={handleSelectAllFiltered}
-                      className="cursor-pointer rounded-sm"
+                      className="cursor-pointer rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                     />
                   </th>
-                  <th className="py-2.5 px-3">Roll No</th>
-                  <th className="py-2.5 px-3">Candidate Name</th>
-                  <th className="py-2.5 px-3">Scholar No</th>
-                  <th className="py-2.5 px-3">Class & Sec</th>
-                  <th className="py-2.5 px-3">Father's Name</th>
-                  <th className="py-2.5 px-3 text-center">Verification Status</th>
-                  <th className="py-2.5 px-3 text-right">Admit Card Actions</th>
+                  <th className="py-3 px-3 font-bold">Roll No</th>
+                  <th className="py-3 px-4 font-bold">Candidate Name</th>
+                  <th className="py-3 px-3 font-bold">Scholar No</th>
+                  <th className="py-3 px-3 font-bold">Class & Sec</th>
+                  <th className="py-3 px-4 font-bold">Father's Name</th>
+                  <th className="py-3 px-3 text-center font-bold">Verification Status</th>
+                  <th className="py-3 px-4 text-right font-bold">Admit Card Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-800">
@@ -488,73 +515,97 @@ export default function AdmitCardsView() {
                       <tr 
                         key={st.id} 
                         className={cn(
-                          "hover:bg-slate-50/80 transition-colors",
+                          "hover:bg-slate-50/80 transition-colors group",
                           isSelected && "bg-blue-50/40"
                         )}
                       >
-                        <td className="py-2.5 px-3 text-center">
+                        <td className="py-3 px-4 text-center">
                           <input 
                             type="checkbox" 
                             checked={isSelected}
                             onChange={() => handleToggleSelectStudent(st.id)}
-                            className="cursor-pointer rounded-sm"
+                            className="cursor-pointer rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                           />
                         </td>
-                        <td className="py-2.5 px-3 font-mono font-black text-blue-900">
-                          #{st.roll_number || idx + 1}
+                        <td className="py-3 px-3">
+                          <span className="font-mono font-bold text-slate-800 bg-slate-100/90 border border-slate-200/80 px-2 py-0.5 rounded-md text-[11px]">
+                            #{st.roll_number || idx + 1}
+                          </span>
                         </td>
-                        <td className="py-2.5 px-3">
+                        <td className="py-3 px-4">
                           <div className="flex items-center gap-2.5">
-                            <div className="w-7 h-7 rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center font-black text-[10px] text-slate-600 shrink-0">
+                            <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center font-bold text-xs text-slate-600 shrink-0 shadow-2xs">
                               {st.photo_url ? (
                                 <img src={st.photo_url} alt="" className="w-full h-full object-cover" />
                               ) : (
                                 st.name.charAt(0).toUpperCase()
                               )}
                             </div>
-                            <span className="font-bold text-slate-900 uppercase text-xs">{st.name}</span>
+                            <div>
+                              <span className="font-bold text-slate-900 block text-xs group-hover:text-blue-600 transition-colors">
+                                {st.name}
+                              </span>
+                              <span className="text-[10px] text-slate-400 font-normal">
+                                {st.gender || 'Regular'}
+                              </span>
+                            </div>
                           </div>
                         </td>
-                        <td className="py-2.5 px-3 font-mono text-slate-600">{st.admission_number || 'N/A'}</td>
-                        <td className="py-2.5 px-3 font-bold text-slate-700">Class {st.class}-{st.section || 'A'}</td>
-                        <td className="py-2.5 px-3 text-slate-600 uppercase text-[11px]">{st.father_name || 'N/A'}</td>
-                        <td className="py-2.5 px-3 text-center">
-                          <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md text-[9.5px] font-black uppercase inline-flex items-center gap-1">
-                            <CheckCircle2 size={10} /> Verified Pass
+                        <td className="py-3 px-3 font-mono text-xs text-slate-600 font-medium">
+                          {st.admission_number || 'N/A'}
+                        </td>
+                        <td className="py-3 px-3">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200/80">
+                            Class {st.class}-{st.section || 'A'}
                           </span>
                         </td>
-                        <td className="py-2.5 px-3 text-right">
+                        <td className="py-3 px-4 text-slate-600 text-xs">
+                          {st.father_name || 'N/A'}
+                        </td>
+                        <td className="py-3 px-3 text-center">
+                          <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200/80 rounded-full text-[10px] font-bold inline-flex items-center gap-1 shadow-2xs">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                            <span>Verified Pass</span>
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right">
                           <div className="flex items-center justify-end gap-1.5">
                             {/* Preview Modal Button */}
                             <button
+                              type="button"
                               onClick={() => setPreviewStudent(st)}
-                              className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-bold transition-colors inline-flex items-center gap-1 cursor-pointer"
+                              className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200/80 text-slate-700 rounded-lg text-xs font-semibold transition-colors inline-flex items-center gap-1 cursor-pointer border border-slate-200/60"
                               title="Preview Full Hall Ticket Modal"
                             >
-                              <Eye size={12} /> View
+                              <Eye className="w-3.5 h-3.5 text-slate-500" />
+                              <span>View</span>
                             </button>
 
                             {/* Download PDF Button */}
                             <button
+                              type="button"
                               onClick={() => handleDownloadSinglePDF(st)}
                               disabled={isGeneratingSinglePdf}
-                              className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-bold transition-colors inline-flex items-center gap-1 cursor-pointer shadow-2xs"
+                              className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-colors inline-flex items-center gap-1 cursor-pointer shadow-2xs disabled:opacity-50"
                               title="Download Crisp PDF Admit Card"
                             >
-                              <Download size={12} /> PDF
+                              <Download className="w-3.5 h-3.5" />
+                              <span>PDF</span>
                             </button>
 
                             {/* Print Button */}
                             <button
+                              type="button"
                               onClick={() => {
                                 setSelectedStudentId(st.id);
                                 setViewMode('preview');
                                 setTimeout(() => printRegion('admit-card-print', 'Admit Card'), 200);
                               }}
-                              className="px-2 py-1 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-[11px] font-bold transition-colors inline-flex items-center gap-1 cursor-pointer"
+                              className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-semibold transition-colors inline-flex items-center gap-1 cursor-pointer shadow-2xs"
                               title="Print A4 Admit Card"
                             >
-                              <Printer size={12} />
+                              <Printer className="w-3.5 h-3.5 text-slate-300" />
+                              <span>Print</span>
                             </button>
                           </div>
                         </td>
@@ -572,15 +623,15 @@ export default function AdmitCardsView() {
       {viewMode === 'preview' && (
         <div className="space-y-4">
           {/* Document Toolbar */}
-          <div className="bg-white rounded-[20px] border border-slate-200/80 p-3 shadow-2xs flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-3.5 shadow-xs flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               {/* Active candidate selector */}
               <div className="flex items-center gap-2">
-                <span className="text-xs font-black text-slate-500 uppercase">Selected Student:</span>
+                <span className="text-xs font-bold text-slate-600">Candidate:</span>
                 <select 
                   value={selectedStudentId} 
                   onChange={(e) => setSelectedStudentId(e.target.value)}
-                  className="bg-slate-50 border border-slate-200 rounded-xl py-1 px-3 text-xs font-bold text-blue-900 outline-none h-[34px] cursor-pointer"
+                  className="bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl py-1.5 px-3 text-xs font-semibold text-slate-900 outline-none h-[36px] cursor-pointer transition-colors focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 max-w-xs truncate"
                 >
                   {filteredStudents.map(st => (
                     <option key={st.id} value={st.id}>
@@ -591,12 +642,12 @@ export default function AdmitCardsView() {
               </div>
 
               {/* Zoom control */}
-              <div className="flex items-center gap-1.5 pl-2 border-l border-slate-200">
-                <span className="text-[10px] font-black text-slate-400 uppercase">Zoom:</span>
+              <div className="flex items-center gap-1.5 pl-3 border-l border-slate-200">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Zoom:</span>
                 <select 
                   value={zoom} 
                   onChange={(e) => setZoom(parseFloat(e.target.value))}
-                  className="bg-slate-50 border border-slate-200 rounded-lg py-1 px-2 text-xs font-semibold text-slate-700 h-[30px] cursor-pointer"
+                  className="bg-slate-50 border border-slate-200 rounded-lg py-1 px-2 text-xs font-semibold text-slate-700 h-[32px] cursor-pointer"
                 >
                   <option value="0.85">85% Fit</option>
                   <option value="1.0">100% Std</option>
@@ -605,12 +656,12 @@ export default function AdmitCardsView() {
               </div>
 
               {/* Watermark control */}
-              <div className="flex items-center gap-1.5 pl-2 border-l border-slate-200">
-                <span className="text-[10px] font-black text-slate-400 uppercase">Watermark:</span>
+              <div className="flex items-center gap-1.5 pl-3 border-l border-slate-200">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Watermark:</span>
                 <select 
                   value={watermark} 
                   onChange={(e) => setWatermark(e.target.value)}
-                  className="bg-slate-50 border border-slate-200 rounded-lg py-1 px-2 text-xs font-semibold text-slate-700 h-[30px] cursor-pointer"
+                  className="bg-slate-50 border border-slate-200 rounded-lg py-1 px-2 text-xs font-semibold text-slate-700 h-[32px] cursor-pointer"
                 >
                   <option value="NONE">None</option>
                   <option value="OFFICIAL COPY">Official Copy</option>
@@ -622,22 +673,25 @@ export default function AdmitCardsView() {
 
             <div className="flex items-center gap-2">
               <button 
+                type="button"
                 onClick={() => handleDownloadSinglePDF()}
                 disabled={isGeneratingSinglePdf}
-                className="flex items-center gap-1.5 px-3.5 h-[34px] bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                className="flex items-center gap-1.5 px-3.5 h-[36px] bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer disabled:opacity-50"
               >
-                {isGeneratingSinglePdf ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download size={13} />}
-                Download PDF
+                {isGeneratingSinglePdf ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                <span>Download PDF</span>
               </button>
               
               <button 
+                type="button"
                 onClick={() => {
                   const ok = printRegion('admit-card-print', `Admit Card — ${activeStudent?.name || 'Student'}`);
                   if (!ok) toast.error('Open a student admit card before printing.');
                 }}
-                className="flex items-center gap-1.5 px-3.5 h-[34px] bg-slate-900 hover:bg-slate-950 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                className="flex items-center gap-1.5 px-3.5 h-[36px] bg-slate-900 hover:bg-slate-950 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
               >
-                <Printer size={13} /> Print Slip
+                <Printer className="w-3.5 h-3.5" />
+                <span>Print Slip</span>
               </button>
             </div>
           </div>

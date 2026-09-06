@@ -127,15 +127,26 @@ async function writeViaRpc(url: string, init: RequestInit | undefined, method: s
   const table = m[1];
   if (table === 'rpc') return null;
 
-  const match: Record<string, string> = {};
+  const fixedMatch: Record<string, string> = {};
+  let inKey: string | null = null;
+  let inValues: string[] = [];
   let wantsRepresentation = false;
+
   for (const [key, value] of parsed.searchParams.entries()) {
     if (key === 'select') { wantsRepresentation = true; continue; }
     if (key === 'order' || key === 'limit' || key === 'offset') continue;
-    if (!value.startsWith('eq.')) return null;      // unsupported operator
-    match[key] = value.slice(3);
+    if (value.startsWith('eq.')) {
+      fixedMatch[key] = value.slice(3);
+    } else if (value.startsWith('in.(') && value.endsWith(')')) {
+      if (inKey) return null; // support at most one 'in' filter per query
+      inKey = key;
+      inValues = value.slice(4, -1).split(',').map(s => s.trim().replace(/^["']|["']$/g, '')).filter(Boolean);
+    } else {
+      return null;      // unsupported operator
+    }
   }
-  if (Object.keys(match).length === 0) return null;  // never rewrite an unfiltered write
+
+  if (Object.keys(fixedMatch).length === 0 && !inKey) return null;  // never rewrite an unfiltered write
 
   const headers = new Headers(init?.headers as HeadersInit);
   if ((headers.get('Prefer') || '').includes('return=representation')) wantsRepresentation = true;
@@ -150,21 +161,33 @@ async function writeViaRpc(url: string, init: RequestInit | undefined, method: s
   headers.set('Accept', 'application/json');
   headers.delete('Prefer');
 
-  const res = await fetch(`${parsed.origin}/rest/v1/rpc/rest_write`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      _table: table,
-      _op: method === 'DELETE' ? 'delete' : 'update',
-      _match: match,
-      _patch: patch,
-    }),
-  });
+  const matchesToRun: Record<string, string>[] = inKey && inValues.length > 0
+    ? inValues.map(v => ({ ...fixedMatch, [inKey!]: v }))
+    : [fixedMatch];
 
-  if (!res.ok) return res;                           // let the caller surface the real error
+  const callRpc = async (matchPayload: Record<string, string>) => {
+    return fetch(`${parsed.origin}/rest/v1/rpc/rest_write`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        _table: table,
+        _op: method === 'DELETE' ? 'delete' : 'update',
+        _match: matchPayload,
+        _patch: patch,
+      }),
+    });
+  };
 
-  const rows = await res.json().catch(() => []);
-  const list = Array.isArray(rows) ? rows : [];
+  const responses = await Promise.all(matchesToRun.map(callRpc));
+  const failedRes = responses.find(r => !r.ok);
+  if (failedRes) return failedRes;                           // let caller surface real error
+
+  let combinedRows: any[] = [];
+  for (const res of responses) {
+    const rows = await res.json().catch(() => []);
+    if (Array.isArray(rows)) combinedRows = combinedRows.concat(rows);
+  }
+  const list = combinedRows;
 
   const reply = (body: string | null, status: number) =>
     new Response(body, {

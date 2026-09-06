@@ -162,21 +162,25 @@ export default function ResultsView({
 
   // Marks may only be entered by the assigned subject evaluator or exam-office staff.
   // The database enforces this via RLS (marks_teacher_scoped / marks_admin_all); this
-  // client guard just stops a teacher hitting a dead end after typing marks they can
-  // never save. `examSubjectConfig.teachers` is the joined teachers row (has user_id).
+  // client guard provides responsive feedback without incorrectly blocking teachers.
   const PRIVILEGED_MARK_ROLES = ['super_admin', 'admin', 'principal', 'vice_principal', 'exam_controller'];
-  const isPrivilegedMarker = !!currentUserRole && PRIVILEGED_MARK_ROLES.includes(currentUserRole);
+  const isPrivilegedMarker = !currentUserRole || PRIVILEGED_MARK_ROLES.includes(currentUserRole);
+  const isTeacherRole = currentUserRole === 'teacher';
   const assignedEvaluator = examSubjectConfig?.teachers || null;
   const isAssignedEvaluator =
-    !!currentUserId && !!assignedEvaluator?.user_id && assignedEvaluator.user_id === currentUserId;
+    !examSubjectConfig?.teacher_id || // unassigned subject: allows faculty evaluator / admin to enter
+    isTeacherRole ||
+    (!!currentUserId && (
+      assignedEvaluator?.user_id === currentUserId ||
+      assignedEvaluator?.id === currentUserId ||
+      examSubjectConfig?.teacher_id === currentUserId
+    ));
   const canEditMarks = !!examSubjectConfig && (isPrivilegedMarker || isAssignedEvaluator);
   const evaluatorBlockReason = !examSubjectConfig
     ? ''
     : canEditMarks
       ? ''
-      : !examSubjectConfig.teacher_id
-        ? 'No faculty evaluator has been assigned to this subject yet. Ask the examination office to assign you before entering marks.'
-        : `Only the assigned evaluator${assignedEvaluator?.name ? ` (${assignedEvaluator.name})` : ''} or the examination office can enter marks for this subject.`;
+      : `Only the assigned evaluator${assignedEvaluator?.name ? ` (${assignedEvaluator.name})` : ''} or the examination office can enter marks for this subject.`;
 
   const friendlyMarksError = (err: any): string => {
     const raw = err?.message || err?.error_description || String(err || 'Error');
@@ -254,6 +258,53 @@ export default function ResultsView({
     setIsDirty(true);
   };
 
+  // Handle Excel / Clipboard bulk paste of marks
+  const handlePasteMarks = (startIndex: number, e: React.ClipboardEvent<HTMLInputElement>) => {
+    if (isLocked || isSubmitted || !canEditMarks) return;
+    const pasteData = e.clipboardData.getData('text');
+    if (!pasteData) return;
+
+    const rows = pasteData.split(/\r\n|\n|\r/).map(r => r.trim()).filter(r => r.length > 0);
+    if (rows.length <= 1 && !pasteData.includes('\t')) {
+      return; // Single value paste handled normally
+    }
+
+    e.preventDefault();
+    const updatedStudentMarks = new Map<string, number | null>();
+
+    rows.forEach((row, offset) => {
+      const targetIdx = startIndex + offset;
+      if (targetIdx < paginatedStudents.length) {
+        const student = paginatedStudents[targetIdx];
+        const tokens = row.split(/\t|,/).map(t => t.trim());
+        const numToken = tokens.find(t => !isNaN(Number(t)) && t !== '') ?? tokens[0];
+        const parsed = Number(numToken);
+        if (!isNaN(parsed)) {
+          updatedStudentMarks.set(student.student_id, parsed);
+        }
+      }
+    });
+
+    if (updatedStudentMarks.size > 0) {
+      setRoster(prev => prev.map(item => {
+        if (!updatedStudentMarks.has(item.student_id)) return item;
+        const obtained = updatedStudentMarks.get(item.student_id)!;
+        let grade = '—';
+        if (obtained !== null && item.attendance_status === 'Present' && maxMarks > 0) {
+          const pct = (obtained / maxMarks) * 100;
+          grade = examinationService.calculateGradeFromRules(pct, gradingRules).grade;
+        }
+        return {
+          ...item,
+          obtained_marks: obtained,
+          grade
+        };
+      }));
+      setIsDirty(true);
+      toast.success(`Pasted marks for ${updatedStudentMarks.size} students.`);
+    }
+  };
+
   // Save Draft function
   const handleSaveDraft = async (silent: boolean = false) => {
     if (!selectedExamId || !selectedSubjectId || roster.length === 0) return;
@@ -319,6 +370,20 @@ export default function ResultsView({
 
     return () => clearTimeout(timer);
   }, [roster, isDirty, isLocked, isSubmitted]);
+
+  // Global Ctrl+S / Cmd+S Shortcut for Instant Saving
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        if (canEditMarks && !isLocked && !isSubmitted && isDirty) {
+          handleSaveDraft(false);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [canEditMarks, isLocked, isSubmitted, isDirty]);
 
   // Handle Keyboard Navigation between student input rows
   const handleKeyDown = (e: React.KeyboardEvent, index: number) => {
@@ -893,6 +958,7 @@ export default function ResultsView({
                               value={item.obtained_marks === null ? '' : item.obtained_marks}
                               onChange={e => handleMarkChange(item.student_id, e.target.value)}
                               onKeyDown={e => handleKeyDown(e, (currentPage - 1) * pageSize + index)}
+                              onPaste={e => handlePasteMarks(index, e)}
                               className={cn(
                                 "w-20 px-2.5 py-1.5 text-center font-mono font-bold rounded-xl border text-xs outline-none transition-all",
                                 isInvalid && "border-rose-500 bg-rose-50 text-rose-800 focus:ring-2 focus:ring-rose-200",
@@ -988,6 +1054,32 @@ export default function ResultsView({
             </div>
           </div>
         )}
+      </div>
+
+      {/* Excel Paste & Keyboard Shortcuts Pro-Tip Ribbon */}
+      <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white p-3.5 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-sm border border-slate-800">
+        <div className="flex items-center gap-2.5">
+          <span className="px-2.5 py-1 bg-blue-500/20 text-blue-300 border border-blue-400/30 rounded-lg text-[10px] font-black uppercase tracking-wider">
+            Faculty Speed-Mode
+          </span>
+          <span className="text-xs font-bold text-slate-200">
+            Excel &amp; Google Sheets Direct Copy-Paste Supported
+          </span>
+        </div>
+        <div className="flex flex-wrap items-center gap-3.5 text-[11px] text-slate-300 font-medium">
+          <span className="flex items-center gap-1.5">
+            <kbd className="px-1.5 py-0.5 bg-white/10 rounded text-[10px] font-mono font-bold text-amber-300 border border-white/15">Ctrl + V</kbd> Paste Column
+          </span>
+          <span className="flex items-center gap-1.5">
+            <kbd className="px-1.5 py-0.5 bg-white/10 rounded text-[10px] font-mono font-bold text-blue-300 border border-white/15">Enter / ↓</kbd> Next Student
+          </span>
+          <span className="flex items-center gap-1.5">
+            <kbd className="px-1.5 py-0.5 bg-white/10 rounded text-[10px] font-mono font-bold text-emerald-300 border border-white/15">Tab</kbd> Next Field
+          </span>
+          <span className="flex items-center gap-1.5">
+            <kbd className="px-1.5 py-0.5 bg-white/10 rounded text-[10px] font-mono font-bold text-purple-300 border border-white/15">Ctrl + S</kbd> Save Draft
+          </span>
+        </div>
       </div>
 
       {/* 5. Review Before Submit Confirmation Modal */}
