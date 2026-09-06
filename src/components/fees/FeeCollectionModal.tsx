@@ -10,6 +10,19 @@ import { supabase } from '@/lib/supabase';
 import { feeService } from '@/services/feeService';
 import { FeeCategory, PaymentMode, CollectFeeResult, StudentFeeLedger } from '@/types/fee';
 
+/**
+ * Formats an amount for display, tolerating a missing or non-numeric value.
+ *
+ * Callers hand this modal a ledger from several different queries. One of them
+ * omitted remaining_amount, and calling .toFixed() on undefined threw during
+ * render, which unmounted the whole Fees route and left a blank page. A missing
+ * figure should read as 0.00, never take the page down.
+ */
+const money = (value: unknown): string => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n.toFixed(2) : '0.00';
+};
+
 interface FeeCollectionModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -337,7 +350,7 @@ export default function FeeCollectionModal({
               </h2>
               <p className="text-xs text-slate-500 font-normal">
                 {selectedLedger 
-                  ? `Direct settlement for ${selectedLedger.category_name} • Balance: ₹${selectedLedger.remaining_amount.toFixed(2)}`
+                  ? `Direct settlement for ${selectedLedger.category_name || 'fee'} • Balance: ₹${money(selectedLedger.remaining_amount)}`
                   : 'Record student payment, generate sequential CBSE receipt, and update ledger balance.'}
               </p>
             </div>
@@ -529,7 +542,7 @@ export default function FeeCollectionModal({
                     </div>
 
                     <div className="text-right shrink-0">
-                      <div className="text-xs font-mono font-bold text-rose-700">₹{inv.remaining_amount.toFixed(2)}</div>
+                      <div className="text-xs font-mono font-bold text-rose-700">₹{money(inv.remaining_amount)}</div>
                       <span className="text-[10px] font-semibold text-blue-700">
                         {selectedLedger?.id === inv.id ? 'Selected ✓' : 'Settle →'}
                       </span>
@@ -622,7 +635,7 @@ export default function FeeCollectionModal({
                 {selectedLedger ? 'Outstanding Ledger Balance:' : 'Net Demand Payable:'}
               </span>
               <span className="font-mono font-bold text-slate-900 text-sm">
-                ₹{(selectedLedger ? selectedLedger.remaining_amount : netPayable).toFixed(2)}
+                ₹{money(selectedLedger ? selectedLedger.remaining_amount : netPayable)}
               </span>
             </div>
 
@@ -635,10 +648,10 @@ export default function FeeCollectionModal({
                 {selectedLedger && (
                   <button
                     type="button"
-                    onClick={() => setPayingAmount(selectedLedger.remaining_amount)}
+                    onClick={() => setPayingAmount(Number(selectedLedger.remaining_amount) || 0)}
                     className="text-[11px] font-semibold text-emerald-700 hover:text-emerald-900 bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-200 cursor-pointer"
                   >
-                    Pay Full Due (₹{selectedLedger.remaining_amount.toFixed(2)})
+                    Pay Full Due (₹{money(selectedLedger.remaining_amount)})
                   </button>
                 )}
               </div>
@@ -664,7 +677,7 @@ export default function FeeCollectionModal({
                   </span>
                 ) : numPaying > 0 ? (
                   <span className="text-amber-700 font-semibold">
-                    Partial Payment: Balance of <strong className="font-mono font-bold">₹{balanceAfterPayment.toFixed(2)}</strong> will remain due.
+                    Partial Payment: Balance of <strong className="font-mono font-bold">₹{money(balanceAfterPayment)}</strong> will remain due.
                   </span>
                 ) : null}
               </div>

@@ -172,7 +172,9 @@ export default function Student360Drawer({
         const { data: feeLedgers, error: feeErr } = await supabase
           .from('student_fees')
           .select(`
-            id, total_amount, discount_amount, net_amount, amount_paid, due_date, status,
+            id, student_id, fee_category_id, academic_year_id,
+            total_amount, discount_amount, scholarship_amount, fine_amount,
+            net_amount, amount_paid, due_date, status,
             fee_categories:fee_category_id (id, category_name),
             fee_payments (id, receipt_number, amount_paid, payment_date, payment_mode)
           `)
@@ -181,17 +183,45 @@ export default function Student360Drawer({
 
         if (feeErr) console.error('Fee load error in Student360Drawer:', feeErr);
 
-        const ledgers = (feeLedgers || []).map((l: any) => ({
-          id: l.id,
-          fee_category_name: l.fee_categories?.category_name || 'Composite School Fee',
-          total_amount: Number(l.total_amount || 0),
-          discount_amount: Number(l.discount_amount || 0),
-          net_amount: Number(l.net_amount || (Number(l.total_amount || 0) - Number(l.discount_amount || 0))),
-          amount_paid: Number(l.amount_paid || 0),
-          due_date: l.due_date,
-          status: l.status || 'pending',
-          receipts: l.fee_payments || []
-        }));
+        // Shaped as a full StudentFeeLedger, because "Collect" hands this very
+        // object to FeeCollectionModal. It used to carry only a display subset,
+        // so the modal read remaining_amount off it, got undefined, and the
+        // .toFixed() call took the whole Fees page down with a blank screen.
+        const ledgers = (feeLedgers || []).map((l: any) => {
+          const total     = Number(l.total_amount || 0);
+          const discount  = Number(l.discount_amount || 0);
+          const netAmount = Number(l.net_amount ?? (total - discount));
+          const paid      = Number(l.amount_paid || 0);
+          return {
+            id: l.id,
+            student_id: l.student_id || student.id,
+            fee_category_id: l.fee_category_id,
+            academic_year_id: l.academic_year_id,
+            category_name: l.fee_categories?.category_name || 'Composite School Fee',
+            fee_category_name: l.fee_categories?.category_name || 'Composite School Fee',
+            total_amount: total,
+            discount_amount: discount,
+            scholarship_amount: Number(l.scholarship_amount || 0),
+            fine_amount: Number(l.fine_amount || 0),
+            net_amount: netAmount,
+            amount_paid: paid,
+            remaining_amount: Math.max(0, netAmount - paid),
+            due_date: l.due_date,
+            status: l.status || 'pending',
+            academic_year: student.academic_year || '',
+            students: {
+              id: student.id,
+              name: student.name,
+              roll_number: student.roll_number,
+              admission_number: student.admission_number,
+              class: student.class,
+              section: student.section,
+              father_name: student.father_name,
+              phone: student.phone,
+            },
+            receipts: l.fee_payments || []
+          };
+        });
 
         const totalBilled = ledgers.reduce((acc, cur) => acc + cur.net_amount, 0);
         const totalPaid = ledgers.reduce((acc, cur) => acc + cur.amount_paid, 0);
