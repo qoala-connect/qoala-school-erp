@@ -47,9 +47,36 @@ export default function ResultProcessingView({
   onOpenMarksEntry,
   onRefreshData
 }: ResultProcessingViewProps) {
-  const [selectedExamId, setSelectedExamId] = useState<string>(exams[0]?.id || '');
   const [selectedClassId, setSelectedClassId] = useState<string>('all');
+  const [selectedExamId, setSelectedExamId] = useState<string>(exams[0]?.id || '');
   const [activeSubTab, setActiveSubTab] = useState<'verification' | 'processing' | 'published'>('verification');
+
+  // Bulk actions state
+  const [isBulkApproving, setIsBulkApproving] = useState<boolean>(false);
+  const [isBulkLocking, setIsBulkLocking] = useState<boolean>(false);
+
+  // Cascading: exams belonging to the selected class
+  const availableExamsForClass = useMemo(() => {
+    if (selectedClassId === 'all') return exams;
+    return exams.filter(e => e.class_id === selectedClassId || (e as any).classes?.id === selectedClassId || (e as any).class === selectedClassId);
+  }, [exams, selectedClassId]);
+
+  // Handle class switch: cascade exam dropdown
+  const handleClassChange = (newClassId: string) => {
+    setSelectedClassId(newClassId);
+    if (newClassId === 'all') {
+      if (!exams.some(e => e.id === selectedExamId)) {
+        setSelectedExamId(exams[0]?.id || '');
+      }
+    } else {
+      const classExams = exams.filter(e => e.class_id === newClassId || (e as any).classes?.id === newClassId || (e as any).class === newClassId);
+      if (classExams.length > 0) {
+        if (!classExams.some(e => e.id === selectedExamId)) {
+          setSelectedExamId(classExams[0].id);
+        }
+      }
+    }
+  };
 
   // Processing state
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
@@ -61,10 +88,15 @@ export default function ResultProcessingView({
     warnings: string[];
   } | null>(null);
 
-  // Subject ids of the selected exam that actually carry marks. Approving a
-  // subject with no marks would still add its max to every student's total in
-  // processClassResults, silently deflating percentages — so it is not offered.
+  // Subject ids of the selected exam that actually carry marks.
   const [subjectsWithMarks, setSubjectsWithMarks] = useState<Set<string>>(new Set());
+
+  // Live exam_subjects for the selected exam. The `exams` prop carries a
+  // baseline that ExaminationModule only fetches on page load, so a lock or
+  // approval done in Marks Verification did not surface here until a full
+  // reload. This is re-read on every exam switch and after every mutation so
+  // the verification board and Marks Verification never drift apart.
+  const [liveExamSubjects, setLiveExamSubjects] = useState<any[] | null>(null);
 
   // Results list state
   const [examResultsList, setExamResultsList] = useState<StudentExamResult[]>([]);
@@ -131,18 +163,55 @@ export default function ResultProcessingView({
     }
   };
 
+  // Re-read the marks streams for the selected exam straight from the table so
+  // the verification board reflects a lock/approval done in Marks Verification
+  // without waiting for a page reload.
+  const loadExamSubjects = async () => {
+    if (!selectedExamId) {
+      setLiveExamSubjects(null);
+      return;
+    }
+    try {
+      const { data, error } = await supabase
+        .from('exam_subjects')
+        .select(`
+          id, exam_id, subject_id, subject_name, max_marks, pass_marks,
+          component_name, review_status, locked, reopen_reason,
+          teachers:teacher_id(id, name, email)
+        `)
+        .eq('exam_id', selectedExamId);
+
+      if (error) throw error;
+      setLiveExamSubjects(data || []);
+    } catch (err) {
+      console.warn('[ResultProcessingView] live exam_subjects warn:', err);
+      setLiveExamSubjects(null);
+    }
+  };
+
+  // The exam picker is seeded from exams[0] once, at mount. When the parent is
+  // still loading its baseline at that point selectedExamId stays '' and the
+  // whole view renders empty; it also needs repairing after a refetch drops the
+  // row it was pointing at. Keep it pinned to a real exam whenever one exists.
+  useEffect(() => {
+    if (!exams.length) return;
+    setSelectedExamId(prev => (prev && exams.some(e => e.id === prev)) ? prev : exams[0].id);
+  }, [exams]);
+
   useEffect(() => {
     if (selectedExamId) {
       loadExamResults();
       loadSubjectsWithMarks();
+      loadExamSubjects();
     }
   }, [selectedExamId]);
 
-  // Exam Subjects in current exam
+  // Exam Subjects in current exam. Prefer the live read; fall back to the
+  // baseline the parent passed while that first fetch is in flight.
   const examSubjectsList = useMemo(() => {
-    if (!currentExam?.exam_subjects) return [];
-    return currentExam.exam_subjects;
-  }, [currentExam]);
+    if (liveExamSubjects) return liveExamSubjects;
+    return currentExam?.exam_subjects || [];
+  }, [liveExamSubjects, currentExam]);
 
   // Counts of subjects in various stages
   const subjectStats = useMemo(() => {
@@ -163,6 +232,81 @@ export default function ResultProcessingView({
     return sub.review_status === 'submitted' || subjectsWithMarks.has(sub.subject_id);
   };
 
+  const isLockableSubject = (sub: any) => {
+    return (sub.review_status === 'approved' || sub.review_status === 'submitted') && !sub.locked;
+  };
+
+  // Bulk Approve all approvable subjects in current exam
+  const handleBulkApprove = async () => {
+    const targets = examSubjectsList.filter(isApprovableSubject);
+    if (targets.length === 0) {
+      toast.error('No pending subjects with marks found to approve in this exam.');
+      return;
+    }
+
+    const ok = window.confirm(
+      `Approve marks for ${targets.length} subject(s) in ${currentExam?.short_name || currentExam?.exam_name}?\n\n` +
+      `Approved subjects will become immediately ready for Result Calculation.`
+    );
+    if (!ok) return;
+
+    setIsBulkApproving(true);
+    try {
+      const { approved, failed } = await examinationService.approveMarksBulk(
+        targets.map(t => ({ examId: selectedExamId, subjectId: t.subject_id || t.id })),
+        currentUserId
+      );
+
+      if (failed.length > 0) {
+        toast.error(`Approved ${approved}, but ${failed.length} failed: ${failed[0].message}`);
+      } else {
+        toast.success(`Successfully approved ${approved} subject stream(s).`);
+      }
+      await Promise.all([loadSubjectsWithMarks(), loadExamSubjects()]);
+      onRefreshData?.();
+    } catch (err: any) {
+      toast.error(err.message || 'Bulk approval failed');
+    } finally {
+      setIsBulkApproving(false);
+    }
+  };
+
+  // Bulk Lock all approved/submitted subjects in current exam
+  const handleBulkLock = async () => {
+    const targets = examSubjectsList.filter(isLockableSubject);
+    if (targets.length === 0) {
+      toast.error('No unlocked approved/submitted subjects found in this exam.');
+      return;
+    }
+
+    const ok = window.confirm(
+      `Lock marks for ${targets.length} subject(s) in ${currentExam?.short_name || currentExam?.exam_name}?\n\n` +
+      `Once locked, faculty members cannot modify scores unless unlocked by an admin.`
+    );
+    if (!ok) return;
+
+    setIsBulkLocking(true);
+    try {
+      const { locked, failed } = await examinationService.lockMarksBulk(
+        targets.map(t => ({ examId: selectedExamId, subjectId: t.subject_id || t.id })),
+        currentUserId,
+        'Bulk locked from Result Processing View'
+      );
+
+      if (failed.length > 0) {
+        toast.error(`Locked ${locked}, but ${failed.length} failed: ${failed[0].message}`);
+      } else {
+        toast.success(`Successfully locked ${locked} subject(s).`);
+      }
+      await loadExamSubjects();
+      onRefreshData?.();
+    } catch (err: any) {
+      toast.error(err.message || 'Bulk lock failed');
+    } finally {
+      setIsBulkLocking(false);
+    }
+  };
+
   // Handle Approve Subject Marks
   const handleApproveSubject = async (subject: any) => {
     if (subject.review_status !== 'submitted') {
@@ -176,7 +320,7 @@ export default function ResultProcessingView({
     try {
       await examinationService.approveMarks(selectedExamId, subject.subject_id || subject.id, currentUserId);
       toast.success(`Marks for ${subject.subject_name} approved successfully.`);
-      await loadSubjectsWithMarks();
+      await Promise.all([loadSubjectsWithMarks(), loadExamSubjects()]);
       onRefreshData?.();
     } catch (err: any) {
       toast.error('Approval failed: ' + (err.message || 'Error'));
@@ -201,6 +345,7 @@ export default function ResultProcessingView({
       toast.success('Marks returned to evaluator teacher for correction.');
       setReturnModalSubject(null);
       setReturnReason('');
+      await loadExamSubjects();
       onRefreshData?.();
     } catch (err: any) {
       toast.error('Failed to return marks: ' + (err.message || 'Error'));
@@ -220,6 +365,7 @@ export default function ResultProcessingView({
 
       toast.success(`Marks for ${lockModalSubject.subject_name} are now locked.`);
       setLockModalSubject(null);
+      await loadExamSubjects();
       onRefreshData?.();
     } catch (err: any) {
       toast.error('Lock failed: ' + (err.message || 'Error'));
@@ -244,6 +390,7 @@ export default function ResultProcessingView({
       toast.success(`Marks for ${unlockModalSubject.subject_name} unlocked.`);
       setUnlockModalSubject(null);
       setUnlockReason('');
+      await loadExamSubjects();
       onRefreshData?.();
     } catch (err: any) {
       toast.error('Unlock failed: ' + (err.message || 'Error'));
@@ -488,39 +635,37 @@ export default function ResultProcessingView({
 
         {/* Exam & Class Selection Bar */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-1">
+          {/* 1. Class Filter (First) */}
           <div>
             <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1 pl-1">
-              Select Examination Term
-            </label>
-            <select
-              value={selectedExamId}
-              onChange={e => {
-                setSelectedExamId(e.target.value);
-                const ex = exams.find(x => x.id === e.target.value);
-                if (ex?.class_id) setSelectedClassId(ex.class_id);
-              }}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 h-[36px] text-xs font-bold text-slate-800 outline-none hover:border-slate-300 focus:bg-white focus:border-blue-500 cursor-pointer transition-colors"
-            >
-              {exams.map(ex => (
-                <option key={ex.id} value={ex.id}>
-                  {ex.short_name || ex.exam_name} ({ex.academic_year}) - {formatClassDisplay(ex.classes?.class_name || ex.class)}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1 pl-1">
-              Filter by Class
+              1. Filter by Class
             </label>
             <select
               value={selectedClassId}
-              onChange={e => setSelectedClassId(e.target.value)}
+              onChange={e => handleClassChange(e.target.value)}
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 h-[36px] text-xs font-bold text-slate-800 outline-none hover:border-slate-300 focus:bg-white focus:border-blue-500 cursor-pointer transition-colors"
             >
               <option value="all">All Assigned Classes</option>
               {classes.map(c => (
                 <option key={c.id} value={c.id}>{formatClassDisplay(c.class_name)}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* 2. Exam Term (Cascaded) */}
+          <div>
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1 pl-1">
+              2. Select Examination Term {selectedClassId !== 'all' ? `(${availableExamsForClass.length})` : ''}
+            </label>
+            <select
+              value={selectedExamId}
+              onChange={e => setSelectedExamId(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 h-[36px] text-xs font-bold text-slate-800 outline-none hover:border-slate-300 focus:bg-white focus:border-blue-500 cursor-pointer transition-colors"
+            >
+              {availableExamsForClass.map(ex => (
+                <option key={ex.id} value={ex.id}>
+                  {ex.short_name || ex.exam_name} ({ex.academic_year}) {selectedClassId === 'all' ? `- ${formatClassDisplay(ex.classes?.class_name || ex.class)}` : ''}
+                </option>
               ))}
             </select>
           </div>
@@ -572,16 +717,45 @@ export default function ResultProcessingView({
       {/* SUBTAB 1: FACULTY MARKS VERIFICATION */}
       {activeSubTab === 'verification' && (
         <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-2xs">
-          <div className="px-5 py-3.5 bg-slate-50 border-b border-slate-200/80 flex items-center justify-between">
+          <div className="px-5 py-3.5 bg-slate-50 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
             <div className="flex items-center gap-2">
               <ShieldCheck size={16} className="text-blue-600" />
               <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
                 Faculty Marks Submissions &amp; Verification Board
               </h4>
             </div>
-            <span className="text-xs text-slate-500 font-bold bg-white px-2.5 py-0.5 rounded-full border border-slate-200">
-              {examSubjectsList.length} subject workload(s)
-            </span>
+
+            <div className="flex items-center gap-2">
+              {examSubjectsList.filter(isApprovableSubject).length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleBulkApprove}
+                  disabled={isBulkApproving || isBulkLocking}
+                  className="px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs disabled:opacity-60 shrink-0"
+                  title="Bulk Approve all subjects with marks in this exam"
+                >
+                  <CheckCircle2 size={13} />
+                  <span>Approve All ({examSubjectsList.filter(isApprovableSubject).length})</span>
+                </button>
+              )}
+
+              {examSubjectsList.filter(isLockableSubject).length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleBulkLock}
+                  disabled={isBulkLocking || isBulkApproving}
+                  className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs disabled:opacity-60 shrink-0"
+                  title="Bulk Lock all approved/submitted subjects in this exam"
+                >
+                  <Lock size={13} />
+                  <span>Lock All ({examSubjectsList.filter(isLockableSubject).length})</span>
+                </button>
+              )}
+
+              <span className="text-xs text-slate-500 font-bold bg-white px-2.5 py-1 rounded-xl border border-slate-200 shrink-0">
+                {examSubjectsList.length} subject workload(s)
+              </span>
+            </div>
           </div>
 
           {examSubjectsList.length === 0 ? (

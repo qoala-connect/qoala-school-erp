@@ -156,6 +156,111 @@ export interface StudentExamResult {
   exams?: ExamRecord;
 }
 
+/**
+ * PostgREST sends an upsert array as a single statement, so one row the caller
+ * has no RLS grant for aborts the whole batch. Chunking bounds the blast radius
+ * and keeps a large class under the request-size ceiling.
+ */
+const MARKS_UPSERT_CHUNK = 200;
+
+/** Workflow states a marks stream (`exam_subjects.review_status`) can hold. */
+export type MarksStreamStatus =
+  | 'draft'
+  | 'in_progress'
+  | 'submitted'
+  | 'returned'
+  | 'approved'
+  | 'locked';
+
+const MARKS_STREAM_STATUSES: MarksStreamStatus[] = [
+  'draft', 'in_progress', 'submitted', 'returned', 'approved', 'locked'
+];
+
+/** Statuses a teacher may still type into. Past these, entry is read-only. */
+export const TEACHER_EDITABLE_MARK_STATUSES: MarksStreamStatus[] = [
+  'draft', 'in_progress', 'returned'
+];
+
+/** Roles that may moderate marks at any point short of an explicit lock. */
+export const MARKS_MODERATOR_ROLES = [
+  'super_admin', 'admin', 'principal', 'vice_principal', 'exam_controller'
+];
+
+function normaliseStreamStatus(value?: string | null): MarksStreamStatus {
+  const s = (value || '').toLowerCase().trim() as MarksStreamStatus;
+  return MARKS_STREAM_STATUSES.includes(s) ? s : 'draft';
+}
+
+/**
+ * Coerce a stored score to a number.
+ *
+ * `obtained_marks` is numeric(5,2), so PostgREST hands it over as the string
+ * "0.00". Only null/undefined/'' mean "not evaluated" — a genuine zero has to
+ * survive as 0. `Number('')` is 0, which is why the empty check comes first.
+ */
+function toScore(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'string' && value.trim() === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Resolve attendance from the row, falling back to the legacy boolean flags. */
+function normaliseAttendance(markRow: any): StudentMarkEntry['attendance_status'] {
+  const raw = (markRow?.attendance_status || '').toString().trim().toLowerCase();
+  if (raw === 'absent') return 'Absent';
+  if (raw === 'medical') return 'Medical';
+  if (raw === 'exempted') return 'Exempted';
+  if (raw === 'present') return 'Present';
+  if (markRow?.is_absent) return 'Absent';
+  if (markRow?.is_medical) return 'Medical';
+  if (markRow?.is_exempted) return 'Exempted';
+  return 'Present';
+}
+
+/** Roll numbers are text, so Postgres orders "10" before "2". Sort naturally. */
+function compareRollNumbers(a?: string | null, b?: string | null): number {
+  const av = (a || '').trim();
+  const bv = (b || '').trim();
+  const an = Number(av);
+  const bn = Number(bv);
+  const aNum = av !== '' && Number.isFinite(an);
+  const bNum = bv !== '' && Number.isFinite(bn);
+  if (aNum && bNum) return an - bn;
+  if (aNum) return -1;
+  if (bNum) return 1;
+  return av.localeCompare(bv, undefined, { numeric: true, sensitivity: 'base' });
+}
+
+function formatSavedAt(iso: string): string {
+  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+/**
+ * Turn a Postgres/PostgREST failure into something an evaluator can act on.
+ *
+ * 42501 is what RLS raises when a teacher touches a class or section they are
+ * not the assigned evaluator for; the raw "new row violates row-level security
+ * policy" text tells them nothing about which row or why.
+ */
+function marksAccessMessage(error: any, action: string): string {
+  const code = error?.code || '';
+  const raw = error?.message || error?.error_description || 'Unexpected database error.';
+
+  if (code === '42501' || /row-level security|violates .*policy|permission denied/i.test(raw)) {
+    return `You do not have permission to ${action}. Marks are restricted to the assigned evaluator and the examination office.`;
+  }
+  if (code === 'P0002') {
+    return 'This subject is not mapped to the selected exam. Map it under Exams → Subject Mapping first.';
+  }
+  if (code === '23514' || code === 'check_violation' || /check constraint|workflow transition/i.test(raw)) {
+    return raw;
+  }
+  if (code === '22P02') {
+    return 'The selected exam, subject or class is invalid. Reselect them and try again.';
+  }
+  return raw;
+}
 class ExaminationService {
   /**
    * Log an exam lifecycle event to audit_logs
@@ -582,9 +687,28 @@ class ExaminationService {
       await this.logAudit('EXAM_SUBJECT_CONFIGURED', 'exam_subjects', payload.id, null, payload);
       return data;
     } else {
+      // A stream can already exist for this (exam, subject) even when the caller
+      // holds no id: the Subject Mapping screen builds its list from Academics →
+      // Class Subjects, not from exam_subjects. The previous `upsert(..., review_status:'draft')`
+      // then wrote 'draft' straight over the conflict row on every re-save,
+      // silently knocking every already-verified subject of a live exam back to
+      // Draft (and, where a row was locked, failing the workflow trigger). Route
+      // an existing row through the id path, which only touches config columns
+      // and never the workflow state.
+      const { data: existing } = await supabase
+        .from('exam_subjects')
+        .select('id')
+        .eq('exam_id', payload.exam_id)
+        .eq('subject_id', payload.subject_id)
+        .maybeSingle();
+
+      if (existing?.id) {
+        return this.saveExamSubject({ ...payload, id: existing.id });
+      }
+
       const { data, error } = await supabase
         .from('exam_subjects')
-        .upsert({
+        .insert({
           exam_id: payload.exam_id,
           class_id: payload.class_id,
           subject_id: payload.subject_id,
@@ -601,7 +725,7 @@ class ExaminationService {
           invigilator_id: payload.invigilator_id || null,
           instructions: payload.instructions || null,
           review_status: 'draft'
-        }, { onConflict: 'exam_id,subject_id' })
+        })
         .select(`
           *,
           subjects:subject_id(id, subject_name, subject_code),
@@ -705,6 +829,29 @@ class ExaminationService {
         teachers:teacher_id(id, name, employee_id, email)
       `);
 
+    // Scope to the academic year at the query level. Without this every
+    // exam_subjects row for every session is read, and the students/marks bulk
+    // reads below then fan out across all of history — the marks table alone is
+    // well past PostgREST's 1000-row cap, so the verification board was paging
+    // through the entire mark history on every load. Resolving year -> exam ids
+    // first and constraining the query keeps the whole pipeline to one session.
+    if (academicYearId && academicYearId !== 'all') {
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(academicYearId);
+      const { data: yearExams, error: yearErr } = await supabase
+        .from('exams')
+        .select('id')
+        .eq(isUUID ? 'academic_year_id' : 'academic_year', academicYearId);
+
+      if (yearErr) {
+        console.error('[ExaminationService] getTeacherWorkload year scope error:', yearErr);
+        throw yearErr;
+      }
+
+      const yearExamIds = (yearExams || []).map((e: any) => e.id);
+      if (yearExamIds.length === 0) return [];
+      query = query.in('exam_id', yearExamIds);
+    }
+
     // Fetch timetable matching pairs for teacher if teacherId passed
     let teacherTaughtSet = new Set<string>();
     if (teacherId && teacherId !== 'all') {
@@ -751,10 +898,10 @@ class ExaminationService {
     });
 
     // Roster sizes and entered-marks progress used to be fetched per task —
-    // two round trips each, so ~300+ requests and ~45s for a full board. Both
-    // are now resolved with one paged bulk read apiece and grouped in memory.
-    // The paging is not optional: marks is already past PostgREST's 1000-row
-    // cap, and an unranged read would truncate it without raising an error.
+    // two round trips each, so ~300+ requests for a full board. They are now
+    // three bulk reads (roster / marks / timetable) that all run concurrently,
+    // and the marks read pages in PARALLEL rather than walking 7 sequential
+    // 1000-row ranges — that serial paging was the bulk of the load time.
     const examIds = [...new Set(tasks.map((t: any) => t.exam_id).filter(Boolean))];
     const classIds = [...new Set(tasks.map((t: any) => t.exams?.class_id).filter(Boolean))];
     const classNames = [...new Set(tasks.map((t: any) => t.exams?.class).filter(Boolean))];
@@ -764,27 +911,55 @@ class ExaminationService {
       classNames.length ? `class.in.(${classNames.map(c => `"${c}"`).join(',')})` : '',
     ].filter(Boolean).join(',');
 
-    // Fetch timetable mapping to resolve faculty names when teacher_id is unassigned
-    let timetableTeacherMap = new Map<string, { id: string; name: string; email?: string }>();
-    try {
-      const { data: ttAll } = await supabase
-        .from('timetable')
-        .select('class_id, subject_id, teacher_id, teachers:teacher_id(id, name, email)')
-        .not('teacher_id', 'is', null);
-      (ttAll || []).forEach((r: any) => {
-        if (r.class_id && r.subject_id && r.teachers) {
-          timetableTeacherMap.set(`${r.class_id}::${r.subject_id}`, {
-            id: r.teachers.id,
-            name: r.teachers.name,
-            email: r.teachers.email
-          });
-        }
-      });
-    } catch (err) {
-      console.warn('[ExaminationService] Could not fetch timetable teacher map:', err);
-    }
+    const PAGE = 1000;
+    const MARK_COLS = 'exam_id, subject_id, obtained_marks, attendance_status';
 
-    const [studentRows, markRows] = await Promise.all([
+    // Entered-mark count per (exam, subject). The fast path is the
+    // `exam_workload_progress` RPC — a single indexed GROUP BY that returns one
+    // row per stream (~150) instead of every marks row. Where that function is
+    // not deployed it falls back to a parallel paged scan of `marks` (count
+    // head + ceil(rows/1000) concurrent ranges), which is still far better than
+    // the old 7 sequential 1000-row pages.
+    const fetchEnteredCounts = async (): Promise<Map<string, number>> => {
+      const map = new Map<string, number>();
+      if (!examIds.length) return map;
+
+      const { data: rpcRows, error: rpcErr } = await supabase.rpc('exam_workload_progress', {
+        _exam_ids: examIds,
+      });
+      if (!rpcErr && Array.isArray(rpcRows)) {
+        for (const r of rpcRows as any[]) {
+          map.set(`${r.exam_id}::${r.subject_id}`, Number(r.entered_count) || 0);
+        }
+        return map;
+      }
+
+      const { count } = await supabase
+        .from('marks')
+        .select('exam_id', { count: 'exact', head: true })
+        .in('exam_id', examIds);
+      const pageCount = Math.max(1, Math.ceil((count || 0) / PAGE));
+      const pages = await Promise.all(
+        Array.from({ length: pageCount }, (_, i) =>
+          supabase
+            .from('marks')
+            .select(MARK_COLS)
+            .in('exam_id', examIds)
+            .order('id', { ascending: true })
+            .range(i * PAGE, i * PAGE + PAGE - 1)
+        )
+      );
+      for (const p of pages) {
+        for (const m of ((p.data as any[]) || [])) {
+          if (m.obtained_marks === null && m.attendance_status === 'Present') continue;
+          const key = `${m.exam_id}::${m.subject_id}`;
+          map.set(key, (map.get(key) || 0) + 1);
+        }
+      }
+      return map;
+    };
+
+    const [studentRows, enteredByKey, ttAll] = await Promise.all([
       classIds.length || classNames.length
         ? this.fetchAllPaged<any>(() =>
             supabase
@@ -795,16 +970,25 @@ class ExaminationService {
               .order('id', { ascending: true })
           )
         : Promise.resolve([] as any[]),
-      examIds.length
-        ? this.fetchAllPaged<any>(() =>
-            supabase
-              .from('marks')
-              .select('exam_id, subject_id, obtained_marks, attendance_status')
-              .in('exam_id', examIds)
-              .order('id', { ascending: true })
-          )
-        : Promise.resolve([] as any[]),
+      fetchEnteredCounts(),
+      supabase
+        .from('timetable')
+        .select('class_id, subject_id, teacher_id, teachers:teacher_id(id, name, email)')
+        .not('teacher_id', 'is', null)
+        .then(r => (r.data as any[]) || [], () => [] as any[]),
     ]);
+
+    // Resolve faculty names for streams whose teacher_id is unassigned.
+    const timetableTeacherMap = new Map<string, { id: string; name: string; email?: string }>();
+    for (const r of ttAll) {
+      if (r.class_id && r.subject_id && r.teachers) {
+        timetableTeacherMap.set(`${r.class_id}::${r.subject_id}`, {
+          id: r.teachers.id,
+          name: r.teachers.name,
+          email: r.teachers.email
+        });
+      }
+    }
 
     const countByClassId = new Map<string, number>();
     const countByClassName = new Map<string, number>();
@@ -813,15 +997,10 @@ class ExaminationService {
       if (s.class) countByClassName.set(s.class, (countByClassName.get(s.class) || 0) + 1);
     }
 
-    const enteredByKey = new Map<string, number>();
-    for (const m of markRows) {
-      if (m.obtained_marks === null && m.attendance_status === 'Present') continue;
-      const key = `${m.exam_id}::${m.subject_id}`;
-      enteredByKey.set(key, (enteredByKey.get(key) || 0) + 1);
-    }
-
-    const enrichedTasks = await Promise.all(
-      tasks.map(async (task: any) => {
+    // Roster size and entered-marks progress are both resolved from the bulk
+    // reads grouped above, so this is a plain synchronous projection now — no
+    // per-task round trips left to await.
+    const enrichedTasks = tasks.map((task: any) => {
         const exam = task.exams;
         if (!exam) return null;
 
@@ -870,14 +1049,20 @@ class ExaminationService {
           deadline: exam.marks_entry_deadline,
           locked: task.locked
         };
-      })
-    );
+      });
 
     return enrichedTasks.filter(Boolean);
   }
 
   /**
-   * Fetch Class Roster with Student Marks for a specific Exam + Subject
+   * Fetch Class Roster with Student Marks for a specific Exam + Subject.
+   *
+   * The roster and the marks are read as two scoped queries rather than one
+   * embedded join. `marks` carries FKs to both `students` and `subjects`, and a
+   * nested select through them returns only rows that already have a marks row —
+   * students with nothing entered yet would silently vanish from the sheet.
+   * Reading students first and left-joining the marks in memory keeps every
+   * candidate on the roster whether or not they have been evaluated.
    */
   async getStudentRosterWithMarks(
     examId: string,
@@ -889,8 +1074,15 @@ class ExaminationService {
     roster: StudentMarkEntry[];
     gradingRules: GradingRule[];
   }> {
+    // An empty id reaches Postgres as ''::uuid and fails with 22P02, which
+    // surfaced as "Failed to load marks roster" on first paint while the exam
+    // and subject selects were still resolving.
+    if (!examId || !subjectId) {
+      return { examSubject: null, roster: [], gradingRules: await this.getGradingRules() };
+    }
+
     // 1. Fetch Exam Subject config
-    const { data: examSubject } = await supabase
+    const { data: examSubject, error: subjectErr } = await supabase
       .from('exam_subjects')
       .select(`
         *,
@@ -902,15 +1094,19 @@ class ExaminationService {
       .eq('subject_id', subjectId)
       .maybeSingle();
 
-    const targetClassId = classId || examSubject?.exams?.class_id;
+    if (subjectErr) {
+      console.error('[ExaminationService] fetch exam subject error:', subjectErr);
+      throw new Error(marksAccessMessage(subjectErr, 'read this subject'));
+    }
+
+    const targetClassId = classId || (examSubject as any)?.class_id || examSubject?.exams?.class_id;
     const targetClassName = examSubject?.exams?.class;
 
     // 2. Fetch Students enrolled in this class
     let studentQuery = supabase
       .from('students')
       .select('id, name, roll_number, admission_number, class, section, photo_url, class_id, section_id')
-      .eq('status', 'active')
-      .order('roll_number', { ascending: true });
+      .eq('status', 'active');
 
     if (targetClassId) {
       studentQuery = studentQuery.eq('class_id', targetClassId);
@@ -918,38 +1114,58 @@ class ExaminationService {
       studentQuery = studentQuery.eq('class', targetClassName);
     }
 
-    if (sectionId && sectionId !== 'All') {
-      studentQuery = studentQuery.eq('section_id', sectionId);
+    const targetSectionId = sectionId || (examSubject as any)?.section_id;
+    if (targetSectionId && targetSectionId !== 'All') {
+      studentQuery = studentQuery.eq('section_id', targetSectionId);
     }
 
     const { data: students, error: studentErr } = await studentQuery;
     if (studentErr) {
       console.error('[ExaminationService] fetch students error:', studentErr);
-      throw studentErr;
+      throw new Error(marksAccessMessage(studentErr, 'view this class roster'));
     }
 
-    // 3. Fetch existing marks for this exam & subject
-    const { data: existingMarks } = await supabase
+    // 3. Fetch existing marks for this exam & subject.
+    //    This error used to be swallowed: an RLS rejection produced a full
+    //    roster with every score blank, which reads exactly like "the teacher
+    //    never entered anything" and invites an admin to overwrite real marks.
+    const { data: existingMarks, error: marksErr } = await supabase
       .from('marks')
       .select('*')
       .eq('exam_id', examId)
       .eq('subject_id', subjectId);
 
-    const marksMap = new Map<string, any>((existingMarks || []).map(m => [m.student_id, m]));
+    if (marksErr) {
+      console.error('[ExaminationService] fetch marks error:', marksErr);
+      throw new Error(marksAccessMessage(marksErr, 'view these marks'));
+    }
+
+    // Legacy data holds a few duplicate (exam, student, subject) rows from
+    // before the unique index landed. Keep the most recently updated one so the
+    // sheet never shows a stale score.
+    const marksMap = new Map<string, any>();
+    for (const m of existingMarks || []) {
+      if (!m?.student_id) continue;
+      const prev = marksMap.get(m.student_id);
+      if (!prev || String(m.updated_at || '') >= String(prev.updated_at || '')) {
+        marksMap.set(m.student_id, m);
+      }
+    }
 
     // 4. Fetch Grading Rules
     const gradingRules = await this.getGradingRules();
 
-    const maxMarks = examSubject?.max_marks || 20;
+    const maxMarks = Number(examSubject?.max_marks) || 20;
+    const streamStatus = normaliseStreamStatus(examSubject?.review_status);
 
     // 5. Build clean unified roster
     const roster: StudentMarkEntry[] = (students || []).map(s => {
       const markRow = marksMap.get(s.id);
-      const obtained = markRow && markRow.obtained_marks !== null && markRow.obtained_marks !== undefined
-        ? Number(markRow.obtained_marks)
-        : null;
 
-      const attendance = (markRow?.attendance_status as any) || (markRow?.is_absent ? 'Absent' : 'Present');
+      // numeric(5,2) arrives as the string "0.00": a genuine zero must survive
+      // as 0 rather than collapsing into "not entered".
+      const obtained = toScore(markRow?.obtained_marks);
+      const attendance = normaliseAttendance(markRow);
 
       // Grade calculation
       let computedGrade = '—';
@@ -970,8 +1186,8 @@ class ExaminationService {
         is_medical: attendance === 'Medical',
         is_exempted: attendance === 'Exempted',
         grade: computedGrade,
-        remarks: markRow?.remarks || '',
-        status: examSubject?.review_status || 'draft',
+        // The row's own workflow state where it has one, else the stream's.
+        status: markRow?.status || streamStatus,
         student: {
           id: s.id,
           name: s.name,
@@ -984,6 +1200,8 @@ class ExaminationService {
       };
     });
 
+    roster.sort((a, b) => compareRollNumbers(a.student?.roll_number, b.student?.roll_number));
+
     return {
       examSubject: examSubject as any,
       roster,
@@ -992,7 +1210,15 @@ class ExaminationService {
   }
 
   /**
-   * Save Draft Marks for a roster (Debounced Autosave or manual Save)
+   * Save marks for a roster (debounced autosave or a manual Save).
+   *
+   * `currentStatus` is the stream's present `review_status`. It matters because
+   * an administrator moderating an already-submitted or approved subject goes
+   * through this same path: writing a flat `status: 'draft'` onto every marks
+   * row used to desynchronise `marks.status` from `exam_subjects.review_status`
+   * and knock the subject out of the verification queue. The save now carries
+   * the stream's status forward — submitted stays submitted, approved stays
+   * approved — and only an explicit return or reset moves it back.
    */
   async saveMarksDraft(
     examId: string,
@@ -1003,71 +1229,136 @@ class ExaminationService {
       attendance_status: 'Present' | 'Absent' | 'Medical' | 'Exempted';
       max_marks: number;
       remarks?: string;
+      grade?: string | null;
     }>,
-    userId?: string
-  ): Promise<{ count: number; timestamp: string }> {
-    if (!marksList.length) return { count: 0, timestamp: new Date().toISOString() };
+    userId?: string,
+    currentStatus?: string
+  ): Promise<{ count: number; status: MarksStreamStatus; timestamp: string; savedAt: string }> {
+    const savedAt = new Date().toISOString();
+
+    if (!examId || !subjectId) {
+      throw new Error('Select an exam and a subject before saving marks.');
+    }
+
+    if (!marksList.length) {
+      return {
+        count: 0,
+        status: normaliseStreamStatus(currentStatus),
+        timestamp: formatSavedAt(savedAt),
+        savedAt
+      };
+    }
+
+    // Trust the caller's status when it passed one; otherwise read the stream,
+    // so a caller that omits it can never silently downgrade a live queue entry.
+    let streamStatus = normaliseStreamStatus(currentStatus);
+    if (!currentStatus) {
+      const { data: streamRow } = await supabase
+        .from('exam_subjects')
+        .select('review_status, locked')
+        .eq('exam_id', examId)
+        .eq('subject_id', subjectId)
+        .maybeSingle();
+      streamStatus = streamRow?.locked
+        ? 'locked'
+        : normaliseStreamStatus(streamRow?.review_status);
+    }
+
+    // marks.status mirrors the stream; 'in_progress' is a stream-only state.
+    const markStatus = streamStatus === 'in_progress' ? 'draft' : streamStatus;
 
     const upsertRows = marksList.map(m => {
-      const isAbsent = m.attendance_status === 'Absent';
-      const isMedical = m.attendance_status === 'Medical';
-      const isExempted = m.attendance_status === 'Exempted';
+      const attendance: StudentMarkEntry['attendance_status'] =
+        m.attendance_status === 'Absent' ||
+        m.attendance_status === 'Medical' ||
+        m.attendance_status === 'Exempted'
+          ? m.attendance_status
+          : 'Present';
+
+      const isAbsent = attendance === 'Absent';
+      const isMedical = attendance === 'Medical';
+      const isExempted = attendance === 'Exempted';
+      const scored = attendance === 'Present' ? toScore(m.obtained_marks) : null;
 
       return {
         exam_id: examId,
         student_id: m.student_id,
         subject_id: subjectId,
-        max_marks: m.max_marks || 20,
-        obtained_marks: isAbsent || isMedical || isExempted ? null : m.obtained_marks,
-        attendance_status: m.attendance_status || 'Present',
+        max_marks: Number(m.max_marks) || 20,
+        obtained_marks: scored,
+        attendance_status: attendance,
         is_absent: isAbsent,
         is_medical: isMedical,
         is_exempted: isExempted,
-        remarks: m.remarks || null,
-        status: 'draft',
+        grade: m.grade && m.grade !== '—' ? m.grade : null,
+        remarks: m.remarks && m.remarks.trim() ? m.remarks.trim() : null,
+        status: markStatus,
         entered_by: userId || null,
-        updated_at: new Date().toISOString()
+        updated_at: savedAt
       };
     });
 
-    const { error } = await supabase
-      .from('marks')
-      .upsert(upsertRows, { onConflict: 'exam_id,student_id,subject_id' });
+    for (let i = 0; i < upsertRows.length; i += MARKS_UPSERT_CHUNK) {
+      const chunk = upsertRows.slice(i, i + MARKS_UPSERT_CHUNK);
+      const { error } = await supabase
+        .from('marks')
+        .upsert(chunk, { onConflict: 'exam_id,student_id,subject_id' });
 
-    if (error) {
-      console.error('[ExaminationService] saveMarksDraft error:', error);
-      throw error;
+      if (error) {
+        console.error('[ExaminationService] saveMarksDraft error:', error);
+        throw new Error(marksAccessMessage(error, 'save marks for this class and section'));
+      }
     }
 
     // Move the stream to in_progress. exam_subjects is writable only by the
     // exam office, so a teacher's direct update here matched 0 rows and raised
     // nothing — the stream silently stayed 'draft'. The definer RPC lets the
-    // assigned evaluator make this one forward transition.
-    const { error: progressErr } = await supabase.rpc('marks_stream_mark_in_progress', {
-      _exam_id: examId,
-      _subject_id: subjectId,
-    });
-    // Advisory only: the marks themselves are saved, so a failure here must not
-    // lose the teacher's work. Surfaced on submit, which does hard-fail.
-    if (progressErr) {
-      console.warn('[ExaminationService] could not flag stream in_progress:', progressErr.message);
+    // assigned evaluator make this one forward transition. It is only meaningful
+    // while the stream is still in entry; on a submitted or approved stream the
+    // RPC is a no-op, so skip the round trip and leave the status untouched.
+    if (streamStatus === 'draft' || streamStatus === 'in_progress') {
+      const { error: progressErr } = await supabase.rpc('marks_stream_mark_in_progress', {
+        _exam_id: examId,
+        _subject_id: subjectId,
+      });
+      // Advisory only: the marks themselves are saved, so a failure here must not
+      // lose the teacher's work. Surfaced on submit, which does hard-fail.
+      if (progressErr) {
+        console.warn('[ExaminationService] could not flag stream in_progress:', progressErr.message);
+      } else {
+        streamStatus = 'in_progress';
+      }
     }
 
-    await this.logAudit('MARKS_SAVED', 'marks', `${examId}:${subjectId}`, null, { count: marksList.length });
+    await this.logAudit('MARKS_SAVED', 'marks', `${examId}:${subjectId}`, null, {
+      count: marksList.length,
+      status: markStatus
+    });
 
     return {
       count: upsertRows.length,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      status: streamStatus,
+      timestamp: formatSavedAt(savedAt),
+      savedAt
     };
   }
 
   /**
-   * Teacher submits marks for Admin Review
+   * Teacher submits marks for Admin Review.
+   *
+   * The definer RPC is the real path. The direct-table fallback exists only for
+   * deployments where that RPC has not been applied yet, and it has to be
+   * verified: exam_subjects is admin-writable, so a teacher's UPDATE matches
+   * zero rows and returns no error. That previously reported a successful
+   * submission for a stream that never left 'draft'.
    */
   async submitMarksForReview(examId: string, subjectId: string, userId?: string): Promise<void> {
+    if (!examId || !subjectId) {
+      throw new Error('Select an exam and a subject before submitting marks.');
+    }
+
     const now = new Date().toISOString();
 
-    // Try RPC first, then fallback to direct database update
     const { error: rpcErr } = await supabase.rpc('marks_stream_submit_for_review', {
       _exam_id: examId,
       _subject_id: subjectId,
@@ -1076,27 +1367,40 @@ class ExaminationService {
     if (rpcErr) {
       console.warn('[ExaminationService] RPC submit failed, running direct database update:', rpcErr.message);
 
-      // Direct fallback update
-      const { error: subErr } = await supabase
+      await supabase
         .from('exam_subjects')
         .update({
           review_status: 'submitted',
+          reviewed_at: null,
+          reviewed_by: null,
+          reopen_reason: null,
           updated_at: now
         })
         .eq('exam_id', examId)
         .eq('subject_id', subjectId);
+
+      // Confirm the transition actually landed before claiming success.
+      const { data: after } = await supabase
+        .from('exam_subjects')
+        .select('review_status')
+        .eq('exam_id', examId)
+        .eq('subject_id', subjectId)
+        .maybeSingle();
+
+      if ((after?.review_status || '').toLowerCase() !== 'submitted') {
+        throw new Error(marksAccessMessage(rpcErr, 'submit these marks for review'));
+      }
 
       const { error: markErr } = await supabase
         .from('marks')
-        .update({
-          status: 'submitted',
-          updated_at: now
-        })
+        .update({ status: 'submitted', updated_at: now })
         .eq('exam_id', examId)
         .eq('subject_id', subjectId);
 
-      if (subErr && markErr) {
-        throw new Error(rpcErr.message || subErr.message || 'Could not submit these marks for review.');
+      // The stream is submitted and visible to the verifier either way; failing
+      // to stamp the rows is a reconciliation detail, not a lost submission.
+      if (markErr) {
+        console.warn('[ExaminationService] stream submitted but marks rows not stamped:', markErr.message);
       }
     }
 
@@ -1346,6 +1650,39 @@ class ExaminationService {
     });
 
     return { approved, failed };
+  }
+
+  /**
+   * Bulk lock multiple approved or submitted exam subjects in one pass
+   */
+  async lockMarksBulk(
+    targets: { examId: string; subjectId: string }[],
+    adminId?: string,
+    reason?: string
+  ): Promise<{ locked: number; failed: { examId: string; subjectId: string; message: string }[] }> {
+    const now = new Date().toISOString();
+    let lockedCount = 0;
+    const failed: { examId: string; subjectId: string; message: string }[] = [];
+
+    for (const t of targets) {
+      if (!t.examId || !t.subjectId) continue;
+      try {
+        await this.lockMarks(t.examId, t.subjectId, adminId, reason || 'Bulk locked by Examination Controller');
+        lockedCount++;
+      } catch (err: any) {
+        console.error(`[ExaminationService] Error locking ${t.examId}:${t.subjectId}`, err);
+        failed.push({ examId: t.examId, subjectId: t.subjectId, message: err?.message || 'Lock failed' });
+      }
+    }
+
+    await this.logAudit('MARKS_LOCKED_BULK', 'exam_subjects', undefined, null, {
+      locked_by: adminId,
+      locked_count: lockedCount,
+      failed_count: failed.length,
+      reason: reason || 'Bulk locked by Examination Controller'
+    });
+
+    return { locked: lockedCount, failed };
   }
 
   /**
@@ -2156,7 +2493,11 @@ class ExaminationService {
       if (r.grade && gradeDistribution[r.grade] !== undefined) {
         gradeDistribution[r.grade]++;
       }
-      const st = (r.result_status || 'PASS').toUpperCase();
+      // No `|| 'PASS'` fallback here: a result nobody has actually classified
+      // (result_status is a nullable column with no DB default) must not be
+      // counted as a pass in school-wide stats. An empty/unrecognized status
+      // already falls through to the withheld bucket below.
+      const st = (r.result_status || '').toUpperCase();
       if (st === 'PASS') passFailStats.pass++;
       else if (st === 'COMPARTMENT') passFailStats.compartment++;
       else if (st === 'FAIL') passFailStats.fail++;

@@ -182,9 +182,20 @@ export default function ExaminationModule({ view: propView }: ExaminationModuleP
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Active marks filter state & incoming selection from Global Search or Task click
-  const [marksTargetExamId, setMarksTargetExamId] = useState<string>(() => location.state?.selectedExamId || '');
-  const [marksTargetSubjectId, setMarksTargetSubjectId] = useState<string>('');
-  const [marksTargetClassId, setMarksTargetClassId] = useState<string>('');
+  const [marksTargetExamId, setMarksTargetExamId] = useState<string>(() => searchParams.get('examId') || location.state?.selectedExamId || '');
+  const [marksTargetSubjectId, setMarksTargetSubjectId] = useState<string>(() => searchParams.get('subjectId') || '');
+  const [marksTargetClassId, setMarksTargetClassId] = useState<string>(() => searchParams.get('classId') || '');
+
+  // Synchronize target exam/subject/class when searchParams update
+  useEffect(() => {
+    const qExamId = searchParams.get('examId');
+    const qSubjectId = searchParams.get('subjectId');
+    const qClassId = searchParams.get('classId');
+
+    if (qExamId) setMarksTargetExamId(qExamId);
+    if (qSubjectId) setMarksTargetSubjectId(qSubjectId);
+    if (qClassId) setMarksTargetClassId(qClassId);
+  }, [searchParams]);
 
   // Exam CRUD Modal state
   const [showExamModal, setShowExamModal] = useState(false);
@@ -296,10 +307,15 @@ export default function ExaminationModule({ view: propView }: ExaminationModuleP
       setTeachers(teachersRes.data || []);
       setExamSubjects(esRes.data || []);
 
-      // Load teacher workload. A teacher only ever needs their own board, so
-      // scope the query — loading all ~150 subject workloads for them is both
-      // slow and shows other faculty's assignments.
-      try {
+      // Default form data
+      const currentYear = finalYears.find(y => y.is_current) || finalYears[0];
+
+      // Load teacher workload for the "tasks" tab. This must not block the
+      // baseline sync: the exam office lands on Marks Verification (which runs
+      // its own scoped fetch), and gating page render on a second full workload
+      // scan is what left this screen spinning. Fire it in the background and
+      // let setTeacherTasks land whenever it resolves.
+      {
         const isExamOffice = ['super_admin', 'admin', 'principal', 'vice_principal', 'exam_controller']
           .includes(role || '');
         const myTeacherId = isExamOffice
@@ -309,15 +325,11 @@ export default function ExaminationModule({ view: propView }: ExaminationModuleP
         if (!isExamOffice && !myTeacherId) {
           setTeacherTasks([]);
         } else {
-          const tasks = await examinationService.getTeacherWorkload(myTeacherId);
-          setTeacherTasks(tasks || []);
+          examinationService.getTeacherWorkload(myTeacherId, currentYear?.id)
+            .then(tasks => setTeacherTasks(tasks || []))
+            .catch(e => console.warn('[ExaminationModule] getTeacherWorkload warning:', e));
         }
-      } catch (e) {
-        console.warn('[ExaminationModule] getTeacherWorkload warning:', e);
       }
-
-      // Default form data
-      const currentYear = finalYears.find(y => y.is_current) || finalYears[0];
       const defaultClassId = classesRes.data && classesRes.data.length > 0 ? classesRes.data[0].id : '';
       const defaultType = finalTypes[0];
 
@@ -703,14 +715,15 @@ export default function ExaminationModule({ view: propView }: ExaminationModuleP
           {/* TAB 8: MARKS ENTRY */}
           {currentTab === 'marks-entry' && (
             <ResultsView 
+              key={`results-view-${marksTargetExamId || searchParams.get('examId') || 'default'}-${marksTargetSubjectId || searchParams.get('subjectId') || 'default'}-${marksTargetClassId || searchParams.get('classId') || 'default'}`}
               exams={exams}
               subjects={subjects}
               classes={classes}
               currentUserRole={role || 'admin'}
               currentUserId={user?.id}
-              initialExamId={marksTargetExamId || (exams[0]?.id || '')}
-              initialSubjectId={marksTargetSubjectId}
-              initialClassId={marksTargetClassId}
+              initialExamId={searchParams.get('examId') || marksTargetExamId || (exams[0]?.id || '')}
+              initialSubjectId={searchParams.get('subjectId') || marksTargetSubjectId}
+              initialClassId={searchParams.get('classId') || marksTargetClassId}
               onBackToTasks={() => setTab('tasks')}
             />
           )}
@@ -722,7 +735,9 @@ export default function ExaminationModule({ view: propView }: ExaminationModuleP
               classes={classes}
               subjects={subjects}
               selectedYearId={academicYears.find(y => y.is_current)?.id || academicYears[0]?.id || '2026-27'}
+              initialTasks={teacherTasks}
               onNavigateTab={(targetTab, extra) => setTab(targetTab, extra)}
+              onRefreshData={fetchBaselineData}
             />
           )}
 

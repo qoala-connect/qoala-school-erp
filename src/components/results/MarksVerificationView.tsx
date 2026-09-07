@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   ShieldCheck, 
   Search, 
@@ -24,7 +24,8 @@ import {
   Edit3,
   BookOpen,
   ArrowRight,
-  UserCheck
+  UserCheck,
+  RefreshCw
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -38,7 +39,18 @@ interface MarksVerificationViewProps {
   classes: any[];
   subjects: any[];
   selectedYearId: string;
+  // The parent already loads the same workload for its "tasks" tab. Passing it
+  // here lets a tab switch paint instantly from that cache instead of blanking
+  // to a spinner while a fresh scan runs.
+  initialTasks?: any[];
   onNavigateTab: (tab: string, extraParams?: Record<string, string>) => void;
+  // Approve/lock/return/unlock here mutate the same exam_subjects rows that
+  // ExaminationModule's baseline fetch feeds to Result Processing (and every
+  // other sibling tab). That baseline is only fetched once on page load and
+  // otherwise refreshed by whichever view made the change calling this — this
+  // view used to not call it at all, so a lock done here left Result
+  // Processing showing the pre-lock status until a full page reload.
+  onRefreshData?: () => Promise<void>;
 }
 
 export default function MarksVerificationView({
@@ -46,12 +58,14 @@ export default function MarksVerificationView({
   classes,
   subjects,
   selectedYearId,
-  onNavigateTab
+  initialTasks,
+  onNavigateTab,
+  onRefreshData
 }: MarksVerificationViewProps) {
   const { user, can } = useAuth();
 
-  const [tasks, setTasks] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [tasks, setTasks] = useState<any[]>(initialTasks ?? []);
+  const [isLoading, setIsLoading] = useState(!(initialTasks && initialTasks.length));
 
   // Filters
   const [selectedExamId, setSelectedExamId] = useState('all');
@@ -69,20 +83,43 @@ export default function MarksVerificationView({
   const [unlockReason, setUnlockReason] = useState('');
   const [isUnlocking, setIsUnlocking] = useState(false);
 
-  // Bulk approval
+  // Bulk approval & Bulk locking
   const [isBulkApproving, setIsBulkApproving] = useState(false);
+  const [isBulkLocking, setIsBulkLocking] = useState(false);
 
   // Roster inspection drawer
   const [inspectingSubject, setInspectingSubject] = useState<any | null>(null);
   const [inspectRoster, setInspectRoster] = useState<any[]>([]);
   const [isInspectLoading, setIsInspectLoading] = useState(false);
 
+  // The parent seeds selectedYearId with the literal string '2026-27' until its
+  // academic-year list resolves, then swaps in the real UUID — firing this
+  // effect twice and running two full workload scans back to back, the second
+  // of which flips isLoading back on over an already-populated board. Only
+  // fetch once we have a real year id, and never re-run for a year already
+  // fetched.
+  const lastFetchedYear = useRef<string | null>(null);
+  const isRealYearId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(selectedYearId || '');
+
   useEffect(() => {
+    if (!isRealYearId) return;
+    if (lastFetchedYear.current === selectedYearId) return;
+    lastFetchedYear.current = selectedYearId;
     fetchTasks();
-  }, [selectedYearId]);
+  }, [selectedYearId, isRealYearId]);
+
+  // Adopt the parent's cache if it arrives before our own fetch resolves.
+  useEffect(() => {
+    if (initialTasks && initialTasks.length && tasks.length === 0) {
+      setTasks(initialTasks);
+      setIsLoading(false);
+    }
+  }, [initialTasks]);
 
   const fetchTasks = async () => {
-    setIsLoading(true);
+    // Keep the current rows on screen during a refresh; only block the board
+    // on the very first load when there is nothing to show yet.
+    setIsLoading(prev => prev || tasks.length === 0);
     try {
       const data = await examinationService.getTeacherWorkload(undefined, selectedYearId);
       setTasks(data);
@@ -95,7 +132,10 @@ export default function MarksVerificationView({
   };
 
   const isApprovable = (t: any) =>
-    t.status === 'submitted' || (t.status === 'in_progress' && t.entered_count > 0);
+    (t.status === 'submitted' || (t.status === 'in_progress' && t.entered_count > 0)) && t.status !== 'approved' && !t.locked;
+
+  const isLockable = (t: any) =>
+    (t.status === 'approved' || t.status === 'submitted') && !t.locked;
 
   const handleApprove = async (task: any) => {
     if (task.status !== 'submitted') {
@@ -110,6 +150,7 @@ export default function MarksVerificationView({
       await examinationService.approveMarks(task.exam_id, task.subject_id, user?.id);
       toast.success(`Marks approved for ${task.subject_name} (${task.class_name}).`);
       fetchTasks();
+      onRefreshData?.();
     } catch (err: any) {
       toast.error(err.message || 'Failed to approve marks');
     }
@@ -146,10 +187,46 @@ export default function MarksVerificationView({
         toast.success(`Approved ${approved} subject stream(s). Ready for Result Processing.`);
       }
       fetchTasks();
+      onRefreshData?.();
     } catch (err: any) {
       toast.error(err.message || 'Bulk approval failed');
     } finally {
       setIsBulkApproving(false);
+    }
+  };
+
+  const handleBulkLock = async () => {
+    const targets = filteredTasks.filter(isLockable);
+    if (targets.length === 0) {
+      toast.error('No unlocked approved or submitted streams found in the current filter to lock.');
+      return;
+    }
+
+    const ok = window.confirm(
+      `Lock marks for ${targets.length} subject stream(s)?\n\n` +
+      `Once locked, faculty members will no longer be able to edit or modify any scores for these subjects unless unlocked by an administrator.`
+    );
+    if (!ok) return;
+
+    setIsBulkLocking(true);
+    try {
+      const { locked, failed } = await examinationService.lockMarksBulk(
+        targets.map(t => ({ examId: t.exam_id, subjectId: t.subject_id })),
+        user?.id,
+        'Bulk locked by Examination Controller'
+      );
+
+      if (failed.length > 0) {
+        toast.error(`Locked ${locked}, but ${failed.length} failed: ${failed[0].message}`);
+      } else {
+        toast.success(`Successfully locked ${locked} subject stream(s).`);
+      }
+      fetchTasks();
+      onRefreshData?.();
+    } catch (err: any) {
+      toast.error(err.message || 'Bulk locking failed');
+    } finally {
+      setIsBulkLocking(false);
     }
   };
 
@@ -178,6 +255,7 @@ export default function MarksVerificationView({
       toast.success(`Marks for ${returnModalTarget.subject_name} sent back for teacher correction.`);
       setReturnModalTarget(null);
       fetchTasks();
+      onRefreshData?.();
     } catch (err: any) {
       toast.error(err.message || 'Failed to return marks');
     } finally {
@@ -194,6 +272,7 @@ export default function MarksVerificationView({
       await examinationService.lockMarks(task.exam_id, task.subject_id, user?.id, 'Locked by Examination Controller');
       toast.success(`Marks locked for ${task.subject_name}.`);
       fetchTasks();
+      onRefreshData?.();
     } catch (err: any) {
       toast.error(err.message || 'Failed to lock marks');
     }
@@ -224,6 +303,7 @@ export default function MarksVerificationView({
       toast.success(`Marks unlocked for ${unlockModalTarget.subject_name}.`);
       setUnlockModalTarget(null);
       fetchTasks();
+      onRefreshData?.();
     } catch (err: any) {
       toast.error(err.message || 'Failed to unlock marks');
     } finally {
@@ -231,19 +311,32 @@ export default function MarksVerificationView({
     }
   };
 
-  // Inspect student roster for an exam subject
-  const handleInspect = async (task: any) => {
+  // Inspect student roster for an exam subject.
+  // Always a fresh read: the scores a teacher saved a moment ago in Marks Entry
+  // have to be visible here immediately, so nothing is served from the workload
+  // snapshot. The stale roster is cleared first so a slow fetch never shows the
+  // previously inspected subject's marks under this subject's heading.
+  const handleInspect = async (task: any, refreshQueue = false) => {
     setInspectingSubject(task);
+    setInspectRoster([]);
     setIsInspectLoading(true);
     try {
-      const { roster } = await examinationService.getStudentRosterWithMarks(
+      const { roster, examSubject } = await examinationService.getStudentRosterWithMarks(
         task.exam_id,
         task.subject_id,
         task.class_id
       );
       setInspectRoster(roster);
+      // Reflect a status the exam office changed elsewhere while this queue
+      // snapshot was open, rather than trusting the row we were clicked from.
+      if (examSubject) {
+        setInspectingSubject((prev: any) =>
+          prev ? { ...prev, status: (examSubject as any).locked ? 'locked' : ((examSubject as any).review_status || prev.status), locked: (examSubject as any).locked } : prev
+        );
+      }
+      if (refreshQueue) fetchTasks();
     } catch (err: any) {
-      toast.error('Failed to load student score list');
+      toast.error(err?.message || 'Failed to load student score list');
     } finally {
       setIsInspectLoading(false);
     }
@@ -258,11 +351,34 @@ export default function MarksVerificationView({
     });
   };
 
+  // Available exams filtered by selected academic year, then selected class.
+  // The workload rows are already scoped to selectedYearId by the service, so
+  // the exam-term dropdown has to match — otherwise it lists terms from every
+  // past session that can never resolve to a visible task.
+  const availableExamsForClass = useMemo(() => {
+    const yearScoped = selectedYearId
+      ? exams.filter(e => !e.academic_year_id || e.academic_year_id === selectedYearId)
+      : exams;
+    if (selectedClassId === 'all') return yearScoped;
+    return yearScoped.filter(e => e.class_id === selectedClassId || (e as any).classes?.id === selectedClassId);
+  }, [exams, selectedClassId, selectedYearId]);
+
+  // Handle Class change with cascading Exam reset
+  const handleClassChange = (classId: string) => {
+    setSelectedClassId(classId);
+    if (classId !== 'all') {
+      const validExams = exams.filter(e => e.class_id === classId || (e as any).classes?.id === classId);
+      if (selectedExamId !== 'all' && !validExams.some(e => e.id === selectedExamId)) {
+        setSelectedExamId('all');
+      }
+    }
+  };
+
   // Filtered tasks
   const filteredTasks = useMemo(() => {
     return tasks.filter(t => {
-      const matchExam = selectedExamId === 'all' || t.exam_id === selectedExamId;
       const matchClass = selectedClassId === 'all' || t.class_id === selectedClassId;
+      const matchExam = selectedExamId === 'all' || t.exam_id === selectedExamId;
       const matchStatus = statusFilter === 'all' || t.status === statusFilter;
       const matchSearch = !searchQuery.trim() ||
         t.subject_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -270,11 +386,12 @@ export default function MarksVerificationView({
         t.teacher_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         t.exam_name?.toLowerCase().includes(searchQuery.toLowerCase());
 
-      return matchExam && matchClass && matchStatus && matchSearch;
+      return matchClass && matchExam && matchStatus && matchSearch;
     });
-  }, [tasks, selectedExamId, selectedClassId, statusFilter, searchQuery]);
+  }, [tasks, selectedClassId, selectedExamId, statusFilter, searchQuery]);
 
   const approvableCount = filteredTasks.filter(isApprovable).length;
+  const lockableCount = filteredTasks.filter(isLockable).length;
   const submittedCount = tasks.filter(t => t.status === 'submitted').length;
   const approvedCount = tasks.filter(t => t.status === 'approved' || t.status === 'locked').length;
   const inProgressCount = tasks.filter(t => t.status === 'in_progress').length;
@@ -426,12 +543,38 @@ export default function MarksVerificationView({
         {/* Inputs & Actions Row */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1 border-t border-slate-100">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 flex-1 max-w-2xl">
-            {/* Search */}
+            {/* 1. Class Filter (First) */}
+            <select
+              value={selectedClassId}
+              onChange={(e) => handleClassChange(e.target.value)}
+              className="text-xs bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-2.5 h-[34px] font-bold text-slate-800 outline-none cursor-pointer transition-colors focus:border-blue-500 focus:bg-white"
+            >
+              <option value="all">All Classes</option>
+              {classes.map(c => (
+                <option key={c.id} value={c.id}>Class {c.class_name}</option>
+              ))}
+            </select>
+
+            {/* 2. Exam Term Filter (Cascaded by selected class) */}
+            <select
+              value={selectedExamId}
+              onChange={(e) => setSelectedExamId(e.target.value)}
+              className="text-xs bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-2.5 h-[34px] font-medium text-slate-800 outline-none cursor-pointer transition-colors focus:border-blue-500 focus:bg-white truncate"
+            >
+              <option value="all">All Exam Terms {selectedClassId !== 'all' ? `(${availableExamsForClass.length})` : ''}</option>
+              {availableExamsForClass.map(e => (
+                <option key={e.id} value={e.id}>
+                  {e.exam_name} {selectedClassId === 'all' && e.class ? `(Class ${e.class})` : ''}
+                </option>
+              ))}
+            </select>
+
+            {/* 3. Search */}
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 w-3.5 h-3.5 pointer-events-none" />
               <input
                 type="text"
-                placeholder="Search exam, subject, teacher..."
+                placeholder="Search subject, teacher..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-8 pr-7 py-1 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 h-[34px] font-medium"
@@ -446,30 +589,6 @@ export default function MarksVerificationView({
                 </button>
               )}
             </div>
-
-            {/* Exam Filter */}
-            <select
-              value={selectedExamId}
-              onChange={(e) => setSelectedExamId(e.target.value)}
-              className="text-xs bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-2.5 h-[34px] font-medium text-slate-800 outline-none cursor-pointer transition-colors focus:border-blue-500 focus:bg-white truncate"
-            >
-              <option value="all">All Exam Terms</option>
-              {exams.map(e => (
-                <option key={e.id} value={e.id}>{e.exam_name} (Class {e.class})</option>
-              ))}
-            </select>
-
-            {/* Class Filter */}
-            <select
-              value={selectedClassId}
-              onChange={(e) => setSelectedClassId(e.target.value)}
-              className="text-xs bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-2.5 h-[34px] font-medium text-slate-800 outline-none cursor-pointer transition-colors focus:border-blue-500 focus:bg-white"
-            >
-              <option value="all">All Classes</option>
-              {classes.map(c => (
-                <option key={c.id} value={c.id}>Class {c.class_name}</option>
-              ))}
-            </select>
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
@@ -477,7 +596,7 @@ export default function MarksVerificationView({
               <button
                 type="button"
                 onClick={handleBulkApprove}
-                disabled={isBulkApproving}
+                disabled={isBulkApproving || isBulkLocking}
                 className="px-3.5 h-[34px] bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs disabled:opacity-60 shrink-0"
                 title="Approve every stream with marks in the current filter"
               >
@@ -490,6 +609,28 @@ export default function MarksVerificationView({
                   <>
                     <CheckCircle2 className="w-3.5 h-3.5" />
                     <span>Approve {approvableCount} Filtered</span>
+                  </>
+                )}
+              </button>
+            )}
+
+            {can('results.publish') && lockableCount > 0 && (
+              <button
+                type="button"
+                onClick={handleBulkLock}
+                disabled={isBulkLocking || isBulkApproving}
+                className="px-3.5 h-[34px] bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs disabled:opacity-60 shrink-0"
+                title="Lock all approved/submitted streams in the current filter"
+              >
+                {isBulkLocking ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Locking...</span>
+                  </>
+                ) : (
+                  <>
+                    <Lock className="w-3.5 h-3.5" />
+                    <span>Lock {lockableCount} Filtered</span>
                   </>
                 )}
               </button>
@@ -539,7 +680,11 @@ export default function MarksVerificationView({
                   const progressPct = t.total_students > 0 ? Math.round((t.entered_count / t.total_students) * 100) : 0;
 
                   return (
-                    <tr key={t.id} className="hover:bg-slate-50/80 transition-colors group">
+                    <tr 
+                      key={t.id} 
+                      onClick={() => handleInspect(t)}
+                      className="hover:bg-blue-50/40 transition-colors group cursor-pointer"
+                    >
                       {/* Exam Term & Class */}
                       <td className="py-2.5 px-3.5">
                         <p className="font-bold text-slate-900 text-xs group-hover:text-blue-600 transition-colors">{t.exam_name}</p>
@@ -630,7 +775,7 @@ export default function MarksVerificationView({
                       </td>
 
                       {/* Actions */}
-                      <td className="py-2.5 px-3.5 text-right">
+                      <td className="py-2.5 px-3.5 text-right" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1 shrink-0">
                           {/* Inspect Roster */}
                           <button
@@ -646,10 +791,11 @@ export default function MarksVerificationView({
                           <button
                             type="button"
                             onClick={() => handleOpenMarksEntry(t)}
-                            className="p-1.5 bg-blue-50 hover:bg-blue-100/80 text-blue-700 border border-blue-200/60 rounded-lg transition-colors cursor-pointer"
+                            className="p-1.5 bg-blue-50 hover:bg-blue-100/80 text-blue-700 border border-blue-200/60 rounded-lg transition-colors cursor-pointer flex items-center gap-1 font-semibold text-xs"
                             title="Open Marks Entry Grid"
                           >
                             <Edit3 className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Edit</span>
                           </button>
 
                           {/* Approve Marks */}
@@ -864,6 +1010,15 @@ export default function MarksVerificationView({
                 </h3>
               </div>
               <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleInspect(inspectingSubject, true)}
+                  disabled={isInspectLoading}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                  title="Reload live database scores"
+                >
+                  <RefreshCw size={12} className={isInspectLoading ? "animate-spin" : ""} />
+                  <span>Refresh</span>
+                </button>
                 <button
                   onClick={() => handleOpenMarksEntry(inspectingSubject)}
                   className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
