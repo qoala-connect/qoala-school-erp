@@ -27,19 +27,41 @@ interface Message {
 
 export default function AIAssistant() {
   const { user, session, role, roleLabel } = useAuth();
+  const isStudent = role === 'student' || role === 'parent';
+  const isTeacher = role === 'teacher' || role === 'class_teacher';
+  const isAdmin = !isStudent && !isTeacher;
+
   const [activeTab, setActiveTab] = useState<'assistant' | 'predictions' | 'insights'>('assistant');
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'm1',
       sender: 'ai',
-      text: "👋 Hello! I am **St. Joseph's School, Barhalganj’s AI Enterprise Assistant** (Powered by Google Gemini & Qoala Labs).\n\nI am connected to live ERP records. How can I assist you with your academic and administrative tasks today?",
+      text: isStudent
+        ? "👋 Hello! I am your **AI Study Tutor & Academic Copilot** (Powered by Google Gemini).\n\nI can help you understand syllabus concepts, solve homework problems, prepare for upcoming exams, and check your timetable. How can I help your studies today?"
+        : isTeacher
+        ? "👋 Hello! I am your **AI Teaching & Classroom Assistant** (Powered by Google Gemini).\n\nI can help you with lesson planning, question paper creation, student performance summaries, and attendance tracking. How can I assist your teaching today?"
+        : "👋 Hello! I am **St. Joseph's School, Barhalganj’s AI Enterprise Assistant** (Powered by Google Gemini & Qoala Labs).\n\nI am connected to live ERP records. How can I assist you with your academic and administrative tasks today?",
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      suggestedFollowUps: [
-        "Show school executive summary",
-        "Predict at-risk students",
-        "Generate teacher substitution plan",
-        "Forecast 30-day fee cashflow"
-      ]
+      suggestedFollowUps: isStudent
+        ? [
+            "What homework is due this week?",
+            "Explain my syllabus topics",
+            "Show my attendance summary",
+            "When is my next examination?"
+          ]
+        : isTeacher
+        ? [
+            "Who is absent in my classes today?",
+            "Help me create a lesson plan",
+            "Show my weekly teaching periods",
+            "Predict at-risk students in my class"
+          ]
+        : [
+            "Show school executive summary",
+            "Predict at-risk students",
+            "Generate teacher substitution plan",
+            "Forecast 30-day fee cashflow"
+          ]
     }
   ]);
   const [inputMessage, setInputMessage] = useState('');
@@ -48,16 +70,12 @@ export default function AIAssistant() {
   const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  const isStudent = role === 'student' || role === 'parent';
-  const isTeacher = role === 'teacher' || role === 'class_teacher';
-  const isAdmin = !isStudent && !isTeacher;
-
   // Dynamic role-tailored prompt suggestions
   const suggestedPrompts = useMemo(() => {
     if (isStudent) {
       return [
+        'What homework or assignments are due this week?',
         'What is my current attendance percentage and total present days?',
-        'Show my pending fee balance, paid amounts, and receipt records.',
         'Show my latest CBSE examination report card and subject marks.',
         'What is my class schedule and timetable for today?'
       ];
@@ -66,9 +84,9 @@ export default function AIAssistant() {
       return [
         '🔮 Predict at-risk students based on low attendance and failing exam marks',
         'Who is absent in my assigned classes today?',
-        'Send SMS alert to parents of students who are absent today',
         'Show my assigned classes, sections, and student roster.',
-        'Show my weekly teaching periods and classroom allocations.'
+        'Show my weekly teaching periods and classroom allocations.',
+        'Draft a lesson plan for this week'
       ];
     }
     return [
@@ -81,27 +99,15 @@ export default function AIAssistant() {
     ];
   }, [isStudent, isTeacher]);
 
-  // Real Database Prediction States
-  const [performanceData, setPerformanceData] = useState<any[]>([
-    { name: 'Class 6th', passingProb: 94, avgScore: 78, attendanceAvg: 91 },
-    { name: 'Class 7th', passingProb: 92, avgScore: 76, attendanceAvg: 89 },
-    { name: 'Class 8th', passingProb: 89, avgScore: 73, attendanceAvg: 88 },
-    { name: 'Class 9th', passingProb: 84, avgScore: 68, attendanceAvg: 85 },
-    { name: 'Class 10th', passingProb: 95, avgScore: 82, attendanceAvg: 93 },
-    { name: 'Class 11th', passingProb: 88, avgScore: 74, attendanceAvg: 87 },
-    { name: 'Class 12th', passingProb: 97, avgScore: 85, attendanceAvg: 95 },
-  ]);
-
-  const [defaulterRiskData, setDefaulterRiskData] = useState<any[]>([
-    { category: 'Critical Risk (Overdue)', value: 0, color: '#EF4444' },
-    { category: 'Medium Risk (Pending Due)', value: 0, color: '#F59E0B' },
-    { category: 'Low Risk (Partial Payment)', value: 0, color: '#3B82F6' },
-    { category: 'No Risk (Cleared / Paid)', value: 0, color: '#10B981' },
-  ]);
-
+  // Real Database Prediction States (only for admin / management)
+  const [performanceData, setPerformanceData] = useState<any[]>([]);
+  const [defaulterRiskData, setDefaulterRiskData] = useState<any[]>([]);
   const [totalAccounts, setTotalAccounts] = useState(0);
 
   useEffect(() => {
+    // Only administrators should load school-wide financial projections and macro predictions
+    if (!isAdmin) return;
+
     async function loadLivePredictions() {
       try {
         // 1. Fetch live fee statuses
@@ -163,7 +169,7 @@ export default function AIAssistant() {
       }
     }
     loadLivePredictions();
-  }, []);
+  }, [isAdmin]);
 
   // Weak Subject Analysis Recommendations
   const insights = [
@@ -332,42 +338,60 @@ export default function AIAssistant() {
     }
   };
 
+  const availableTabs = useMemo(() => {
+    if (isStudent) {
+      return [
+        { id: 'assistant' as const, label: 'AI Study Tutor & Homework Copilot', icon: Bot }
+      ];
+    }
+    if (isTeacher) {
+      return [
+        { id: 'assistant' as const, label: 'AI Teaching Assistant', icon: Bot }
+      ];
+    }
+    return [
+      { id: 'assistant' as const, label: 'AI Enterprise Copilot', icon: Bot },
+      { id: 'predictions' as const, label: 'Predictive Analytics & Board Forecasting', icon: TrendingUp },
+      { id: 'insights' as const, label: 'Actionable Smart Insights', icon: Sparkles }
+    ];
+  }, [isStudent, isTeacher]);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
             <Brain className="w-6 h-6 text-violet-600 shrink-0" />
-            Artificial Intelligence (AI) Portal
+            {isStudent ? 'AI Study Tutor & Academic Assistant' : 'Artificial Intelligence (AI) Portal'}
           </h1>
           <p className="text-xs text-slate-400 font-semibold mt-1">
-            Access live ERP data grounding, role-aware academic analysis, and interactive AI assistant.
+            {isStudent 
+              ? 'Ask questions about your subjects, understand syllabus concepts, and get homework explanations.'
+              : 'Access live ERP data grounding, role-aware academic analysis, and interactive AI assistant.'}
           </p>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="bg-white border border-slate-200/60 p-1.5 rounded-2xl shadow-xs flex overflow-x-auto gap-1">
-        {[
-          { id: 'assistant', label: 'AI Enterprise Copilot', icon: Bot },
-          { id: 'predictions', label: 'Predictive Analytics & Board Forecasting', icon: TrendingUp },
-          { id: 'insights', label: 'Actionable Smart Insights', icon: Sparkles }
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)}
-            className={cn(
-              "flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer",
-              activeTab === tab.id 
-                ? "bg-violet-50 text-violet-600 border border-violet-100/40" 
-                : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
-            )}
-          >
-            <tab.icon className="w-4 h-4 flex-shrink-0" />
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      {/* Tabs - Only render if more than 1 tab */}
+      {availableTabs.length > 1 && (
+        <div className="bg-white border border-slate-200/60 p-1.5 rounded-2xl shadow-xs flex overflow-x-auto gap-1">
+          {availableTabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={cn(
+                "flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer",
+                activeTab === tab.id 
+                  ? "bg-violet-50 text-violet-600 border border-violet-100/40" 
+                  : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
+              )}
+            >
+              <tab.icon className="w-4 h-4 flex-shrink-0" />
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       <AnimatePresence mode="wait">
         {activeTab === 'assistant' && (
@@ -572,7 +596,7 @@ export default function AIAssistant() {
           </motion.div>
         )}
 
-        {activeTab === 'predictions' && (
+        {activeTab === 'predictions' && isAdmin && (
           <motion.div 
             key="predictions"
             initial={{ opacity: 0, y: 10 }}
@@ -663,7 +687,7 @@ export default function AIAssistant() {
           </motion.div>
         )}
 
-        {activeTab === 'insights' && (
+        {activeTab === 'insights' && isAdmin && (
           <motion.div 
             key="insights"
             initial={{ opacity: 0, y: 10 }}

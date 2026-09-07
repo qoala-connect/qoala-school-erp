@@ -1,18 +1,19 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { 
-  Trophy, 
-  Award, 
-  Search, 
-  Printer, 
-  Download, 
-  Check, 
-  CheckCircle2, 
-  Heart, 
-  Activity, 
-  BookOpen, 
-  Save, 
-  Clock, 
+import {
+  Trophy,
+  Award,
+  Search,
+  Printer,
+  Download,
+  Check,
+  CheckCircle2,
+  Heart,
+  Activity,
+  BookOpen,
+  Save,
+  Clock,
   ChevronRight,
+  ChevronLeft,
   User,
   Shield,
   FileText,
@@ -23,7 +24,9 @@ import {
   CheckSquare,
   AlertCircle,
   HelpCircle,
-  Eye
+  Eye,
+  X,
+  Users
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -155,17 +158,39 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
     }
   }, [filteredExams, selectedExamId]);
 
+  // Sections actually present for the selected class, rather than a fixed
+  // A/B/C guess — pre-primary classes here only run a single section, and
+  // nothing stops a school from adding a D stream later, so the dropdown
+  // should reflect whatever the roster actually contains.
+  const availableSections = useMemo(() => {
+    const pool = selectedClass === 'All'
+      ? students
+      : students.filter(s => isSameClass(s.class, selectedClass));
+    const set = new Set(
+      pool.map(s => (s.section || '').trim().toUpperCase()).filter(Boolean)
+    );
+    return Array.from(set).sort();
+  }, [students, selectedClass]);
+
+  // Drop a section pick that no longer applies once the class changes under it
+  // (e.g. switching from Class 3, which has B/C, to LKG, which doesn't).
+  useEffect(() => {
+    if (selectedSection !== 'All' && !availableSections.includes(selectedSection)) {
+      setSelectedSection('All');
+    }
+  }, [availableSections, selectedSection]);
+
   // Filter students based on selected class, section & query
   const filteredStudents = useMemo(() => {
     return students.filter(s => {
       const matchClass = selectedClass === 'All' || isSameClass(s.class, selectedClass);
       const matchSection = selectedSection === 'All' || (s.section || '').toUpperCase() === selectedSection.toUpperCase();
       const q = searchQuery.toLowerCase().trim();
-      const matchQuery = !q || 
+      const matchQuery = !q ||
         (s.name || '').toLowerCase().includes(q) ||
         (s.roll_number || '').toString().includes(q) ||
         (s.admission_number || '').toLowerCase().includes(q);
-      
+
       return matchClass && matchSection && matchQuery;
     });
   }, [students, selectedClass, selectedSection, searchQuery]);
@@ -176,6 +201,17 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
       setSelectedStudentId(filteredStudents[0].id);
     }
   }, [filteredStudents, selectedStudentId]);
+
+  // Step through the current roster one candidate at a time — printing report
+  // cards for a whole class means going through every name in it, and
+  // reopening a 45-entry dropdown for each one is the slow way to do that.
+  const currentStudentPosition = filteredStudents.findIndex(s => s.id === selectedStudentId);
+  const goToAdjacentStudent = (direction: 1 | -1) => {
+    if (filteredStudents.length === 0) return;
+    const base = currentStudentPosition === -1 ? 0 : currentStudentPosition;
+    const nextIndex = (base + direction + filteredStudents.length) % filteredStudents.length;
+    setSelectedStudentId(filteredStudents[nextIndex].id);
+  };
 
   const activeStudent = useMemo(() => {
     return students.find(s => s.id === selectedStudentId) || filteredStudents[0] || students[0] || null;
@@ -455,14 +491,22 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
 
   return (
     <div className="space-y-4">
-      {/* 1. Header Filter Controls */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-3.5 shadow-xs flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2.5">
+      {/* 1. Header Filter Controls — two rows: who you're looking up, then how
+          the document comes out. These used to be one row that wrapped
+          unpredictably once Watermark ran out of space next to Candidate. */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-3.5 shadow-xs space-y-3">
+        {/* Row A: Lookup — Class / Section / Exam Term / Search / Candidate */}
+        <div className="flex flex-wrap items-end gap-2.5">
+          <div className="flex items-center gap-1.5 text-slate-400 pb-2 pr-0.5">
+            <Users size={13} />
+            <span className="text-[9px] font-black uppercase tracking-widest">Lookup</span>
+          </div>
+
           {/* Class select */}
           <div className="flex flex-col min-w-[120px]">
             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1">Class</span>
-            <select 
-              value={selectedClass} 
+            <select
+              value={selectedClass}
               onChange={(e) => setSelectedClass(e.target.value)}
               className="bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs font-bold text-slate-800 outline-none h-[36px] cursor-pointer hover:border-slate-300 focus:border-violet-500 focus:bg-white transition-colors"
             >
@@ -481,26 +525,28 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
             </select>
           </div>
 
-          {/* Section Filter */}
+          {/* Section Filter — options come from whichever sections the
+              roster actually has for this class, not a fixed A/B/C guess. */}
           <div className="flex flex-col min-w-[90px]">
             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1">Section</span>
-            <select 
-              value={selectedSection} 
+            <select
+              value={selectedSection}
               onChange={(e) => setSelectedSection(e.target.value)}
-              className="bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs font-bold text-slate-800 outline-none h-[36px] cursor-pointer hover:border-slate-300 focus:border-violet-500 focus:bg-white transition-colors"
+              disabled={availableSections.length === 0}
+              className="bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs font-bold text-slate-800 outline-none h-[36px] cursor-pointer hover:border-slate-300 focus:border-violet-500 focus:bg-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <option value="All">All Sec</option>
-              <option value="A">Sec A</option>
-              <option value="B">Sec B</option>
-              <option value="C">Sec C</option>
+              {availableSections.map(sec => (
+                <option key={sec} value={sec}>Sec {sec}</option>
+              ))}
             </select>
           </div>
 
           {/* Exam term */}
           <div className="flex flex-col min-w-[200px]">
             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1">Examination Term</span>
-            <select 
-              value={selectedExamId} 
+            <select
+              value={selectedExamId}
               onChange={(e) => setSelectedExamId(e.target.value)}
               className="bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs font-bold text-slate-800 outline-none h-[36px] cursor-pointer hover:border-slate-300 focus:border-violet-500 focus:bg-white transition-colors"
             >
@@ -512,31 +558,89 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
             </select>
           </div>
 
-          {/* Student selection */}
-          <div className="flex flex-col min-w-[220px]">
+          {/* Search — filters the Candidate list below. This input existed
+              only as dead filtering logic before; a 45-name dropdown is slow
+              to hunt through without it. */}
+          <div className="flex flex-col min-w-[170px]">
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1">Search Student</span>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={13} />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Name, roll, admission no..."
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 pl-8 pr-7 text-xs font-semibold text-slate-800 outline-none h-[36px] hover:border-slate-300 focus:border-violet-500 focus:bg-white transition-colors placeholder:text-slate-400 placeholder:font-normal"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  title="Clear search"
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Student selection, with prev/next to page through the roster
+              one report card at a time without reopening the dropdown. */}
+          <div className="flex flex-col min-w-[240px] flex-1">
             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1">
               Candidate ({filteredStudents.length})
             </span>
-            <select 
-              value={selectedStudentId} 
-              onChange={(e) => setSelectedStudentId(e.target.value)}
-              className="bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs font-bold text-slate-800 outline-none h-[36px] cursor-pointer hover:border-slate-300 focus:border-violet-500 focus:bg-white transition-colors"
-            >
-              {filteredStudents.map(st => (
-                <option key={st.id} value={st.id}>
-                  {st.name} • Roll #{st.roll_number || 'N/A'} ({formatClassDisplay(st.class)}-{st.section || 'A'})
-                </option>
-              ))}
-            </select>
+            <div className="flex items-stretch gap-1">
+              <button
+                type="button"
+                onClick={() => goToAdjacentStudent(-1)}
+                disabled={filteredStudents.length <= 1}
+                title="Previous candidate"
+                className="shrink-0 w-8 h-[36px] flex items-center justify-center bg-slate-50 border border-slate-200 rounded-xl text-slate-500 hover:border-slate-300 hover:text-slate-800 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronLeft size={15} />
+              </button>
+              <select
+                value={selectedStudentId}
+                onChange={(e) => setSelectedStudentId(e.target.value)}
+                className="flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs font-bold text-slate-800 outline-none h-[36px] cursor-pointer hover:border-slate-300 focus:border-violet-500 focus:bg-white transition-colors"
+              >
+                {filteredStudents.length === 0 && <option value="">No students match this filter</option>}
+                {filteredStudents.map(st => (
+                  <option key={st.id} value={st.id}>
+                    {st.name} • Roll #{st.roll_number || 'N/A'} ({formatClassDisplay(st.class)}-{st.section || 'A'})
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => goToAdjacentStudent(1)}
+                disabled={filteredStudents.length <= 1}
+                title="Next candidate"
+                className="shrink-0 w-8 h-[36px] flex items-center justify-center bg-slate-50 border border-slate-200 rounded-xl text-slate-500 hover:border-slate-300 hover:text-slate-800 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronRight size={15} />
+              </button>
+            </div>
           </div>
+        </div>
 
-          {mode === 'final' && (
-            <>
+        {/* Row B: document controls — presentation & output, kept visually
+            separate from the lookup filters above. */}
+        <div className="flex flex-wrap items-end justify-between gap-3 pt-3 border-t border-slate-100">
+          {mode === 'final' ? (
+            <div className="flex flex-wrap items-end gap-2.5">
+              <div className="flex items-center gap-1.5 text-slate-400 pb-2 pr-0.5">
+                <FileText size={13} />
+                <span className="text-[9px] font-black uppercase tracking-widest">Document</span>
+              </div>
+
               {/* Zoom Selector */}
               <div className="flex flex-col min-w-[85px]">
                 <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1">Scale</span>
-                <select 
-                  value={zoom} 
+                <select
+                  value={zoom}
                   onChange={(e) => setZoom(parseFloat(e.target.value))}
                   className="bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-2.5 text-xs font-semibold text-slate-700 h-[36px] cursor-pointer hover:border-slate-300"
                 >
@@ -549,8 +653,8 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
               {/* Watermark Selector */}
               <div className="flex flex-col min-w-[110px]">
                 <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1">Watermark</span>
-                <select 
-                  value={watermark} 
+                <select
+                  value={watermark}
                   onChange={(e) => setWatermark(e.target.value)}
                   className="bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-2.5 text-xs font-semibold text-slate-700 h-[36px] cursor-pointer hover:border-slate-300"
                 >
@@ -561,67 +665,73 @@ export default function StudentReportsView({ mode, initialStudentId, initialClas
                   <option value="DRAFT">Draft</option>
                 </select>
               </div>
-            </>
+            </div>
+          ) : (
+            <div className="flex flex-col justify-end">
+              <p className="text-[10px] text-slate-400 font-semibold">
+                Evaluations save per candidate — pick the next one above once you're done here.
+              </p>
+            </div>
+          )}
+
+          {mode === 'coscholastic' ? (
+            <button
+              onClick={handleSaveCoScholastic}
+              disabled={isSaving}
+              className="flex items-center gap-1.5 px-5 h-[36px] bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
+            >
+              {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+              {isSaving ? 'Saving...' : 'Sync Co-Scholastics'}
+            </button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={async () => {
+                  if (!reportRef.current) return;
+                  setIsGeneratingPdf(true);
+                  const toastId = toast.loading('Compiling crisp vector PDF Report Card...');
+                  try {
+                    const canvas = await html2canvasSafe(reportRef.current, {
+                      scale: 3.0,
+                      useCORS: true,
+                      allowTaint: true,
+                      backgroundColor: '#ffffff'
+                    });
+                    const imgData = canvas.toDataURL('image/png');
+                    const pdf = new jsPDF({
+                      orientation: 'portrait',
+                      unit: 'px',
+                      format: [794, 1123]
+                    });
+                    pdf.addImage(imgData, 'PNG', 0, 0, 794, 1123);
+                    pdf.save(`CBSE_ReportCard_${(activeStudent?.name || 'Student').replace(/\s+/g, '_')}_${formatClassDisplay(activeStudent?.class)}.pdf`);
+                    toast.success('Report Card PDF downloaded successfully!', { id: toastId });
+                  } catch (err) {
+                    console.error(err);
+                    toast.error('Failed to compile PDF report card.', { id: toastId });
+                  } finally {
+                    setIsGeneratingPdf(false);
+                  }
+                }}
+                disabled={isGeneratingPdf}
+                className="flex items-center gap-1.5 px-3.5 h-[36px] border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs"
+              >
+                {isGeneratingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download size={14} />}
+                Download PDF
+              </button>
+              <button
+                onClick={() => {
+                  const ok = printRegion('student-report-print', `Report Card — ${activeStudent?.name || 'Student'}`);
+                  if (!ok) toast.error('Open a student report card before printing.');
+                }}
+                className="flex items-center gap-1.5 px-4 h-[36px] bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                Print Report
+              </button>
+            </div>
           )}
         </div>
-
-        {mode === 'coscholastic' ? (
-          <button 
-            onClick={handleSaveCoScholastic}
-            disabled={isSaving}
-            className="flex items-center gap-1.5 px-5 h-[36px] bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
-          >
-            {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-            {isSaving ? 'Saving...' : 'Sync Co-Scholastics'}
-          </button>
-        ) : (
-          <div className="flex items-center gap-2">
-            <button 
-              onClick={async () => {
-                if (!reportRef.current) return;
-                setIsGeneratingPdf(true);
-                const toastId = toast.loading('Compiling crisp vector PDF Report Card...');
-                try {
-                  const canvas = await html2canvasSafe(reportRef.current, {
-                    scale: 3.0,
-                    useCORS: true,
-                    allowTaint: true,
-                    backgroundColor: '#ffffff'
-                  });
-                  const imgData = canvas.toDataURL('image/png');
-                  const pdf = new jsPDF({
-                    orientation: 'portrait',
-                    unit: 'px',
-                    format: [794, 1123]
-                  });
-                  pdf.addImage(imgData, 'PNG', 0, 0, 794, 1123);
-                  pdf.save(`CBSE_ReportCard_${(activeStudent?.name || 'Student').replace(/\s+/g, '_')}_${formatClassDisplay(activeStudent?.class)}.pdf`);
-                  toast.success('Report Card PDF downloaded successfully!', { id: toastId });
-                } catch (err) {
-                  console.error(err);
-                  toast.error('Failed to compile PDF report card.', { id: toastId });
-                } finally {
-                  setIsGeneratingPdf(false);
-                }
-              }}
-              disabled={isGeneratingPdf}
-              className="flex items-center gap-1.5 px-3.5 h-[36px] border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs"
-            >
-              {isGeneratingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download size={14} />}
-              Download PDF
-            </button>
-            <button 
-              onClick={() => {
-                const ok = printRegion('student-report-print', `Report Card — ${activeStudent?.name || 'Student'}`);
-                if (!ok) toast.error('Open a student report card before printing.');
-              }}
-              className="flex items-center gap-1.5 px-4 h-[36px] bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
-            >
-              <Printer className="w-3.5 h-3.5" />
-              Print Report
-            </button>
-          </div>
-        )}
       </div>
 
       {/* 2. Co-Scholastic Mode vs Full Report Card Mode */}

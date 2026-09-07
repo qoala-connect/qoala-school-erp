@@ -22,6 +22,7 @@ import { supabase } from '@/lib/supabase';
 import { isSameClass, formatClassDisplay } from '@/lib/cbseExamUtils';
 import { useExamScope } from '@/lib/useExamScope';
 import { printRegion } from '@/lib/printRegion';
+import ExamTimetablePrintModal from '@/components/results/ExamTimetablePrintModal';
 
 // The stored duration must always be offered, or a slot saved as "1 Hour"
 // silently resaves as whatever option happened to render first.
@@ -79,6 +80,7 @@ export default function DatesheetsView() {
   const [filterClass, setFilterClass] = useState('All');
   const [filterExamId, setFilterExamId] = useState('All');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showPrintModal, setShowPrintModal] = useState(false);
 
   // New slot form state
   const [formData, setFormData] = useState({
@@ -342,13 +344,51 @@ export default function DatesheetsView() {
     setShowAddModal(true);
   };
 
+  // Deduplicate and scope assessment terms based on selected class
+  const availableExamOptions = useMemo(() => {
+    const seen = new Set<string>();
+    const result: { id: string; name: string; examName: string; academicYear: string }[] = [];
+
+    if (filterClass !== 'All') {
+      const classExams = exams.filter(ex => isSameClass(ex.class, filterClass));
+      classExams.forEach(ex => {
+        const key = `${ex.exam_name}_${ex.academic_year}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          result.push({
+            id: ex.id,
+            name: `${ex.exam_name} (${ex.academic_year})`,
+            examName: ex.exam_name,
+            academicYear: ex.academic_year
+          });
+        }
+      });
+    } else {
+      exams.forEach(ex => {
+        const key = `${ex.exam_name}_${ex.academic_year}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          result.push({
+            id: ex.exam_name,
+            name: `${ex.exam_name} (${ex.academic_year})`,
+            examName: ex.exam_name,
+            academicYear: ex.academic_year
+          });
+        }
+      });
+    }
+    return result;
+  }, [exams, filterClass]);
+
   const filteredSlots = useMemo(() => {
     return datesheets.filter(d => {
       // A teacher may read every slot in the school (exam_subjects_read is
       // `true`), so the narrowing to their own classes/subjects is done here.
       if (!scope.allowsSlot(d.class_id, d.subject_id)) return false;
       const matchClass = filterClass === 'All' || isSameClass(d.class_name, filterClass);
-      const matchExam = filterExamId === 'All' || d.exam_id === filterExamId;
+      const matchExam = filterExamId === 'All' 
+        || d.exam_id === filterExamId 
+        || d.exam_name === filterExamId;
       return matchClass && matchExam;
     });
   }, [datesheets, filterClass, filterExamId, scope]);
@@ -375,7 +415,10 @@ export default function DatesheetsView() {
             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1">Class Grade</span>
             <select 
               value={filterClass} 
-              onChange={(e) => setFilterClass(e.target.value)}
+              onChange={(e) => {
+                setFilterClass(e.target.value);
+                setFilterExamId('All');
+              }}
               className="bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs font-bold text-slate-700 outline-none h-[36px] cursor-pointer focus:border-violet-500 focus:bg-white"
             >
               <option value="All">All Grades</option>
@@ -400,8 +443,8 @@ export default function DatesheetsView() {
               className="bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs font-bold text-slate-700 outline-none h-[36px] cursor-pointer focus:border-violet-500 focus:bg-white"
             >
               <option value="All">All Assessments</option>
-              {exams.map(ex => (
-                <option key={ex.id} value={ex.id}>{ex.exam_name} ({ex.academic_year})</option>
+              {availableExamOptions.map(opt => (
+                <option key={opt.id} value={opt.id}>{opt.name}</option>
               ))}
             </select>
           </div>
@@ -409,11 +452,9 @@ export default function DatesheetsView() {
 
         <div className="flex items-center gap-2">
           <button 
-            onClick={() => {
-              const ok = printRegion('exam-datesheet-print', 'Examination Datesheet');
-              if (!ok) toast.error('Could not open the timetable for printing.');
-            }}
-            className="flex items-center gap-1.5 px-4 h-[36px] border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+            onClick={() => setShowPrintModal(true)}
+            className="flex items-center gap-1.5 px-4 h-[36px] bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+            title="Download / Print Wall Notice & Student Slips"
           >
             <Printer size={14} /> Print Timetable
           </button>
@@ -730,6 +771,24 @@ export default function DatesheetsView() {
           </div>
         </div>
       )}
+
+      {/* 4. Enterprise Printable Datesheet & Student Slip Modal */}
+      <ExamTimetablePrintModal
+        isOpen={showPrintModal}
+        onClose={() => setShowPrintModal(false)}
+        className={filterClass}
+        examName={
+          filterExamId === 'All'
+            ? 'All Assessments'
+            : exams.find(ex => ex.id === filterExamId)?.exam_name || 'Examination Datesheet'
+        }
+        academicYear={
+          filterExamId !== 'All'
+            ? exams.find(ex => ex.id === filterExamId)?.academic_year || '2026-2027'
+            : '2026-2027'
+        }
+        slots={filteredSlots}
+      />
     </div>
   );
 }

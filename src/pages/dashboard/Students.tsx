@@ -685,7 +685,6 @@ export default function Students() {
                   </th>
                   <th className="py-3 px-3 hidden lg:table-cell">Session</th>
                   <th className="py-3 px-3">Parent / Contact</th>
-                  <th className="py-3 px-3 hidden md:table-cell">Category</th>
                   <th className="py-3 px-3">
                     <button
                       onClick={() => handleSort('status')}
@@ -769,16 +768,6 @@ export default function Students() {
                         <div className="text-[10px] text-slate-500 flex items-center gap-1 font-medium mt-0.5">
                           <Phone className="w-2.5 h-2.5 text-slate-400" /> {student.phone || 'N/A'}
                         </div>
-                      </td>
-
-                      <td className="py-3.5 px-3 hidden md:table-cell">
-                        <span className={`inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${
-                          student.category === 'General' ? 'bg-slate-100 text-slate-600' :
-                          student.category === 'OBC' ? 'bg-blue-50 text-blue-600' :
-                          'bg-purple-50 text-purple-600'
-                        }`}>
-                          {student.category || 'General'}
-                        </span>
                       </td>
 
                       <td className="py-3.5 px-3">

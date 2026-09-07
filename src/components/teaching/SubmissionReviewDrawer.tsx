@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { ExternalLink } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 import {
   fetchAssignmentSubmissions, reviewSubmission,
   type Assignment, type AssignmentSubmission,
@@ -29,6 +30,24 @@ export default function SubmissionReviewDrawer({
   const [open, setOpen] = useState<string | null>(null);
   const [draft, setDraft] = useState<{ marks: string; feedback: string }>({ marks: '', feedback: '' });
   const [busy, setBusy] = useState(false);
+  const [totalStudents, setTotalStudents] = useState<number | undefined>(rosterCount);
+
+  useEffect(() => {
+    if (rosterCount != null) {
+      setTotalStudents(rosterCount);
+      return;
+    }
+    if (!assignment.class_id && !assignment.class) return;
+    let q = supabase.from('students').select('id', { count: 'exact', head: true }).eq('status', 'active');
+    if (assignment.class_id) q = q.eq('class_id', assignment.class_id);
+    else if (assignment.class) q = q.eq('class', assignment.class);
+    if (assignment.section_id) q = q.eq('section_id', assignment.section_id);
+    else if (assignment.section) q = q.eq('section', assignment.section);
+
+    q.then(({ count }) => {
+      if (count != null) setTotalStudents(count);
+    });
+  }, [assignment.class_id, assignment.class, assignment.section_id, assignment.section, rosterCount]);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -78,7 +97,7 @@ export default function SubmissionReviewDrawer({
   return (
     <Modal
       title={assignment.title}
-      description={`${assignment.kind === 'homework' ? 'Homework' : 'Assignment'} · ${subs.length} submission${subs.length === 1 ? '' : 's'}${rosterCount ? ` of ${rosterCount}` : ''} · ${reviewed} reviewed`}
+      description={`${assignment.kind === 'homework' ? 'Homework' : 'Assignment'} · ${subs.length} submission${subs.length === 1 ? '' : 's'}${totalStudents ? ` of ${totalStudents}` : ''} · ${reviewed} reviewed`}
       onClose={onClose}
       wide
       footer={<GhostButton onClick={onClose}>Close</GhostButton>}

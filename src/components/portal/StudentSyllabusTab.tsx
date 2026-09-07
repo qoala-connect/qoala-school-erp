@@ -84,9 +84,10 @@ export default function StudentSyllabusTab({ studentId }: { studentId: string })
       )}
 
       <AsyncBlock
-        isLoading={false}
-        error={null}
+        isLoading={isLoading}
+        error={error}
         isEmpty={subjects.length === 0}
+        onRetry={load}
         empty={
           <EmptyBlock
             icon={ListTree}
@@ -97,7 +98,8 @@ export default function StudentSyllabusTab({ studentId }: { studentId: string })
       >
         <ul className="space-y-2">
           {subjects.map(s => {
-            const pct = s.percent_complete ?? 0;
+            const pct = s.percent_complete ?? null;
+            const pctDisplay = pct == null ? 'N/A' : `${pct}%`;
             const open = openSubject === s.subject_id;
             const chList = chapters[s.subject_id] ?? [];
             return (
@@ -106,10 +108,12 @@ export default function StudentSyllabusTab({ studentId }: { studentId: string })
                   {open ? <ChevronDown size={15} className="text-slate-400 shrink-0" /> : <ChevronRight size={15} className="text-slate-400 shrink-0" />}
                   <span className="text-[13px] font-extrabold text-slate-800 flex-1 min-w-0 truncate">{s.subject_name}</span>
                   <span className="hidden sm:block w-32 h-2 rounded-full bg-slate-100 overflow-hidden">
-                    <span className={cn('block h-full rounded-full', pct >= 75 ? 'bg-emerald-500' : pct >= 40 ? 'bg-amber-500' : 'bg-rose-500')}
-                      style={{ width: `${Math.min(100, pct)}%` }} />
+                    {pct != null && (
+                      <span className={cn('block h-full rounded-full', pct >= 75 ? 'bg-emerald-500' : pct >= 40 ? 'bg-amber-500' : 'bg-rose-500')}
+                        style={{ width: `${Math.min(100, pct)}%` }} />
+                    )}
                   </span>
-                  <span className="text-[11px] font-bold text-slate-600 tabular-nums w-10 text-right">{pct}%</span>
+                  <span className="text-[11px] font-bold text-slate-600 tabular-nums w-10 text-right">{pctDisplay}</span>
                 </button>
                 {open && (
                   <div className="border-t border-slate-100 px-3 py-2 bg-slate-50/40">

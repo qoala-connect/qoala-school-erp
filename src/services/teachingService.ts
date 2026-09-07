@@ -470,7 +470,7 @@ export async function fetchAssignmentSubmissions(assignmentId: string): Promise<
     id: r.id,
     assignment_id: r.assignment_id,
     student_id: r.student_id,
-    student_name: r.students?.name ?? 'Unknown',
+    student_name: r.students?.name ?? '—',
     roll_number: r.students?.roll_number ?? '—',
     submission_text: r.submission_text,
     submission_url: r.submission_url,

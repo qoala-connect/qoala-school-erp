@@ -147,11 +147,16 @@ export interface StudentMedicalRecord {
   blood_group?: string | null;
   allergies?: string | null;
   medical_history?: string | null;
+  medical_conditions?: string | null;
   doctor_name?: string | null;
   doctor_phone?: string | null;
   vaccination_status?: string | null;
   emergency_contact_name?: string | null;
   emergency_contact_phone?: string | null;
+  emergency_contact?: string | null;
+  height_cm?: number | null;
+  weight_kg?: number | null;
+  remarks?: string | null;
 }
 
 export interface StudentDisciplineRecord {

@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils';
 
 import { AdminHeader } from '@/components/common/AdminHeader';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/context/AuthContext';
 
 // ---------------------------------------------------------------------
 // CSV helpers
@@ -275,11 +276,25 @@ function slug(name: string) {
 }
 
 export default function Reports() {
+  const { role, can } = useAuth();
   const [pendingReport, setPendingReport] = useState<string | null>(null);
   const [exportAllRunning, setExportAllRunning] = useState(false);
   const [builderOpen, setBuilderOpen] = useState(false);
   const [pendingDataset, setPendingDataset] = useState<string | null>(null);
   const [lastError, setLastError] = useState<string | null>(null);
+
+  const isPlainTeacher = role === 'teacher' || role === 'class_teacher';
+  const canViewFinancials = can('fees.view') && !isPlainTeacher;
+
+  const availableCategories = REPORT_CATEGORIES.filter(cat => {
+    if (cat.title === 'Financial Reports' && !canViewFinancials) return false;
+    return true;
+  });
+
+  const availableDatasets = Object.keys(CUSTOM_DATASETS).filter(dataset => {
+    if (dataset === 'Fee Records' && !canViewFinancials) return false;
+    return true;
+  });
 
   const runExport = async (reportName: string) => {
     const exporter = REPORT_EXPORTERS[reportName];
@@ -299,7 +314,7 @@ export default function Reports() {
   const runExportAll = async () => {
     setExportAllRunning(true);
     setLastError(null);
-    for (const cat of REPORT_CATEGORIES) {
+    for (const cat of availableCategories) {
       for (const report of cat.reports) {
         try {
           const rows = await REPORT_EXPORTERS[report.name]();
@@ -362,7 +377,7 @@ export default function Reports() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {REPORT_CATEGORIES.map((cat) => (
+        {availableCategories.map((cat) => (
           <div key={cat.title} className="p-5 bg-white border border-slate-200/60 rounded-2xl shadow-sm space-y-4">
             <div className="flex items-center gap-2.5">
               <div className="p-2 bg-violet-50 rounded-xl border border-violet-100/60">
@@ -431,7 +446,7 @@ export default function Reports() {
               animate={{ opacity: 1, height: 'auto' }}
               className="flex flex-wrap gap-2.5 pt-4 border-t border-violet-100/60"
             >
-              {Object.keys(CUSTOM_DATASETS).map((dataset) => (
+              {availableDatasets.map((dataset) => (
                 <button
                   key={dataset}
                   onClick={() => runDatasetExport(dataset)}

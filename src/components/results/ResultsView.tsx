@@ -20,12 +20,20 @@ import {
   Check,
   X,
   FileCheck,
-  ArrowLeft
+  ArrowLeft,
+  ShieldAlert
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { calculateCBSEGrade, getWorkflowBadge } from '@/lib/cbseExamUtils';
-import { examinationService, GradingRule, StudentMarkEntry } from '@/services/examinationService';
+import {
+  examinationService,
+  GradingRule,
+  StudentMarkEntry,
+  MarksStreamStatus,
+  MARKS_MODERATOR_ROLES,
+  TEACHER_EDITABLE_MARK_STATUSES
+} from '@/services/examinationService';
 
 interface ResultsViewProps {
   exams: any[];
@@ -81,10 +89,36 @@ export default function ResultsView({
   // Focus navigation ref map
   const inputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
 
+  // Guards against loadRosterData silently clobbering an in-progress edit.
+  // loadRosterData is recreated whenever `currentExam` gets a new object
+  // reference (e.g. a parent refetch that rebuilds the `exams` array with the
+  // same rows) even though selectedExamId/selectedSubjectId/selectedClassId
+  // never changed. The effect below re-runs on every such recreation, and a
+  // reload while the teacher is mid-edit would overwrite their unsaved
+  // keystrokes with whatever is still on the server. isDirtyRef mirrors
+  // isDirty into a ref so the callback (whose own deps don't include isDirty)
+  // can see the latest value, and lastLoadedKeyRef records which roster is
+  // currently on screen so a genuine subject/exam switch still loads fresh
+  // data even while a stale edit elsewhere is dirty.
+  const isDirtyRef = useRef(false);
+  isDirtyRef.current = isDirty;
+  const lastLoadedKeyRef = useRef<string | null>(null);
+
   // Current selected exam object
   const currentExam = useMemo(() => {
     return exams.find(e => e.id === selectedExamId);
   }, [exams, selectedExamId]);
+
+  // Exams available for selected class (cascading)
+  const availableExamsForClass = useMemo(() => {
+    if (!selectedClassId || selectedClassId === 'all') return exams;
+    const filtered = exams.filter(
+      ex => ex.class_id === selectedClassId || 
+            (ex as any).classes?.id === selectedClassId || 
+            (ex as any).class === selectedClassId
+    );
+    return filtered.length > 0 ? filtered : exams;
+  }, [exams, selectedClassId]);
 
   // Available subjects for the selected exam
   const availableExamSubjects = useMemo(() => {
@@ -114,9 +148,43 @@ export default function ResultsView({
     }
   }, [initialClassId]);
 
-  // Auto-select first subject if not selected
+  // One-time fallback for when nothing set a class at all (no initialClassId
+  // and no manual pick yet): default to the selected exam's own class. Gated
+  // on `!selectedClassId` so it only ever fires while the field is genuinely
+  // empty — previously this lived in the effect above keyed off
+  // `currentExam?.class_id`, which changes every time the Class dropdown's own
+  // onChange picks a new exam, so it kept firing and snapping the selection
+  // back to initialClassId (e.g. always "Class 1") no matter what was chosen.
   useEffect(() => {
-    if (availableExamSubjects.length > 0 && !selectedSubjectId) {
+    if (!selectedClassId && currentExam?.class_id) {
+      setSelectedClassId(currentExam.class_id);
+    }
+  }, [selectedClassId, currentExam?.class_id]);
+
+  // Ensure selectedExamId matches available exams for class
+  useEffect(() => {
+    if (availableExamsForClass.length > 0) {
+      const examExists = availableExamsForClass.some(e => e.id === selectedExamId);
+      if (!examExists) {
+        setSelectedExamId(availableExamsForClass[0].id);
+      }
+    }
+  }, [availableExamsForClass, selectedExamId]);
+
+  // Fallback: if the subject currently selected isn't valid for the exam now
+  // in view (e.g. the exam just changed under it), default to the first
+  // available one. The initialSubjectId prop is already seeded by the "Sync
+  // initial selections" effect above, which — like the exam/class ones —
+  // depends only on the incoming prop itself. This effect used to also
+  // re-assert initialSubjectId here keyed off selectedSubjectId, which meant
+  // every manual subject pick (still perfectly valid for the exam) got
+  // immediately reverted back to whatever subject the URL first pointed at.
+  useEffect(() => {
+    if (availableExamSubjects.length === 0) return;
+    const isCurrentValid = selectedSubjectId && availableExamSubjects.some(
+      (s: any) => (s.subject_id || s.id) === selectedSubjectId
+    );
+    if (!isCurrentValid) {
       const firstSubId = availableExamSubjects[0].subject_id || availableExamSubjects[0].id;
       setSelectedSubjectId(firstSubId);
     }
@@ -126,6 +194,18 @@ export default function ResultsView({
   const loadRosterData = useCallback(async () => {
     if (!selectedExamId || !selectedSubjectId) {
       setIsLoading(false);
+      return;
+    }
+
+    // Same exam/subject/class already on screen and the teacher has unsaved
+    // edits: this call was triggered by an incidental identity change (see
+    // the comment on lastLoadedKeyRef above), not a deliberate switch. Fetching
+    // now would silently overwrite what they just typed with the server's
+    // still-old values. A real switch to a different exam/subject/class still
+    // goes through, since the key below won't match.
+    const requestKey = `${selectedExamId}|${selectedSubjectId}|${selectedClassId || currentExam?.class_id || ''}`;
+    if (requestKey === lastLoadedKeyRef.current && isDirtyRef.current) {
+      console.warn('[ResultsView] Skipped a roster reload while edits were unsaved to avoid overwriting them.');
       return;
     }
 
@@ -141,6 +221,7 @@ export default function ResultsView({
       setRoster(data.roster);
       setGradingRules(data.gradingRules);
       setIsDirty(false);
+      lastLoadedKeyRef.current = requestKey;
     } catch (err: any) {
       console.error('[ResultsView] Error loading roster:', err);
       toast.error('Failed to load marks roster: ' + (err.message || 'Network error'));
@@ -155,16 +236,16 @@ export default function ResultsView({
 
   const maxMarks = examSubjectConfig?.max_marks || 20;
   const passMarks = examSubjectConfig?.pass_marks || 7;
-  const isLocked = examSubjectConfig?.locked || examSubjectConfig?.review_status === 'locked';
-  const isSubmitted = examSubjectConfig?.review_status === 'submitted';
-  const isReturned = examSubjectConfig?.review_status === 'returned';
-  const isApproved = examSubjectConfig?.review_status === 'approved';
+  const streamStatus = (examSubjectConfig?.review_status || 'draft') as MarksStreamStatus;
+  const isLocked = examSubjectConfig?.locked || streamStatus === 'locked';
+  const isSubmitted = streamStatus === 'submitted';
+  const isReturned = streamStatus === 'returned';
+  const isApproved = streamStatus === 'approved';
 
   // Marks may only be entered by the assigned subject evaluator or exam-office staff.
   // The database enforces this via RLS (marks_teacher_scoped / marks_admin_all); this
   // client guard provides responsive feedback without incorrectly blocking teachers.
-  const PRIVILEGED_MARK_ROLES = ['super_admin', 'admin', 'principal', 'vice_principal', 'exam_controller'];
-  const isPrivilegedMarker = !currentUserRole || PRIVILEGED_MARK_ROLES.includes(currentUserRole);
+  const isPrivilegedMarker = !currentUserRole || MARKS_MODERATOR_ROLES.includes(currentUserRole);
   const isTeacherRole = currentUserRole === 'teacher';
   const assignedEvaluator = examSubjectConfig?.teachers || null;
   const isAssignedEvaluator =
@@ -190,9 +271,21 @@ export default function ResultsView({
     return raw;
   };
 
+  // Editability matrix.
+  //   Moderators (super_admin / admin / principal / vice_principal / exam_controller)
+  //     keep moderation access at every stage until the subject is explicitly locked.
+  //   Teachers may only type while the stream is still in entry — draft, in_progress
+  //     or returned. Once submitted or approved the sheet is read-only for them.
+  // Stated as an allowlist rather than a chain of negations so a status added to the
+  // workflow later is read-only for teachers by default instead of silently editable.
+  const isTeacherEditableStatus = TEACHER_EDITABLE_MARK_STATUSES.includes(streamStatus);
+  const isEditableForUser = !isLocked && (
+    isPrivilegedMarker || (isTeacherEditableStatus && canEditMarks)
+  );
+
   // Handle Mark Change
   const handleMarkChange = (studentId: string, valStr: string) => {
-    if (isLocked || isSubmitted || !canEditMarks) return;
+    if (!isEditableForUser) return;
 
     setRoster(prev => prev.map(item => {
       if (item.student_id !== studentId) return item;
@@ -224,7 +317,7 @@ export default function ResultsView({
 
   // Handle Attendance Change
   const handleAttendanceChange = (studentId: string, status: 'Present' | 'Absent' | 'Medical' | 'Exempted') => {
-    if (isLocked || isSubmitted) return;
+    if (!isEditableForUser) return;
 
     setRoster(prev => prev.map(item => {
       if (item.student_id !== studentId) return item;
@@ -253,14 +346,14 @@ export default function ResultsView({
 
   // Handle Remarks Change
   const handleRemarksChange = (studentId: string, remarks: string) => {
-    if (isLocked || isSubmitted) return;
+    if (!isEditableForUser) return;
     setRoster(prev => prev.map(item => item.student_id === studentId ? { ...item, remarks } : item));
     setIsDirty(true);
   };
 
   // Handle Excel / Clipboard bulk paste of marks
   const handlePasteMarks = (startIndex: number, e: React.ClipboardEvent<HTMLInputElement>) => {
-    if (isLocked || isSubmitted || !canEditMarks) return;
+    if (!isEditableForUser) return;
     const pasteData = e.clipboardData.getData('text');
     if (!pasteData) return;
 
@@ -305,12 +398,31 @@ export default function ResultsView({
     }
   };
 
-  // Save Draft function
-  const handleSaveDraft = async (silent: boolean = false) => {
-    if (!selectedExamId || !selectedSubjectId || roster.length === 0) return;
+  // The 3.5s autosave timer, the global Ctrl+S handler and the Save button
+  // can all call handleSaveDraft, and none of them know about the others.
+  // Two overlapping upserts racing the same rows means whichever response
+  // lands second silently overwrites whatever the first one just wrote — so
+  // a call made while one is already in flight joins that same promise
+  // instead of starting a second request.
+  const inFlightSaveRef = useRef<Promise<boolean> | null>(null);
+
+  const handleSaveDraft = (silent: boolean = false): Promise<boolean> => {
+    if (inFlightSaveRef.current) return inFlightSaveRef.current;
+    const run = runSaveDraft(silent).finally(() => {
+      inFlightSaveRef.current = null;
+    });
+    inFlightSaveRef.current = run;
+    return run;
+  };
+
+  // Save Draft function. Returns true only when the rows actually reached the
+  // database, so the submit flow can refuse to advance the workflow over a
+  // failed save instead of marking an empty sheet "submitted".
+  const runSaveDraft = async (silent: boolean): Promise<boolean> => {
+    if (!selectedExamId || !selectedSubjectId || roster.length === 0) return false;
     if (!canEditMarks) {
       if (!silent) toast.error(evaluatorBlockReason || 'You are not permitted to edit these marks.');
-      return;
+      return false;
     }
 
     // Only persist rows the evaluator actually touched. Blank rows stay
@@ -325,7 +437,7 @@ export default function ResultsView({
 
     if (touched.length === 0) {
       if (!silent) toast.error('Enter at least one mark before saving.');
-      return;
+      return false;
     }
 
     setIsSaving(true);
@@ -335,26 +447,38 @@ export default function ResultsView({
         obtained_marks: r.obtained_marks,
         attendance_status: r.attendance_status,
         max_marks: maxMarks,
-        remarks: r.remarks
+        remarks: r.remarks,
+        grade: r.grade
       }));
 
+      // Passing the stream's current status is what stops a moderator's save
+      // from downgrading an already submitted or approved subject back to draft
+      // and dropping it out of the verification queue.
       const res = await examinationService.saveMarksDraft(
         selectedExamId,
         selectedSubjectId,
         payload,
-        currentUserId
+        currentUserId,
+        streamStatus
       );
 
       setLastSavedTime(res.timestamp);
       setIsDirty(false);
+      // Keep the local config in step with the stream transition the save made
+      // (draft -> in_progress), so the workflow badge does not lag a reload.
+      if (res.status !== streamStatus) {
+        setExamSubjectConfig((prev: any) => (prev ? { ...prev, review_status: res.status } : prev));
+      }
       if (!silent) {
         toast.success(`Draft saved successfully for ${res.count} students.`);
       }
+      return true;
     } catch (err: any) {
       console.error('[ResultsView] Error saving draft:', err);
       if (!silent) {
         toast.error('Failed to save draft: ' + friendlyMarksError(err));
       }
+      return false;
     } finally {
       setIsSaving(false);
     }
@@ -362,28 +486,57 @@ export default function ResultsView({
 
   // Safe Autosave Debounce (3.5 seconds after last change)
   useEffect(() => {
-    if (!isDirty || isLocked || isSubmitted) return;
+    if (!isDirty || !isEditableForUser) return;
 
     const timer = setTimeout(() => {
       handleSaveDraft(true);
     }, 3500);
 
     return () => clearTimeout(timer);
-  }, [roster, isDirty, isLocked, isSubmitted]);
+  }, [roster, isDirty, isEditableForUser]);
+
+  // Switching examination tabs unmounts this view, which used to discard
+  // anything typed inside the 3.5s autosave window. Keep the latest save in a
+  // ref and flush it once on unmount — the request outlives the component, so
+  // the edits land even though the sheet is already gone.
+  const pendingSaveRef = useRef<{ dirty: boolean; save: () => Promise<boolean> }>({
+    dirty: false,
+    save: async () => false
+  });
+  pendingSaveRef.current = { dirty: isDirty && isEditableForUser, save: () => handleSaveDraft(true) };
+
+  useEffect(() => {
+    return () => {
+      if (pendingSaveRef.current.dirty) {
+        void pendingSaveRef.current.save();
+      }
+    };
+  }, []);
+
+  // A full page reload cannot be flushed the same way, so warn instead.
+  useEffect(() => {
+    if (!isDirty || !isEditableForUser) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [isDirty, isEditableForUser]);
 
   // Global Ctrl+S / Cmd+S Shortcut for Instant Saving
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
         e.preventDefault();
-        if (canEditMarks && !isLocked && !isSubmitted && isDirty) {
+        if (isEditableForUser && isDirty) {
           handleSaveDraft(false);
         }
       }
     };
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [canEditMarks, isLocked, isSubmitted, isDirty]);
+  }, [isEditableForUser, isDirty]);
 
   // Handle Keyboard Navigation between student input rows
   const handleKeyDown = (e: React.KeyboardEvent, index: number) => {
@@ -495,8 +648,14 @@ export default function ResultsView({
 
     setIsSubmitting(true);
     try {
-      // 1. Save all current marks first
-      await handleSaveDraft(true);
+      // 1. Save all current marks first. A silent save swallows its own errors,
+      //    so check the result: submitting over a failed save would move the
+      //    stream to 'submitted' while the edits on screen were never persisted.
+      const saved = await handleSaveDraft(true);
+      if (!saved) {
+        toast.error('Could not save the current marks, so they were not submitted. Fix the errors above and try again.');
+        return;
+      }
 
       // 2. Transition workflow status to submitted
       await examinationService.submitMarksForReview(
@@ -536,36 +695,66 @@ export default function ResultsView({
 
       {/* 0b. Submitted / Approved / Locked confirmation banner */}
       {(isSubmitted || isApproved || isLocked) && !isReturned && (
-        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-start justify-between gap-4 animate-in fade-in slide-in-from-top-2">
+        <div className={cn(
+          "p-4 border rounded-2xl flex items-start justify-between gap-4 animate-in fade-in slide-in-from-top-2",
+          isPrivilegedMarker && !isLocked && !isApproved
+            ? "bg-indigo-50/70 border-indigo-200"
+            : "bg-emerald-50 border-emerald-200"
+        )}>
           <div className="flex items-start gap-3">
-            <div className="p-2 bg-emerald-100 text-emerald-700 rounded-xl mt-0.5">
-              {isLocked ? <Lock size={18} /> : isApproved ? <CheckCircle2 size={18} /> : <Send size={18} />}
+            <div className={cn(
+              "p-2 rounded-xl mt-0.5",
+              isPrivilegedMarker && !isLocked && !isApproved
+                ? "bg-indigo-100 text-indigo-700"
+                : "bg-emerald-100 text-emerald-700"
+            )}>
+              {isLocked ? <Lock size={18} /> : isApproved ? <CheckCircle2 size={18} /> : isPrivilegedMarker ? <ShieldAlert size={18} /> : <Send size={18} />}
             </div>
             <div>
-              <h4 className="text-sm font-bold text-emerald-900">
+              <h4 className={cn(
+                "text-sm font-bold",
+                isPrivilegedMarker && !isLocked && !isApproved ? "text-indigo-900" : "text-emerald-900"
+              )}>
                 {isLocked
                   ? 'Marks locked'
                   : isApproved
                     ? 'Marks approved by administrator'
-                    : 'Marks submitted for verification'}
+                    : isPrivilegedMarker
+                      ? 'Marks Submitted by Evaluator (Admin Moderation Mode)'
+                      : 'Marks submitted for verification'}
               </h4>
-              <p className="text-xs text-emerald-700 mt-1 font-medium">
+              <p className={cn(
+                "text-xs mt-1 font-medium",
+                isPrivilegedMarker && !isLocked && !isApproved ? "text-indigo-700" : "text-emerald-700"
+              )}>
                 {isLocked
                   ? 'These marks are finalised and can no longer be edited.'
                   : isApproved
-                    ? 'The administrator has approved these marks — no further action needed.'
-                    : 'Your marks were sent to the administrator for review. They stay read-only until approved or returned for correction.'}
+                    ? (isPrivilegedMarker
+                        ? 'Marks are approved. As an administrator, you can still adjust scores if necessary.'
+                        : 'The administrator has approved these marks — no further action needed.')
+                    : isPrivilegedMarker
+                      ? 'The evaluator has submitted these marks for review. You have full edit access to moderate scores directly and save changes, or approve/return from the Marks Verification tab.'
+                      : 'Your marks were sent to the administrator for review. They stay read-only until approved or returned for correction.'}
               </p>
               {(examSubjectConfig?.reviewed_at || examSubjectConfig?.updated_at) && (
-                <p className="text-[11px] text-emerald-600/80 mt-1">
+                <p className={cn(
+                  "text-[11px] mt-1",
+                  isPrivilegedMarker && !isLocked && !isApproved ? "text-indigo-600/80" : "text-emerald-600/80"
+                )}>
                   {isApproved ? 'Approved' : isLocked ? 'Locked' : 'Submitted'} on{' '}
                   {new Date(examSubjectConfig.reviewed_at || examSubjectConfig.updated_at).toLocaleString()}
                 </p>
               )}
             </div>
           </div>
-          <span className="px-3 py-1 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-lg shrink-0">
-            {isLocked ? 'Locked' : isApproved ? 'Approved' : 'Submitted'}
+          <span className={cn(
+            "px-3 py-1 text-xs font-bold rounded-lg shrink-0",
+            isPrivilegedMarker && !isLocked && !isApproved
+              ? "bg-indigo-100 text-indigo-800"
+              : "bg-emerald-100 text-emerald-800"
+          )}>
+            {isLocked ? 'Locked' : isApproved ? 'Approved' : isPrivilegedMarker ? 'Admin Editable' : 'Submitted'}
           </span>
         </div>
       )}
@@ -694,12 +883,12 @@ export default function ResultsView({
           </div>
 
           <div className="flex items-center gap-2">
-            {!isLocked && !isSubmitted && !canEditMarks && examSubjectConfig && (
+            {!isEditableForUser && examSubjectConfig && (
               <span className="px-2.5 py-1 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200 flex items-center gap-1">
-                <Lock size={12} /> Read-Only
+                <Lock size={12} /> {isLocked ? 'Locked' : 'Read-Only'}
               </span>
             )}
-            {!isLocked && !isSubmitted && canEditMarks && (
+            {isEditableForUser && (
               <>
                 <button
                   onClick={() => handleSaveDraft(false)}
@@ -707,28 +896,59 @@ export default function ResultsView({
                   className="px-4 py-2 bg-slate-900 hover:bg-slate-950 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 disabled:opacity-40 cursor-pointer active:scale-95"
                 >
                   {isSaving ? <RefreshCcw size={14} className="animate-spin" /> : <Save size={14} />}
-                  <span>{isSaving ? 'Saving...' : 'Save Draft'}</span>
+                  <span>{isSaving ? 'Saving...' : isSubmitted || isApproved ? 'Save Moderations' : 'Save Draft'}</span>
                 </button>
 
-                <button
-                  onClick={() => setIsReviewModalOpen(true)}
-                  disabled={isSaving || isLoading || roster.length === 0}
-                  className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 disabled:opacity-40 cursor-pointer active:scale-95 border border-blue-500/20"
-                >
-                  <Send size={14} />
-                  <span>Review &amp; Submit Marks</span>
-                </button>
+                {!isSubmitted && !isApproved && (
+                  <button
+                    onClick={() => setIsReviewModalOpen(true)}
+                    disabled={isSaving || isLoading || roster.length === 0}
+                    className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 disabled:opacity-40 cursor-pointer active:scale-95 border border-blue-500/20"
+                  >
+                    <Send size={14} />
+                    <span>Review &amp; Submit Marks</span>
+                  </button>
+                )}
               </>
             )}
           </div>
         </div>
 
-        {/* Filters and selectors */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
-          {/* Exam Selector */}
+        {/* Clean, Aligned Enterprise Filter Toolbar */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* 1. Class Selector */}
           <div>
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">
-              Assessment Term
+            <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block mb-1.5 flex items-center justify-between">
+              <span>Class</span>
+              <span className="text-[9px] text-slate-400 font-normal">Step 1</span>
+            </label>
+            <select
+              value={selectedClassId || currentExam?.class_id || ''}
+              onChange={e => {
+                const newClassId = e.target.value;
+                setSelectedClassId(newClassId);
+                const matchingExams = exams.filter(
+                  ex => ex.class_id === newClassId || (ex as any).classes?.id === newClassId || (ex as any).class === newClassId
+                );
+                if (matchingExams.length > 0) {
+                  setSelectedExamId(matchingExams[0].id);
+                }
+              }}
+              className="w-full bg-slate-50 border border-slate-200 hover:border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all cursor-pointer shadow-2xs"
+            >
+              {classes.map(c => (
+                <option key={c.id} value={c.id}>
+                  Class {c.class_name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* 2. Exam Assessment Term Selector */}
+          <div>
+            <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block mb-1.5 flex items-center justify-between">
+              <span>Assessment Term</span>
+              <span className="text-[9px] text-slate-400 font-normal">Step 2</span>
             </label>
             <select
               value={selectedExamId}
@@ -737,84 +957,131 @@ export default function ResultsView({
                 const ex = exams.find(x => x.id === e.target.value);
                 if (ex?.class_id) setSelectedClassId(ex.class_id);
               }}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-blue-500"
+              className="w-full bg-slate-50 border border-slate-200 hover:border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all cursor-pointer shadow-2xs"
             >
-              {exams.map(ex => (
+              {availableExamsForClass.map(ex => (
                 <option key={ex.id} value={ex.id}>
-                  {ex.short_name || ex.exam_name} ({ex.academic_year}) - Class {ex.classes?.class_name || ex.class}
+                  {ex.short_name || ex.exam_name} {ex.academic_year ? `(${ex.academic_year})` : ''}
                 </option>
               ))}
             </select>
           </div>
 
-          {/* Subject Selector */}
+          {/* 3. Subject Selector */}
           <div>
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">
-              Subject
+            <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block mb-1.5 flex items-center justify-between">
+              <span>Subject</span>
+              <span className="text-[9px] text-slate-400 font-normal">Step 3</span>
             </label>
             <select
               value={selectedSubjectId}
               onChange={e => setSelectedSubjectId(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-blue-500"
+              className="w-full bg-slate-50 border border-slate-200 hover:border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all cursor-pointer shadow-2xs"
             >
+              {availableExamSubjects.length === 0 && (
+                <option value="">No subjects found</option>
+              )}
               {availableExamSubjects.map((sub: any) => (
-                <option key={sub.id} value={sub.subject_id || sub.id}>
-                  {sub.subject_name || sub.subjects?.subject_name} ({sub.max_marks || 20} Marks)
+                <option key={sub.id || sub.subject_id} value={sub.subject_id || sub.id}>
+                  {sub.subject_name || sub.subjects?.subject_name} ({sub.max_marks || maxMarks} Marks)
                 </option>
               ))}
             </select>
           </div>
 
-          {/* Attendance Filter */}
+          {/* 4. Search Student with quick clear */}
           <div>
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">
-              Attendance Filter
-            </label>
-            <select
-              value={attendanceFilter}
-              onChange={e => setAttendanceFilter(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-blue-500"
-            >
-              <option value="all">All Attendance</option>
-              <option value="Present">Present</option>
-              <option value="Absent">Absent</option>
-              <option value="Medical">Medical</option>
-              <option value="Exempted">Exempted</option>
-            </select>
-          </div>
-
-          {/* Status Filter */}
-          <div>
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">
-              Entry Status
-            </label>
-            <select
-              value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-blue-500"
-            >
-              <option value="all">All Marks Status</option>
-              <option value="entered">Marks Recorded</option>
-              <option value="pending">Pending Entry</option>
-            </select>
-          </div>
-
-          {/* Search Input */}
-          <div>
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">
+            <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block mb-1.5">
               Search Student
             </label>
             <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
               <input
                 type="text"
                 placeholder="Name, Roll, or Adm..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-800 outline-none focus:bg-white focus:border-blue-500"
+                className="w-full bg-slate-50 border border-slate-200 hover:border-slate-300 rounded-xl pl-8.5 pr-8 py-2 text-xs text-slate-800 outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all shadow-2xs placeholder:text-slate-400 font-medium"
               />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <X size={13} />
+                </button>
+              )}
             </div>
           </div>
+        </div>
+
+        {/* Optional Secondary Filter Strip (Attendance & Entry Status Quick Filter) */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100 text-xs">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">Filter Roster:</span>
+            
+            {/* Status Filter */}
+            <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+              <button
+                type="button"
+                onClick={() => setStatusFilter('all')}
+                className={cn(
+                  "px-2.5 py-1 text-[11px] font-bold rounded-md transition-all cursor-pointer",
+                  statusFilter === 'all' ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500 hover:text-slate-800"
+                )}
+              >
+                All Marks
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter('entered')}
+                className={cn(
+                  "px-2.5 py-1 text-[11px] font-bold rounded-md transition-all cursor-pointer",
+                  statusFilter === 'entered' ? "bg-white text-emerald-700 shadow-2xs" : "text-slate-500 hover:text-slate-800"
+                )}
+              >
+                Recorded ({metrics.enteredCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter('pending')}
+                className={cn(
+                  "px-2.5 py-1 text-[11px] font-bold rounded-md transition-all cursor-pointer",
+                  statusFilter === 'pending' ? "bg-white text-amber-700 shadow-2xs" : "text-slate-500 hover:text-slate-800"
+                )}
+              >
+                Pending ({metrics.notEnteredCount})
+              </button>
+            </div>
+
+            {/* Attendance Filter dropdown */}
+            <select
+              value={attendanceFilter}
+              onChange={e => setAttendanceFilter(e.target.value)}
+              className="bg-slate-100 border border-slate-200 text-slate-700 rounded-lg px-2.5 py-1 text-[11px] font-bold outline-none cursor-pointer hover:bg-slate-200/70 transition-colors"
+            >
+              <option value="all">All Attendance</option>
+              <option value="Present">Present Only ({metrics.presentCount})</option>
+              <option value="Absent">Absent Only ({metrics.absentCount})</option>
+              <option value="Medical">Medical Only ({metrics.medicalCount})</option>
+              <option value="Exempted">Exempted Only ({metrics.exemptedCount})</option>
+            </select>
+          </div>
+
+          {(attendanceFilter !== 'all' || statusFilter !== 'all' || searchQuery) && (
+            <button
+              type="button"
+              onClick={() => {
+                setAttendanceFilter('all');
+                setStatusFilter('all');
+                setSearchQuery('');
+              }}
+              className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline cursor-pointer flex items-center gap-1"
+            >
+              <RotateCcw size={11} /> Reset Filters
+            </button>
+          )}
         </div>
       </div>
 
@@ -918,7 +1185,7 @@ export default function ResultsView({
                       <td className="py-3 px-4 text-center">
                         <select
                           value={item.attendance_status}
-                          disabled={isLocked || isSubmitted || !canEditMarks}
+                          disabled={!isEditableForUser}
                           onChange={e => handleAttendanceChange(item.student_id, e.target.value as any)}
                           className={cn(
                             "px-2 py-1 rounded-lg text-xs font-bold border outline-none cursor-pointer transition-colors",
@@ -926,7 +1193,7 @@ export default function ResultsView({
                             item.attendance_status === 'Absent' && "bg-rose-50 text-rose-800 border-rose-200",
                             item.attendance_status === 'Medical' && "bg-blue-50 text-blue-800 border-blue-200",
                             item.attendance_status === 'Exempted' && "bg-amber-50 text-amber-800 border-amber-200",
-                            (isLocked || isSubmitted) && "opacity-60 cursor-not-allowed"
+                            !isEditableForUser && "opacity-60 cursor-not-allowed"
                           )}
                         >
                           <option value="Present">Present</option>
@@ -954,7 +1221,7 @@ export default function ResultsView({
                               max={maxMarks}
                               step={0.5}
                               placeholder="—"
-                              disabled={isLocked || isSubmitted || !canEditMarks}
+                              disabled={!isEditableForUser}
                               value={item.obtained_marks === null ? '' : item.obtained_marks}
                               onChange={e => handleMarkChange(item.student_id, e.target.value)}
                               onKeyDown={e => handleKeyDown(e, (currentPage - 1) * pageSize + index)}
@@ -965,7 +1232,7 @@ export default function ResultsView({
                                 !isInvalid && item.obtained_marks !== null && isPassing && "border-emerald-300 bg-emerald-50/40 text-emerald-900 focus:border-emerald-500",
                                 !isInvalid && item.obtained_marks !== null && !isPassing && "border-amber-300 bg-amber-50/40 text-amber-900 focus:border-amber-500",
                                 item.obtained_marks === null && "border-slate-200 bg-white text-slate-800 focus:border-blue-500",
-                                (isLocked || isSubmitted) && "bg-slate-100 text-slate-500 cursor-not-allowed"
+                                !isEditableForUser && "bg-slate-100 text-slate-500 cursor-not-allowed"
                               )}
                             />
                           )}
@@ -1016,7 +1283,7 @@ export default function ResultsView({
                         <input
                           type="text"
                           placeholder="Optional note..."
-                          disabled={isLocked || isSubmitted || !canEditMarks}
+                          disabled={!isEditableForUser}
                           value={item.remarks || ''}
                           onChange={e => handleRemarksChange(item.student_id, e.target.value)}
                           className="w-full max-w-[200px] bg-transparent border-b border-dashed border-slate-200 px-1 py-0.5 text-xs text-slate-700 outline-none focus:border-blue-500"

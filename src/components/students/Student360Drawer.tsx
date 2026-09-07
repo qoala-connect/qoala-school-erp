@@ -30,6 +30,7 @@ import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { cn, formatFeeHeadName } from '@/lib/utils';
+import { useAuth } from '@/context/AuthContext';
 
 interface Student360DrawerProps {
   isOpen: boolean;
@@ -68,6 +69,13 @@ export default function Student360Drawer({
   onRefresh
 }: Student360DrawerProps) {
   const navigate = useNavigate();
+  const { can } = useAuth();
+  // student_fees is RLS-scoped to fees.view (or the student/parent themselves)
+  // — a teacher matches neither, so the query below returns zero rows with no
+  // error at all. Without this check, that silently empty result got read as
+  // "confirmed ₹0, all fees cleared" instead of "not visible to this role",
+  // showing every teacher a false all-clear on every student's account.
+  const canViewFees = can('fees.view');
   const [activeTab, setActiveTab] = useState<Student360Tab>('overview');
 
   // Tab Data States
@@ -168,7 +176,7 @@ export default function Student360Drawer({
         });
       }
 
-      if (tab === 'overview' || tab === 'fees') {
+      if ((tab === 'overview' || tab === 'fees') && canViewFees) {
         const { data: feeLedgers, error: feeErr } = await supabase
           .from('student_fees')
           .select(`
@@ -616,12 +624,21 @@ export default function Student360Drawer({
                           <span>Fee Balance</span>
                           <Wallet size={14} className="text-emerald-500" />
                         </div>
-                        <div className="text-2xl font-black text-slate-800 mt-1">
-                          {feeData ? `₹${feeData.total_outstanding.toLocaleString()}` : '₹0'}
-                        </div>
-                        <span className="text-[10px] text-slate-400 font-medium">
-                          {feeData && feeData.total_outstanding === 0 ? 'All fees cleared' : 'Due this session'}
-                        </span>
+                        {!canViewFees ? (
+                          <>
+                            <div className="text-lg font-black text-slate-300 mt-1">Restricted</div>
+                            <span className="text-[10px] text-slate-400 font-medium">Not visible to your role</span>
+                          </>
+                        ) : (
+                          <>
+                            <div className="text-2xl font-black text-slate-800 mt-1">
+                              {feeData ? `₹${feeData.total_outstanding.toLocaleString()}` : '—'}
+                            </div>
+                            <span className="text-[10px] text-slate-400 font-medium">
+                              {!feeData ? 'Loading…' : feeData.total_outstanding === 0 ? 'All fees cleared' : 'Due this session'}
+                            </span>
+                          </>
+                        )}
                       </div>
 
                       <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs">
@@ -1051,7 +1068,18 @@ export default function Student360Drawer({
                 )}
 
                 {/* TAB 5: FEES & LEDGERS */}
-                {activeTab === 'fees' && (
+                {activeTab === 'fees' && !canViewFees && (
+                  <div className="bg-white border border-slate-200/80 rounded-2xl p-8 shadow-xs text-center">
+                    <Wallet size={28} className="mx-auto mb-2 text-slate-300" />
+                    <h4 className="text-sm font-bold text-slate-700">Fee details are restricted</h4>
+                    <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+                      Your role doesn't have permission to view billing, payments or fee ledgers.
+                      Contact the school office or an administrator for fee-related queries about this student.
+                    </p>
+                  </div>
+                )}
+
+                {activeTab === 'fees' && canViewFees && (
                   <div className="space-y-5">
                     <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs space-y-4">
                       <div className="flex items-center justify-between border-b border-slate-100 pb-3">

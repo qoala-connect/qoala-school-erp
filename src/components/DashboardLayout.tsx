@@ -145,15 +145,15 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       icon: GraduationCap,
       permission: null,
       items: [
-        { label: 'My Dashboard & Profile', path: '/dashboard', permission: null },
+        { label: 'My Overview', path: '/dashboard/portal', permission: null },
         { label: 'Homework', path: '/dashboard/portal?tab=homework', permission: null },
         { label: 'Assignments', path: '/dashboard/portal?tab=assignments', permission: null },
         { label: 'Syllabus & Progress', path: '/dashboard/portal?tab=syllabus', permission: null },
-        { label: 'My Attendance', path: '/dashboard/portal', state: { tab: 'attendance' }, permission: null },
-        { label: 'Fee Invoices & Receipts', path: '/dashboard/portal', state: { tab: 'fees' }, permission: null },
-        { label: 'Report Cards & Results', path: '/dashboard/portal', state: { tab: 'examination' }, permission: null },
-        { label: 'Class Timetable', path: '/dashboard/portal', state: { tab: 'timetable' }, permission: null },
-        { label: 'Transport & Route', path: '/dashboard/portal', state: { tab: 'transport' }, permission: null },
+        { label: 'Attendance Ledger', path: '/dashboard/portal?tab=attendance', permission: null },
+        { label: 'Fee Invoices & Receipts', path: '/dashboard/portal?tab=fees', permission: null },
+        { label: 'Report Cards & Marks', path: '/dashboard/portal?tab=examination', permission: null },
+        { label: 'Class Timetable', path: '/dashboard/portal?tab=timetable', permission: null },
+        { label: 'Student & Family Profile', path: '/dashboard/portal?tab=personal', permission: null },
       ]
     },
     {
@@ -247,7 +247,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       ]
     },
     {
-      title: 'CBSE Examination',
+      title: 'Examination',
       icon: ClipboardList,
       permission: 'results.view',
       items: [
@@ -378,8 +378,12 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
 
   // Auto-expand active path category on mount/location change
   useEffect(() => {
-    sidebarCategories.forEach(cat => {
-      const hasActiveChild = cat.items.some(item => location.pathname === item.path);
+    const allCats = [...sidebarCategories, ...studentSidebarCategories];
+    allCats.forEach(cat => {
+      const hasActiveChild = cat.items.some(item => {
+        const [itemPathname] = item.path.split('?');
+        return location.pathname === itemPathname;
+      });
       if (hasActiveChild) {
         setExpandedSections(prev => ({ ...prev, [cat.title]: true }));
       }
@@ -399,11 +403,22 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   // Filter categories and their items by current user permissions
   const categoriesToRender = isStudentOrParent ? studentSidebarCategories : sidebarCategories;
   const isAdminOrSuperAdmin = role === 'admin' || role === 'super_admin';
+  // Plain classroom roles, as opposed to principal/vice_principal who also
+  // carry academics.teach but keep full administrative oversight.
+  const isPlainTeacher = role === 'teacher' || role === 'class_teacher';
 
   const filteredCategories = categoriesToRender
     .filter(cat => {
       // Hide teacher individual workspace "My Teaching" from Admin/Super Admin
       if (isAdminOrSuperAdmin && cat.title === 'My Teaching') {
+        return false;
+      }
+      // A plain teacher's day runs entirely through "My Teaching" (marks
+      // entry included, since any teacher can now enter marks for any
+      // class from there) — the school-wide Academics config screens,
+      // the full CBSE Examination module, and Financials (fees/billing)
+      // stay off a teacher's sidebar.
+      if (isPlainTeacher && (cat.title === 'Academics' || cat.title === 'Examination' || cat.title === 'Financials')) {
         return false;
       }
       return true;
@@ -602,7 +617,14 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
         {filteredCategories.map((cat) => {
           const CategoryIcon = cat.icon;
           const isExpanded = !!expandedSections[cat.title];
-          const hasActiveChild = cat.items.some(item => location.pathname === item.path);
+          const hasActiveChild = cat.items.some(item => {
+            const [itemPathname, itemSearch] = item.path.split('?');
+            if (location.pathname !== itemPathname) return false;
+            if (!itemSearch) return true; // no query constraint
+            const itemParams = new URLSearchParams(itemSearch);
+            const currentParams = new URLSearchParams(location.search);
+            return Array.from(itemParams.entries()).every(([k, v]) => currentParams.get(k) === v);
+          });
 
           return (
             <div key={cat.title} className="space-y-1">
@@ -634,12 +656,22 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
               {isExpanded && (!collapsed || isMobile) && (
                 <div className="pl-7 space-y-1 border-l border-slate-100 ml-5">
                   {cat.items.map((sub) => {
-                    const isSubActive = location.pathname === sub.path && 
-                      (!sub.state || Object.keys(sub.state).every(k => location.state?.[k] === sub.state[k]));
+                    // Support items whose path contains query params (e.g. ?tab=attendance)
+                    const [subPathname, subSearch] = sub.path.split('?');
+                    const subParams = subSearch ? new URLSearchParams(subSearch) : null;
+                    const currentParams = new URLSearchParams(location.search);
+                    const pathnameMatch = location.pathname === subPathname;
+                    const searchMatch = !subParams || Array.from(subParams.entries()).every(
+                      ([k, v]) => currentParams.get(k) === v
+                    );
+                    // "My Overview" item: active when on /dashboard/portal with no tab param (or overview)
+                    const isOverviewItem = sub.path === '/dashboard/portal' && !subSearch;
+                    const overviewActive = isOverviewItem && pathnameMatch && (!currentParams.get('tab') || currentParams.get('tab') === 'overview');
+                    const isSubActive = isOverviewItem ? overviewActive : (pathnameMatch && searchMatch);
                     return (
-                      <Link 
-                        key={sub.label} 
-                        to={sub.path} 
+                      <Link
+                        key={sub.label}
+                        to={sub.path}
                         state={sub.state}
                         onClick={() => isMobile && setMobileOpen(false)}
                         className={cn(
@@ -849,27 +881,33 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
                           <ClipboardList size={14} className="text-violet-500" />
                           Marks Entry
                         </button>
-                        <button 
-                          onClick={() => navigate('/dashboard/attendance')}
-                          className="p-2.5 rounded-xl border border-slate-150 hover:border-violet-200 hover:bg-violet-50/20 text-left text-xs font-bold text-slate-700 flex items-center gap-2 transition-all cursor-pointer"
-                        >
-                          <CalendarCheck size={14} className="text-indigo-500" />
-                          Take Attendance
-                        </button>
-                        <button 
-                          onClick={() => navigate('/dashboard/fees')}
-                          className="p-2.5 rounded-xl border border-slate-150 hover:border-violet-200 hover:bg-violet-50/20 text-left text-xs font-bold text-slate-700 flex items-center gap-2 transition-all cursor-pointer"
-                        >
-                          <Wallet size={14} className="text-emerald-500" />
-                          Collect Fees
-                        </button>
-                        <button 
-                          onClick={() => navigate('/dashboard/admissions')}
-                          className="p-2.5 rounded-xl border border-slate-150 hover:border-violet-200 hover:bg-violet-50/20 text-left text-xs font-bold text-slate-700 flex items-center gap-2 transition-all cursor-pointer"
-                        >
-                          <GraduationCap size={14} className="text-amber-500" />
-                          New Admission
-                        </button>
+                        {can('attendance.manage') && (
+                          <button 
+                            onClick={() => navigate('/dashboard/attendance')}
+                            className="p-2.5 rounded-xl border border-slate-150 hover:border-violet-200 hover:bg-violet-50/20 text-left text-xs font-bold text-slate-700 flex items-center gap-2 transition-all cursor-pointer"
+                          >
+                            <CalendarCheck size={14} className="text-indigo-500" />
+                            Take Attendance
+                          </button>
+                        )}
+                        {can('fees.collect') && !isPlainTeacher && (
+                          <button 
+                            onClick={() => navigate('/dashboard/fees')}
+                            className="p-2.5 rounded-xl border border-slate-150 hover:border-violet-200 hover:bg-violet-50/20 text-left text-xs font-bold text-slate-700 flex items-center gap-2 transition-all cursor-pointer"
+                          >
+                            <Wallet size={14} className="text-emerald-500" />
+                            Collect Fees
+                          </button>
+                        )}
+                        {can('student.create') && (
+                          <button 
+                            onClick={() => navigate('/dashboard/admissions')}
+                            className="p-2.5 rounded-xl border border-slate-150 hover:border-violet-200 hover:bg-violet-50/20 text-left text-xs font-bold text-slate-700 flex items-center gap-2 transition-all cursor-pointer"
+                          >
+                            <GraduationCap size={14} className="text-amber-500" />
+                            New Admission
+                          </button>
+                        )}
                       </div>
                     </div>
                   )}

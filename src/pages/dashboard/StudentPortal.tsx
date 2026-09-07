@@ -122,6 +122,7 @@ export default function StudentPortal() {
   const [timetableRecords, setTimetableRecords] = useState<any[]>([]);
   const [classSubjects, setClassSubjects] = useState<any[]>([]);
   const [schoolNotices, setSchoolNotices] = useState<any[]>([]);
+  const [classTeacherName, setClassTeacherName] = useState<string>('');
 
   const [isLoading, setIsLoading] = useState(true);
   const [idModalOpen, setIdModalOpen] = useState(false);
@@ -201,7 +202,8 @@ export default function StudentPortal() {
         assignmentsRes,
         submissionsRes,
         noticesRes,
-        examSubjectsRes
+        examSubjectsRes,
+        classTeacherRes
       ] = await Promise.all([
         supabase.from('student_medical').select('*').eq('student_id', studentRecord.id).maybeSingle(),
         supabase.from('student_transport').select('*, transport_routes(route_name), vehicles(vehicle_number)').eq('student_id', studentRecord.id).maybeSingle(),
@@ -213,7 +215,7 @@ export default function StudentPortal() {
         // (the whole grid is ~800 rows x 4 joins otherwise). A slot with a
         // null section_id applies to every section of the class.
         supabase.from('timetable')
-          .select('*, classes(class_name), sections(section_name), subjects(subject_name, subject_code), teachers(name)')
+          .select('*, room_no, classes(class_name), sections(section_name), subjects(subject_name, subject_code), teachers(name)')
           .eq('class_id', (studentRecord as any).class_id)
           .or(`section_id.eq.${(studentRecord as any).section_id},section_id.is.null`)
           .order('period_number', { ascending: true }),
@@ -221,12 +223,26 @@ export default function StudentPortal() {
         supabase.from('assignments').select('*, subjects(subject_name, subject_code), teachers(name)').eq('class', studentRecord.class).order('due_date', { ascending: true }),
         supabase.from('student_assignment_submissions').select('*').eq('student_id', studentRecord.id),
         supabase.from('notices').select('*').order('created_at', { ascending: false }).limit(6),
-        supabase.from('exam_subjects').select('exam_id, subject_id, subject_name, exam_date, start_time, duration, room, subjects(subject_name)')
+        supabase.from('exam_subjects').select('exam_id, subject_id, subject_name, exam_date, start_time, duration, room, subjects(subject_name)'),
+        // Fetch the class teacher for the student's class+section
+        (studentRecord as any).class_id && (studentRecord as any).section_id
+          ? supabase.from('teacher_assignments')
+              .select('teachers(name)')
+              .eq('class_id', (studentRecord as any).class_id)
+              .eq('section_id', (studentRecord as any).section_id)
+              .eq('assignment_type', 'class_teacher')
+              .eq('is_active', true)
+              .maybeSingle()
+          : Promise.resolve({ data: null })
       ]);
 
       if (medicalRes.data) setMedical(medicalRes.data);
       if (transportRes.data) setTransport(transportRes.data);
       if (attendanceRes.data) setAttendanceRecords(attendanceRes.data);
+      if (classTeacherRes?.data) {
+        const ct = (classTeacherRes.data as any)?.teachers;
+        setClassTeacherName(ct?.name || '');
+      }
       
       // Filter timetable strictly to this student's class and section
       if (timetableRes.data) {
@@ -277,8 +293,8 @@ export default function StudentPortal() {
               id: p.id,
               payment_date: p.payment_date,
               amount_paid: Number(p.amount_paid),
-              payment_mode: p.payment_mode || 'UPI Online',
-              receipt_number: p.receipt_number || 'REC-2026',
+              payment_mode: p.payment_mode || '—',
+              receipt_number: p.receipt_number || '—',
               transaction_id: p.transaction_id,
               remarks: p.remarks
             }))
@@ -290,7 +306,19 @@ export default function StudentPortal() {
       // Process Assignments with Student Submission join
       if (assignmentsRes.data) {
         const subsMap = new Map((submissionsRes.data || []).map(s => [s.assignment_id, s]));
-        const asgMapped: RealAssignment[] = assignmentsRes.data.map(a => ({
+        const filteredAsg = assignmentsRes.data.filter((a: any) => {
+          // If assignment is for a specific section, only show to students in that section
+          if (a.section_id && (studentRecord as any).section_id) {
+            return a.section_id === (studentRecord as any).section_id;
+          }
+          if (a.section && studentRecord.section) {
+            return String(a.section).trim().toUpperCase() === String(studentRecord.section).trim().toUpperCase();
+          }
+          // If section is null/undefined, it applies to whole class
+          return true;
+        });
+
+        const asgMapped: RealAssignment[] = filteredAsg.map((a: any) => ({
           id: a.id,
           title: a.title,
           description: a.description,
@@ -520,14 +548,14 @@ export default function StudentPortal() {
           </div>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-xl font-black text-slate-900">
-              {latestExamResult ? `${latestExamResult.percentage}%` : 'Grade A1'}
+              {latestExamResult ? `${latestExamResult.percentage}%` : '—'}
             </span>
             <span className="text-[11px] font-bold text-indigo-600">
-              {latestExamResult ? latestExamResult.grade : 'CBSE Standard'}
+              {latestExamResult ? `Grade ${latestExamResult.grade}` : 'Not published'}
             </span>
           </div>
           <p className="text-[10px] text-slate-400 mt-1 font-medium">
-            {latestExamResult ? latestExamResult.division : 'First Division Standing'}
+            {latestExamResult ? latestExamResult.division : 'Results pending publication'}
           </p>
         </div>
 
@@ -574,43 +602,7 @@ export default function StudentPortal() {
         </div>
       )}
 
-      {/* 3. PORTAL NAVIGATION TABS */}
-      <div className="bg-white border border-slate-200/80 rounded-xl p-1 shadow-2xs overflow-x-auto bg-slate-100">
-        <div className="flex items-center gap-1 min-w-max">
-          {[
-            { id: 'overview', label: 'My Overview', icon: GraduationCap },
-            { id: 'homework', label: `Homework (${assignments.filter(a => a.kind === 'homework' && !a.submission).length})`, icon: PencilRuler },
-            { id: 'assignments', label: `Assignments (${assignments.filter(a => a.kind !== 'homework').length})`, icon: BookMarked },
-            { id: 'syllabus', label: 'Syllabus & Progress', icon: Layers },
-            { id: 'attendance', label: 'Attendance Ledger', icon: Calendar },
-            { id: 'fees', label: 'Fee Invoices & Receipts', icon: Wallet },
-            { id: 'examination', label: 'Report Cards & Marks', icon: ClipboardList },
-            { id: 'timetable', label: 'Class Timetable', icon: Clock },
-            { id: 'personal', label: 'Student & Family Profile', icon: User },
-            { id: 'transport', label: 'Transport & Bus', icon: Bus },
-          ].map(t => {
-            const Icon = t.icon;
-            const isSelected = activeTab === t.id;
-            return (
-              <button
-                key={t.id}
-                onClick={() => handleTabChange(t.id as PortalTab)}
-                className={cn(
-                  "px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer",
-                  isSelected 
-                    ? "bg-[#1a73e8] text-white shadow-xs" 
-                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/70"
-                )}
-              >
-                <Icon size={14} className={isSelected ? "text-white" : "text-slate-400"} />
-                {t.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* 4. ACTIVE TAB CONTENT VIEW */}
+      {/* ACTIVE TAB CONTENT VIEW */}
       <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-2xs min-h-[360px]">
         
         {/* TAB 1: OVERVIEW */}
@@ -641,7 +633,7 @@ export default function StudentPortal() {
                 </div>
                 <div>
                   <span className="font-extrabold text-slate-900 text-xs block">Admit Card</span>
-                  <span className="text-[10px] text-blue-700 font-bold">Session 2026-27</span>
+                  <span className="text-[10px] text-blue-700 font-bold">Session {student.academic_year}</span>
                 </div>
               </button>
 
@@ -717,7 +709,7 @@ export default function StudentPortal() {
                         <h3 className="text-xs font-black uppercase tracking-wider text-slate-900">
                           Today's Academic Schedule (Class {student.class}-{student.section})
                         </h3>
-                        <p className="text-[10px] text-slate-500 font-medium">Room 204 • Senior Academic Wing</p>
+                        <p className="text-[10px] text-slate-500 font-medium">Live from school timetable — Academic Year {student.academic_year}</p>
                       </div>
                     </div>
                     <button 
@@ -739,11 +731,11 @@ export default function StudentPortal() {
                           <span className="text-slate-400 font-normal">{slot.start_time?.slice(0, 5)} - {slot.end_time?.slice(0, 5)}</span>
                         </div>
                         <h4 className="font-black text-slate-900 text-xs truncate">
-                          {slot.subjects?.subject_name || 'Mathematics'}
+                          {slot.subjects?.subject_name || '—'}
                         </h4>
                         <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 border-t border-slate-100">
-                          <span className="truncate">{slot.teachers?.name || 'Shri Alok Kumar'}</span>
-                          <span className="font-mono text-slate-400">{slot.room_number || 'R-204'}</span>
+                          <span className="truncate">{slot.teachers?.name || '—'}</span>
+                          <span className="font-mono text-slate-400">{slot.room_no || slot.room_number || '—'}</span>
                         </div>
                       </div>
                     ))}
@@ -1185,20 +1177,30 @@ export default function StudentPortal() {
                   {subjectMarks.length > 0 ? (
                     subjectMarks.map(m => {
                       const pct = m.max_marks > 0 ? (m.obtained_marks / m.max_marks) * 100 : 0;
-                      const grade = pct >= 90 ? 'A1' : pct >= 80 ? 'A2' : pct >= 70 ? 'B1' : pct >= 60 ? 'B2' : 'C1';
+                      const grade = m.grade || (pct >= 90 ? 'A1' : pct >= 80 ? 'A2' : pct >= 70 ? 'B1' : pct >= 60 ? 'B2' : pct >= 50 ? 'C1' : pct >= 40 ? 'C2' : 'D');
+                      const isAbsent = m.is_absent;
+                      const isExempted = m.is_exempted;
+                      // `m.status` is the marks row's workflow stage (draft /
+                      // submitted / approved / locked) — not a pass/fail
+                      // verdict. It used to be shown here as one: a passing
+                      // subject sitting at "locked" (the normal end state
+                      // once the exam office finalizes it) rendered the word
+                      // LOCKED in red, right on a real student's report.
+                      const resultStatus = isAbsent ? 'ABSENT' : isExempted ? 'EXEMPT' : (pct >= 33 ? 'PASS' : 'FAIL');
+                      const statusColor = resultStatus === 'PASS' ? 'text-emerald-600' : resultStatus === 'ABSENT' ? 'text-amber-600' : resultStatus === 'EXEMPT' ? 'text-blue-600' : 'text-rose-600';
                       return (
                         <tr key={m.id} className="hover:bg-slate-50/50">
                           <td className="py-3 px-4 font-bold text-slate-900">
                             {m.subjects?.subject_name || 'Subject'} {m.subjects?.subject_code ? `(${m.subjects.subject_code})` : ''}
                           </td>
                           <td className="py-3 px-4 text-center font-mono">{m.max_marks}</td>
-                          <td className="py-3 px-4 text-center font-mono font-bold text-slate-900">{m.obtained_marks}</td>
+                          <td className="py-3 px-4 text-center font-mono font-bold text-slate-900">{isAbsent ? 'AB' : isExempted ? 'Ex' : m.obtained_marks}</td>
                           <td className="py-3 px-4 text-center">
                             <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded font-black text-[10px]">
-                              {grade}
+                              {isAbsent || isExempted ? '—' : grade}
                             </span>
                           </td>
-                          <td className="py-3 px-4 text-right text-emerald-600 font-bold">PASS</td>
+                          <td className={`py-3 px-4 text-right font-bold ${statusColor}`}>{resultStatus}</td>
                         </tr>
                       );
                     })
@@ -1283,8 +1285,10 @@ export default function StudentPortal() {
                       </div>
 
                       <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-[11px] text-slate-500">
-                        <span className="font-medium">Faculty: <strong className="text-slate-700">{p.teachers?.name || 'Class Faculty'}</strong></span>
-                        <span className="text-[10px] text-slate-400 font-bold uppercase">Room 204</span>
+                        <span className="font-medium">Faculty: <strong className="text-slate-700">{p.teachers?.name || '—'}</strong></span>
+                        {(p.room_no || p.room_number) && (
+                          <span className="text-[10px] text-slate-400 font-bold uppercase">Room {p.room_no || p.room_number}</span>
+                        )}
                       </div>
                     </div>
                   ))
@@ -1393,24 +1397,28 @@ export default function StudentPortal() {
                 <div className="space-y-2.5">
                   <div className="flex justify-between">
                     <span className="text-slate-400 font-semibold">Father's Name:</span>
-                    <span className="font-bold text-slate-900">{student.father_name || 'Shri Alok Kumar'}</span>
+                    <span className="font-bold text-slate-900">{student.father_name || 'Not on file'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-400 font-semibold">Mother's Name:</span>
-                    <span className="font-bold text-slate-900">{student.mother_name || 'Smt. Sunita Devi'}</span>
+                    <span className="font-bold text-slate-900">{student.mother_name || 'Not on file'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-400 font-semibold">Registered Phone:</span>
-                    <span className="font-mono font-bold text-slate-900">{student.phone || '+91 98765-43210'}</span>
+                    <span className="font-mono font-bold text-slate-900">{student.phone || 'Not on file'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-400 font-semibold">Emergency Contact:</span>
-                    <span className="font-mono font-bold text-emerald-700">{medical?.emergency_contact_phone || '+91 94500-11223'}</span>
+                    <span className="font-mono font-bold text-emerald-700">
+                      {medical?.emergency_contact_phone || medical?.emergency_contact || 'Not on file'}
+                    </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400 font-semibold">Guardian Relation:</span>
-                    <span className="font-bold text-slate-900">Father (Primary Contact)</span>
-                  </div>
+                  {(medical?.emergency_contact_name) && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-400 font-semibold">Emergency Name:</span>
+                      <span className="font-bold text-slate-900">{medical.emergency_contact_name}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1422,16 +1430,28 @@ export default function StudentPortal() {
                 </div>
                 <div className="space-y-2.5">
                   <div className="flex justify-between">
-                    <span className="text-slate-400 font-semibold">Medical Fitness:</span>
-                    <span className="font-bold text-emerald-700">Fit for All Sports</span>
+                    <span className="text-slate-400 font-semibold">Blood Group:</span>
+                    <span className="font-bold text-rose-700">{medical?.blood_group || (student as any).blood_group || 'Not on file'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-400 font-semibold">Known Allergies:</span>
                     <span className="font-bold text-slate-900">{medical?.allergies || 'None Reported'}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400 font-semibold">Vision Standard:</span>
-                    <span className="font-bold text-slate-900">6/6 Normal</span>
+                    <span className="text-slate-400 font-semibold">Medical Conditions:</span>
+                    <span className="font-bold text-slate-900">{medical?.medical_conditions || 'None Reported'}</span>
+                  </div>
+                  {medical?.height_cm && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-400 font-semibold">Height / Weight:</span>
+                      <span className="font-bold text-slate-900">
+                        {medical.height_cm}cm{medical?.weight_kg ? ` / ${medical.weight_kg}kg` : ''}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span className="text-slate-400 font-semibold">Vaccination Status:</span>
+                    <span className="font-bold text-slate-900">{medical?.vaccination_status || 'Not on file'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-400 font-semibold">Assigned Doctor:</span>
@@ -1477,15 +1497,17 @@ export default function StudentPortal() {
                 <div className="space-y-2.5">
                   <div className="flex justify-between">
                     <span className="text-slate-400 font-semibold">Portal Email:</span>
-                    <span className="font-bold text-[#1a73e8]">{user?.email || 'student@sjsbrlschool.edu.in'}</span>
+                    <span className="font-bold text-[#1a73e8]">{user?.email || 'Not on file'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-400 font-semibold">Role Access:</span>
-                    <span className="font-bold text-emerald-700 uppercase">Student Only</span>
+                    <span className="font-bold text-emerald-700 uppercase">{roleLabel || role || 'Student'}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400 font-semibold">Authentication:</span>
-                    <span className="font-bold text-slate-900">Password + SSL</span>
+                    <span className="text-slate-400 font-semibold">Enrolled Since:</span>
+                    <span className="font-bold text-slate-900">
+                      {student.created_at ? new Date(student.created_at).toLocaleDateString('en-IN') : 'Not on file'}
+                    </span>
                   </div>
                   <div className="pt-2">
                     <button
@@ -1504,7 +1526,7 @@ export default function StudentPortal() {
             <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-1 text-xs">
               <span className="text-[10px] font-bold text-slate-400 uppercase block">Registered Residential Address</span>
               <p className="font-bold text-slate-800 leading-relaxed">
-                {student.address || 'Barhalganj, Gorakhpur, Uttar Pradesh - 273402'}
+                {student.address || 'Not on file'}
               </p>
             </div>
 
@@ -1672,7 +1694,7 @@ export default function StudentPortal() {
           onClose={() => setTimetableModalOpen(false)}
           className={student.class}
           sectionName={student.section || ''}
-          classTeacherName=""
+          classTeacherName={classTeacherName}
           academicYear={student.academic_year || '2026-2027'}
           slots={timetableRecords.map(t => ({
             day: t.day,

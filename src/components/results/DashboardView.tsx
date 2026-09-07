@@ -155,45 +155,99 @@ export default function DashboardView({ onNavigateTab, academicYears, selectedYe
         />
       </div>
 
-      {/* 2. Quick Action Workflow Shortcuts */}
-      <div className="p-4 sm:p-5 bg-gradient-to-r from-slate-900 via-[#0a2540] to-slate-900 rounded-2xl text-white shadow-xs border border-slate-800">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 mb-0.5">
+      {/* 2. Interactive 6-Step CBSE Lifecycle Pipeline Tracker */}
+      <div className="p-5 bg-gradient-to-r from-slate-900 via-[#071c38] to-slate-900 rounded-2xl text-white shadow-sm border border-slate-800 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
               <span className="px-2.5 py-0.5 bg-blue-500/20 text-blue-300 border border-blue-400/30 rounded-full text-[10px] font-extrabold uppercase tracking-wider">
-                Exam Workflow Pipeline
+                Guided Lifecycle
               </span>
+              <span className="text-xs text-slate-400 font-medium">Follow steps in order from Term Creation to Student Marksheets</span>
             </div>
-            <h3 className="text-base font-extrabold text-white tracking-tight">Central Examination Operations</h3>
-            <p className="text-xs text-slate-300">Manage the complete exam lifecycle from term scheduling to result publication.</p>
+            <h3 className="text-sm font-black text-white tracking-tight">Examination Workflow Pipeline</h3>
           </div>
-
-          <div className="flex items-center gap-2 flex-wrap shrink-0">
+          <div className="flex items-center gap-2">
             <button
               onClick={() => onNavigateTab('exams')}
-              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1.5 active:scale-95"
+              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1.5 active:scale-95"
             >
-              <ClipboardList size={14} /> Create Exam
-            </button>
-            <button
-              onClick={() => onNavigateTab('marks-entry')}
-              className="px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white border border-white/15 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
-            >
-              <FileText size={14} /> Enter Marks
-            </button>
-            <button
-              onClick={() => onNavigateTab('result-processing')}
-              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1.5 active:scale-95"
-            >
-              <Trophy size={14} /> Process Results
-            </button>
-            <button
-              onClick={() => onNavigateTab('admit-cards')}
-              className="px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white border border-white/15 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
-            >
-              <IdCard size={14} /> Admit Cards
+              <Plus size={13} /> New Term
             </button>
           </div>
+        </div>
+
+        {/* 6 Step Interactive Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2.5">
+          {[
+            {
+              step: '1',
+              title: 'Term Setup',
+              desc: 'Configure exam & subjects',
+              tab: 'exams',
+              count: `${exams.length} Terms`,
+              badge: exams.length > 0 ? 'bg-blue-500/20 text-blue-300 border-blue-400/30' : 'bg-slate-800 text-slate-400 border-slate-700'
+            },
+            {
+              step: '2',
+              title: 'Datesheet & Room',
+              desc: 'Timetable, halls & seating',
+              tab: 'schedule',
+              count: `${upcomingExams.length} Scheduled`,
+              badge: upcomingExams.length > 0 ? 'bg-sky-500/20 text-sky-300 border-sky-400/30' : 'bg-slate-800 text-slate-400 border-slate-700'
+            },
+            {
+              step: '3',
+              title: 'Admit Cards',
+              desc: 'Hall tickets & QR badges',
+              tab: 'admit-cards',
+              count: `${analytics?.totalCandidates ?? 0} Students`,
+              badge: (analytics?.totalCandidates ?? 0) > 0 ? 'bg-indigo-500/20 text-indigo-300 border-indigo-400/30' : 'bg-slate-800 text-slate-400 border-slate-700'
+            },
+            {
+              step: '4',
+              title: 'Marks Entry',
+              desc: 'Teacher evaluation & scores',
+              tab: 'marks-entry',
+              count: awaitingMarks.length > 0 ? `${awaitingMarks.length} Pending` : 'Up to date',
+              badge: awaitingMarks.length > 0 ? 'bg-amber-500/20 text-amber-300 border-amber-400/30' : 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30'
+            },
+            {
+              step: '5',
+              title: 'Audit & Process',
+              desc: 'Verification & CBSE ranks',
+              tab: 'result-processing',
+              count: readyToPublish.length > 0 ? `${readyToPublish.length} Ready` : 'Processed',
+              badge: readyToPublish.length > 0 ? 'bg-violet-500/20 text-violet-300 border-violet-400/30' : 'bg-slate-800 text-slate-400 border-slate-700'
+            },
+            {
+              step: '6',
+              title: 'Publish Live',
+              desc: 'Student portal & reports',
+              tab: 'result-publishing',
+              count: `${publishedExams.length} Live`,
+              badge: publishedExams.length > 0 ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30' : 'bg-slate-800 text-slate-400 border-slate-700'
+            }
+          ].map((item) => (
+            <button
+              key={item.step}
+              onClick={() => onNavigateTab(item.tab)}
+              className="group p-3 bg-white/5 hover:bg-white/10 hover:border-blue-400/50 border border-white/10 rounded-xl text-left transition-all cursor-pointer flex flex-col justify-between space-y-2 hover:-translate-y-0.5 active:translate-y-0"
+            >
+              <div className="flex items-center justify-between w-full">
+                <span className="w-5 h-5 rounded-full bg-white/10 group-hover:bg-blue-600 text-white font-black text-[10px] flex items-center justify-center transition-colors">
+                  {item.step}
+                </span>
+                <span className={cn('text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase', item.badge)}>
+                  {item.count}
+                </span>
+              </div>
+              <div>
+                <p className="text-xs font-black text-white group-hover:text-blue-300 transition-colors">{item.title}</p>
+                <p className="text-[10px] text-slate-400 leading-tight mt-0.5 font-medium">{item.desc}</p>
+              </div>
+            </button>
+          ))}
         </div>
       </div>
 

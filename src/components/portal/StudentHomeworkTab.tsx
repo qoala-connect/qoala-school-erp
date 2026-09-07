@@ -58,12 +58,36 @@ export default function StudentHomeworkTab({
     setIsLoading(true);
     setError(null);
     try {
+      // First get the student's class & section to properly filter assignments
+      const { data: stu } = await supabase
+        .from('students')
+        .select('class, section, class_id, section_id')
+        .eq('id', studentId)
+        .maybeSingle();
+
+      let asgQuery = supabase
+        .from('assignments')
+        .select('id, title, description, kind, status, assigned_date, due_date, max_marks, attachment_url, subjects (subject_name)')
+        .eq('kind', kind)
+        .eq('status', 'published')
+        .order('due_date', { ascending: true });
+
+      if (stu?.class_id) {
+        if (stu?.section_id) {
+          asgQuery = asgQuery.eq('class_id', stu.class_id).or(`section_id.eq.${stu.section_id},section_id.is.null`);
+        } else {
+          asgQuery = asgQuery.eq('class_id', stu.class_id);
+        }
+      } else if (stu?.class) {
+        if (stu?.section) {
+          asgQuery = asgQuery.eq('class', stu.class).or(`section.eq.${stu.section},section.is.null`);
+        } else {
+          asgQuery = asgQuery.eq('class', stu.class);
+        }
+      }
+
       const [{ data: asg, error: aErr }, { data: subs, error: sErr }] = await Promise.all([
-        supabase
-          .from('assignments')
-          .select('id, title, description, kind, status, assigned_date, due_date, max_marks, attachment_url, subjects (subject_name)')
-          .eq('kind', kind)
-          .order('due_date', { ascending: true }),
+        asgQuery,
         supabase
           .from('student_assignment_submissions')
           .select('id, assignment_id, status, submitted_at, marks_obtained, feedback')
@@ -96,7 +120,8 @@ export default function StudentHomeworkTab({
 
   const stateOf = (r: Row): { label: string; tone: 'good' | 'warn' | 'bad' | 'muted' | 'info' } => {
     if (r.submission) {
-      if (r.submission.status === 'reviewed' || r.submission.status === 'returned') return { label: 'Reviewed', tone: 'good' };
+      if (r.submission.status === 'returned') return { label: 'Returned for correction', tone: 'bad' };
+      if (r.submission.status === 'reviewed') return { label: 'Reviewed', tone: 'good' };
       if (r.submission.status === 'late') return { label: 'Submitted late', tone: 'warn' };
       return { label: 'Submitted', tone: 'info' };
     }
@@ -105,10 +130,9 @@ export default function StudentHomeworkTab({
   };
 
   const filtered = useMemo(() => rows.filter(r => {
-    const st = stateOf(r);
-    if (filter === 'pending') return !r.submission;
+    if (filter === 'pending') return !r.submission || r.submission.status === 'returned';
     if (filter === 'submitted') return !!r.submission && r.submission.status !== 'reviewed' && r.submission.status !== 'returned';
-    if (filter === 'reviewed') return r.submission?.status === 'reviewed' || r.submission?.status === 'returned';
+    if (filter === 'reviewed') return r.submission?.status === 'reviewed';
     return true;
   }), [rows, filter]);
 

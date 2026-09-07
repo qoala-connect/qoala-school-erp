@@ -47,13 +47,16 @@ export default function FeesPortal() {
   const navigate = useNavigate();
 
   const isStudentOrParent = role === 'student' || role === 'parent';
+  const isPlainTeacher = role === 'teacher' || role === 'class_teacher';
 
-  // Defense-in-depth: Redirect students/parents to their personal fee ledger
+  // Defense-in-depth: Redirect students/parents to their personal fee ledger, and teachers to their teaching workspace
   useEffect(() => {
     if (isStudentOrParent) {
       navigate('/dashboard/portal?tab=fees', { replace: true });
+    } else if (isPlainTeacher) {
+      navigate('/dashboard/teaching/today', { replace: true });
     }
-  }, [isStudentOrParent, navigate]);
+  }, [isStudentOrParent, isPlainTeacher, navigate]);
 
   // Navigation Sub-workspaces
   const [activeTab, setActiveTab] = useState<'portal' | 'student_fees' | 'fee_structure' | 'recent_payments' | 'fee_reports'>('portal');

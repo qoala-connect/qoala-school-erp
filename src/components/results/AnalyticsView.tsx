@@ -75,6 +75,27 @@ export default function AnalyticsView() {
     }
   };
 
+  // Exams scoped to the selected class. Every class runs its own "Periodic
+  // Assessment 1" (and every other term) as a separate exam row with the
+  // exact same displayed name — so the Assessment Term dropdown, unfiltered,
+  // showed identical-looking entries for 14 different classes with no way to
+  // tell them apart. Picking "Class LKG" here while the term dropdown was
+  // still pointed at whichever class's exam loaded first (the newest one,
+  // by default) silently produced 0% everywhere: real data for a class
+  // nobody was looking at.
+  const examsForClass = useMemo(() => {
+    if (selectedClass === 'All') return exams;
+    return exams.filter(ex => isSameClass(ex.class, selectedClass));
+  }, [exams, selectedClass]);
+
+  // Keep the exam selection valid for whatever class is now in scope.
+  useEffect(() => {
+    if (examsForClass.length === 0) return;
+    if (!examsForClass.some(ex => ex.id === selectedExamId)) {
+      setSelectedExamId(examsForClass[0].id);
+    }
+  }, [examsForClass, selectedExamId]);
+
   useEffect(() => {
     if (!selectedExamId) return;
     loadExamMarksAndResults(selectedExamId);
@@ -207,13 +228,16 @@ export default function AnalyticsView() {
           {/* Exam Filter */}
           <div className="flex flex-col min-w-[170px]">
             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1">Assessment Term</span>
-            <select 
-              value={selectedExamId} 
+            <select
+              value={selectedExamId}
               onChange={(e) => setSelectedExamId(e.target.value)}
               className="bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs font-bold text-slate-700 outline-none h-[36px] cursor-pointer focus:border-violet-500 focus:bg-white"
             >
-              {exams.map(ex => (
-                <option key={ex.id} value={ex.id}>{ex.exam_name} ({ex.academic_year})</option>
+              {examsForClass.length === 0 && <option value="">No exams for this class</option>}
+              {examsForClass.map(ex => (
+                <option key={ex.id} value={ex.id}>
+                  {ex.exam_name} {selectedClass === 'All' ? `— Class ${formatClassDisplay(ex.class)}` : ''} ({ex.academic_year})
+                </option>
               ))}
             </select>
           </div>

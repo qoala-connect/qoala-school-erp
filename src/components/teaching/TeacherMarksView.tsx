@@ -12,14 +12,15 @@ import ResultsView from '@/components/results/ResultsView';
 /**
  * Marks Entry for a teacher, inside their own workspace.
  *
- * A teacher sees only the exam subjects they are the assigned evaluator for —
- * their board, never the whole school's. Entering marks reuses the exam
- * module's marks grid, so the teacher and the examination office work on the
- * same sheet with the same validation. Submitting hands the stream to the
- * admin's Marks Verification queue; nothing here can approve, lock or publish.
- *
- * Scope is enforced three deep: this list, the evaluator guard inside
- * ResultsView, and the marks_teacher_scoped row level security policy.
+ * By request, this is the school's full marks-entry board, not just this
+ * teacher's own assignments: any teacher can enter and submit marks for any
+ * class/subject, with no evaluator or timetable check (see
+ * supabase_open_marks_entry_to_any_teacher_37.sql). Entering marks reuses
+ * the exam module's marks grid, so every teacher and the examination office
+ * work on the same sheet with the same validation. Submitting hands the
+ * stream to the admin's Marks Verification queue; nothing here can approve,
+ * lock or publish — those stay results.publish-only both in the UI and at
+ * the database.
  */
 
 /** Streams a teacher may still type into. Anything else is read only here. */
@@ -60,19 +61,36 @@ export default function TeacherMarksView({
   const [query, setQuery] = useState('');
   const [entering, setEntering] = useState<Task | null>(null);
 
+  // ResultsView's own Class selector renders from this list of {id, class_name}
+  // — pass it empty and the dropdown has no <option> matching selectedClassId,
+  // so it just displays blank even though the roster loads fine underneath.
+  const [classesForTeacher, setClassesForTeacher] = useState<any[]>([]);
+
   const load = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
+      // No teacherId filter: every teacher gets the same full, school-wide
+      // workload — the same list examinationService.getTeacherWorkload(undefined, ...)
+      // already hands to the admin's Marks Verification / Result Processing
+      // boards. There is deliberately no assignment check here any more.
       const [workload, allExams] = await Promise.all([
-        examinationService.getTeacherWorkload(teacherId, academicYearId),
+        examinationService.getTeacherWorkload(undefined, academicYearId),
         examinationService.getExams({ academicYearId }),
       ]);
       setTasks(workload as Task[]);
 
-      // Narrow the exam list and each exam's subject list to this teacher's own
-      // streams (both explicitly assigned teacher_id and timetable-mapped),
-      // so the grid's own pickers cannot wander outside their board.
+      const classMap = new Map<string, { id: string; class_name: string }>();
+      (workload as Task[]).forEach(t => {
+        if (t.class_id && !classMap.has(t.class_id)) {
+          classMap.set(t.class_id, { id: t.class_id, class_name: t.class_name });
+        }
+      });
+      setClassesForTeacher(Array.from(classMap.values()));
+
+      // Kept only to shape each exam's exam_subjects to what actually has a
+      // task row (workload already covers every subject, so this is no
+      // longer a restriction — just matching the two datasets up).
       const taskExamIds = new Set((workload as Task[]).map(t => t.exam_id));
       const taskSubjectExamKeys = new Set((workload as Task[]).map(t => `${t.exam_id}_${t.subject_id}`));
 
@@ -82,7 +100,7 @@ export default function TeacherMarksView({
           .map(ex => ({
             ...ex,
             exam_subjects: (ex.exam_subjects ?? []).filter(
-              (es: any) => es.teacher_id === teacherId || taskSubjectExamKeys.has(`${ex.id}_${es.subject_id}`)
+              (es: any) => taskSubjectExamKeys.has(`${ex.id}_${es.subject_id}`)
             ),
           }))
           .filter(ex => ex.exam_subjects.length > 0),
@@ -92,7 +110,7 @@ export default function TeacherMarksView({
     } finally {
       setIsLoading(false);
     }
-  }, [teacherId, academicYearId]);
+  }, [academicYearId]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -125,7 +143,7 @@ export default function TeacherMarksView({
       <ResultsView
         exams={exams}
         subjects={[]}
-        classes={[]}
+        classes={classesForTeacher}
         currentUserRole={role || 'teacher'}
         currentUserId={user?.id}
         initialExamId={entering.exam_id}

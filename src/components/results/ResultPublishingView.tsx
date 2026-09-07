@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Send, 
   CheckCircle2, 
@@ -20,6 +20,7 @@ import {
   Eye, 
   Printer, 
   ChevronRight,
+  ChevronLeft,
   Check,
   X,
   Loader2,
@@ -31,6 +32,31 @@ import { supabase } from '@/lib/supabase';
 import { examinationService, ExamRecord, StudentExamResult } from '@/services/examinationService';
 import { useAuth } from '@/context/AuthContext';
 import { formatClassDisplay } from '@/lib/cbseExamUtils';
+
+/**
+ * `exam_results.result_status` and `.division` are nullable columns with no
+ * DB default — every row processClassResults writes fills them in, but a row
+ * from any other path (a manual insert, a partial migration) would leave
+ * them null. Two spots here used to paper over that with `|| 'PASS'` /
+ * `|| 'First Division'`, so a result nobody has actually classified read as
+ * a clean pass on the exact screen an admin uses to decide what to publish
+ * to parents. Route it through this instead: an unrecognized/missing status
+ * shows as "Not Verified" in neutral styling, never as a false pass.
+ */
+function getResultStatusBadge(status?: string | null): { label: string; className: string } {
+  switch (status) {
+    case 'PASS':
+      return { label: 'PASS', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+    case 'COMPARTMENT':
+      return { label: 'COMPARTMENT', className: 'bg-amber-50 text-amber-700 border-amber-200' };
+    case 'FAIL':
+      return { label: 'FAIL', className: 'bg-rose-50 text-rose-700 border-rose-200' };
+    case 'WITHHELD':
+      return { label: 'WITHHELD', className: 'bg-slate-100 text-slate-700 border-slate-300' };
+    default:
+      return { label: 'Not Verified', className: 'bg-slate-100 text-slate-500 border-slate-300' };
+  }
+}
 
 interface ResultPublishingViewProps {
   exams: ExamRecord[];
@@ -47,15 +73,37 @@ export default function ResultPublishingView({
 }: ResultPublishingViewProps) {
   const { user, can } = useAuth();
 
-  const [selectedExamId, setSelectedExamId] = useState<string>('all');
   const [selectedClassId, setSelectedClassId] = useState<string>('all');
+  const [selectedExamId, setSelectedExamId] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all'); // all | published | unpublished
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Enterprise Pagination State
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(25);
 
   const [results, setResults] = useState<StudentExamResult[]>([]);
   const [allSessionResults, setAllSessionResults] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [activeExamsList, setActiveExamsList] = useState<ExamRecord[]>(exams);
+
+  // Cascading: exams belonging to the selected class
+  const availableExamsForClass = useMemo(() => {
+    if (selectedClassId === 'all') return activeExamsList;
+    return activeExamsList.filter(e => e.class_id === selectedClassId || (e as any).classes?.id === selectedClassId || (e as any).class === selectedClassId);
+  }, [activeExamsList, selectedClassId]);
+
+  // Handle class change with cascaded exam reset
+  const handleClassChange = (newClassId: string) => {
+    setSelectedClassId(newClassId);
+    setCurrentPage(1);
+    if (newClassId !== 'all') {
+      const classExams = activeExamsList.filter(e => e.class_id === newClassId || (e as any).classes?.id === newClassId || (e as any).class === newClassId);
+      if (classExams.length > 0 && selectedExamId !== 'all' && !classExams.some(e => e.id === selectedExamId)) {
+        setSelectedExamId('all');
+      }
+    }
+  };
 
   // Publish / Unpublish Confirmation Modals
   const [publishModalExam, setPublishModalExam] = useState<ExamRecord | null>(null);
@@ -65,10 +113,23 @@ export default function ResultPublishingView({
   // Preview Drawer Modal
   const [previewResult, setPreviewResult] = useState<StudentExamResult | null>(null);
 
+  // "View Candidates" on an exam card jumps the ledger below to that exam —
+  // it used to just change state with the ledger possibly off-screen, giving
+  // no visible feedback that the click did anything.
+  const ledgerRef = useRef<HTMLDivElement>(null);
+
   // Load results when exam or class selection changes
   useEffect(() => {
     fetchResults();
+    setCurrentPage(1);
   }, [selectedExamId, selectedClassId, selectedYearId]);
+
+  // Any narrowing filter can shrink the result set below the page you were
+  // on, which would otherwise render an empty page with working-looking
+  // pagination controls around it.
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter, searchQuery]);
 
   const fetchResults = async () => {
     setIsLoading(true);
@@ -108,20 +169,30 @@ export default function ResultPublishingView({
     }
   };
 
-  // Filtered list of exams for the top cards
+  // Filtered list of exams for the top cards. Also honors selectedExamId now
+  // — picking a specific term in the shared filter narrows this grid down to
+  // that one card instead of only affecting the ledger below it.
   const filteredExams = useMemo(() => {
     return activeExamsList.filter(ex => {
       if (selectedYearId && ex.academic_year_id && ex.academic_year_id !== selectedYearId) return false;
       if (selectedClassId !== 'all' && ex.class_id !== selectedClassId) return false;
+      if (selectedExamId !== 'all' && ex.id !== selectedExamId) return false;
       if (statusFilter === 'published' && !ex.is_published) return false;
       if (statusFilter === 'unpublished' && ex.is_published) return false;
       return true;
     });
-  }, [activeExamsList, selectedYearId, selectedClassId, statusFilter]);
+  }, [activeExamsList, selectedYearId, selectedClassId, selectedExamId, statusFilter]);
 
-  // Filtered student results
+  // Filtered student results. statusFilter used to only narrow the exam cards
+  // above and silently do nothing here — so picking "Pending / Draft Only" to
+  // review what's left unpublished still showed candidates from
+  // already-published exams mixed into the same ledger.
   const filteredResults = useMemo(() => {
     return results.filter(res => {
+      const isExamPublished = !!(res as any).exams?.is_published;
+      if (statusFilter === 'published' && !isExamPublished) return false;
+      if (statusFilter === 'unpublished' && isExamPublished) return false;
+
       const student = (res as any).students;
       const q = searchQuery.toLowerCase().trim();
       if (!q) return true;
@@ -130,7 +201,14 @@ export default function ResultPublishingView({
       const adm = student?.admission_number?.toLowerCase() || '';
       return name.includes(q) || roll.includes(q) || adm.includes(q);
     });
-  }, [results, searchQuery]);
+  }, [results, searchQuery, statusFilter]);
+
+  // Paginated student records
+  const totalPages = Math.max(1, Math.ceil(filteredResults.length / pageSize));
+  const paginatedResults = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredResults.slice(start, start + pageSize);
+  }, [filteredResults, currentPage, pageSize]);
 
   // Publishing metrics
   const stats = useMemo(() => {
@@ -287,25 +365,71 @@ export default function ResultPublishingView({
         </button>
       </div>
 
-      {/* 3. Examination Status Master Cards */}
+      {/* 3. Shared Filters — Class, Exam Term & Status used to be split across
+          two separate headers (one on the cards below, one on the ledger),
+          with Class duplicated in both and Status silently doing nothing to
+          the ledger. One bar now drives both sections consistently. */}
+      <div className="bg-white border border-slate-200/80 rounded-2xl p-3.5 shadow-2xs flex flex-wrap items-center gap-2.5">
+        <div className="flex items-center gap-1.5 text-slate-400 pr-1">
+          <Filter size={13} />
+          <span className="text-[9px] font-black uppercase tracking-widest">Filters</span>
+        </div>
+
+        <select
+          value={selectedClassId}
+          onChange={e => handleClassChange(e.target.value)}
+          className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-blue-500 cursor-pointer"
+        >
+          <option value="all">All Classes</option>
+          {classes.map(c => (
+            <option key={c.id} value={c.id}>{formatClassDisplay(c.class_name)}</option>
+          ))}
+        </select>
+
+        <select
+          value={selectedExamId}
+          onChange={e => setSelectedExamId(e.target.value)}
+          className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-blue-500 cursor-pointer max-w-[220px] truncate"
+        >
+          <option value="all">All Examinations {selectedClassId !== 'all' ? `(${availableExamsForClass.length})` : ''}</option>
+          {availableExamsForClass.map(ex => (
+            <option key={ex.id} value={ex.id}>
+              {ex.short_name || ex.exam_name} {selectedClassId === 'all' ? `(${formatClassDisplay(ex.classes?.class_name || ex.class)})` : ''}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={statusFilter}
+          onChange={e => setStatusFilter(e.target.value)}
+          className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-blue-500 cursor-pointer"
+        >
+          <option value="all">All Statuses</option>
+          <option value="published">Published Only</option>
+          <option value="unpublished">Pending / Draft Only</option>
+        </select>
+
+        {(selectedClassId !== 'all' || selectedExamId !== 'all' || statusFilter !== 'all') && (
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedClassId('all');
+              setSelectedExamId('all');
+              setStatusFilter('all');
+            }}
+            className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors"
+          >
+            <X size={12} />
+            <span>Clear filters</span>
+          </button>
+        )}
+      </div>
+
+      {/* 4. Examination Status Master Cards */}
       <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-2xs space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
-          <div>
-            <h3 className="text-sm font-bold text-slate-900">Term-Wise Publication State</h3>
-            <p className="text-xs text-slate-500 mt-0.5">Authorize student and parent portal access per assessment</p>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <select
-              value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value)}
-              className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-blue-500 cursor-pointer"
-            >
-              <option value="all">All Statuses</option>
-              <option value="published">Published Only</option>
-              <option value="unpublished">Pending / Draft Only</option>
-            </select>
-          </div>
+        <div className="border-b border-slate-100 pb-3">
+          <h3 className="text-sm font-bold text-slate-900">Term-Wise Publication State</h3>
+          <p className="text-xs text-slate-500 mt-0.5">Authorize student and parent portal access per assessment</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -365,10 +489,11 @@ export default function ResultPublishingView({
                     onClick={() => {
                       setSelectedExamId(ex.id);
                       if (ex.class_id) setSelectedClassId(ex.class_id);
+                      ledgerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                     }}
                     className="text-[11px] font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
                   >
-                    View Candidates ({results.filter(r => r.exam_id === ex.id).length})
+                    View Candidates ({allSessionResults.filter(r => r.exam_id === ex.id).length})
                   </button>
 
                   {can('results.publish') && (
@@ -399,8 +524,8 @@ export default function ResultPublishingView({
         </div>
       </div>
 
-      {/* 4. Candidate Results Registry */}
-      <div className="bg-white border border-slate-200/80 rounded-2xl shadow-2xs overflow-hidden">
+      {/* 5. Candidate Results Registry */}
+      <div ref={ledgerRef} className="bg-white border border-slate-200/80 rounded-2xl shadow-2xs overflow-hidden scroll-mt-4">
         <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h3 className="text-sm font-bold text-slate-900">Processed Candidate Results Ledger</h3>
@@ -419,28 +544,22 @@ export default function ResultPublishingView({
               />
             </div>
 
-            <select
-              value={selectedExamId}
-              onChange={e => setSelectedExamId(e.target.value)}
-              className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-blue-500 cursor-pointer"
-            >
-              <option value="all">All Examinations</option>
-              {activeExamsList.map(ex => (
-                <option key={ex.id} value={ex.id}>
-                  {ex.short_name || ex.exam_name} ({formatClassDisplay(ex.classes?.class_name || ex.class)})
-                </option>
-              ))}
-            </select>
+            {/* Class / Exam Term / Status are set once in the shared Filters
+                bar above — this table already reacts to all three. */}
 
+            {/* Page Size Selector */}
             <select
-              value={selectedClassId}
-              onChange={e => setSelectedClassId(e.target.value)}
-              className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-blue-500 cursor-pointer"
+              value={pageSize}
+              onChange={e => {
+                setPageSize(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+              className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-blue-500 cursor-pointer"
             >
-              <option value="all">All Classes</option>
-              {classes.map(c => (
-                <option key={c.id} value={c.id}>{formatClassDisplay(c.class_name)}</option>
-              ))}
+              <option value={10}>10 / page</option>
+              <option value={25}>25 / page</option>
+              <option value={50}>50 / page</option>
+              <option value={100}>100 / page</option>
             </select>
           </div>
         </div>
@@ -467,7 +586,7 @@ export default function ResultPublishingView({
                     Loading processed results...
                   </td>
                 </tr>
-              ) : filteredResults.length === 0 ? (
+              ) : paginatedResults.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-16 text-center text-slate-400 font-medium">
                     <Award className="w-8 h-8 mx-auto mb-2 text-slate-300" />
@@ -482,9 +601,9 @@ export default function ResultPublishingView({
                   </td>
                 </tr>
               ) : (
-                filteredResults.map(res => {
+                paginatedResults.map(res => {
                   const student = (res as any).students;
-                  const isPass = res.result_status === 'PASS';
+                  const statusBadge = getResultStatusBadge(res.result_status);
 
                   return (
                     <tr key={res.id} className="hover:bg-slate-50/60 transition-colors">
@@ -527,10 +646,10 @@ export default function ResultPublishingView({
                       </td>
                       <td className="py-3 px-4 text-center">
                         <span className={cn(
-                          "px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
-                          isPass ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-rose-50 text-rose-700 border border-rose-200"
+                          "px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border",
+                          statusBadge.className
                         )}>
-                          {res.result_status || 'PASS'}
+                          {statusBadge.label}
                         </span>
                       </td>
                       <td className="py-3 px-4 text-right pr-5">
@@ -549,10 +668,53 @@ export default function ResultPublishingView({
             </tbody>
           </table>
         </div>
+
+        {/* Enterprise Pagination Bar */}
+        {filteredResults.length > 0 && (
+          <div className="p-3 bg-slate-50/80 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div className="text-slate-500 font-medium">
+              Showing <strong className="text-slate-800 font-bold">{Math.min(filteredResults.length, (currentPage - 1) * pageSize + 1)}</strong> to{' '}
+              <strong className="text-slate-800 font-bold">{Math.min(filteredResults.length, currentPage * pageSize)}</strong> of{' '}
+              <strong className="text-slate-800 font-bold">{filteredResults.length}</strong> candidates
+            </div>
+
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed font-semibold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+              >
+                <ChevronLeft size={13} />
+                <span>Previous</span>
+              </button>
+
+              <div className="px-3 py-1 bg-white border border-slate-200 rounded-lg font-bold text-slate-700 shadow-2xs">
+                Page {currentPage} of {totalPages}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed font-semibold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+              >
+                <span>Next</span>
+                <ChevronRight size={13} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* CONFIRM PUBLISH MODAL */}
-      {publishModalExam && (
+      {publishModalExam && (() => {
+        const impactedResults = allSessionResults.filter(r => r.exam_id === publishModalExam.id);
+        const unverifiedCount = impactedResults.filter(
+          r => !['PASS', 'COMPARTMENT', 'FAIL', 'WITHHELD'].includes(r.result_status)
+        ).length;
+
+        return (
         <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
           <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-md w-full p-6 space-y-4">
             <div className="flex items-center gap-3">
@@ -580,9 +742,22 @@ export default function ResultPublishingView({
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500 font-medium">Candidates Impacted:</span>
-                <strong className="text-blue-600">{results.filter(r => r.exam_id === publishModalExam.id).length} candidates</strong>
+                <strong className="text-blue-600">{impactedResults.length} candidates</strong>
               </div>
             </div>
+
+            {/* Publishing exposes result_status/division straight to parents.
+                Both are nullable with no DB default (see getResultStatusBadge
+                above) — an unverified row would otherwise go out silently. */}
+            {unverifiedCount > 0 && (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-2 text-xs text-rose-800 font-medium">
+                <AlertCircle size={15} className="shrink-0 text-rose-600 mt-0.5" />
+                <p>
+                  <strong>{unverifiedCount} of {impactedResults.length} candidate{unverifiedCount === 1 ? '' : 's'} {unverifiedCount === 1 ? 'has' : 'have'} no verified result status.</strong>{' '}
+                  Publishing now will show them as "Not Verified" to parents. Consider re-running Result Processing first.
+                </p>
+              </div>
+            )}
 
             <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2 text-xs text-amber-800 font-medium">
               <AlertTriangle size={15} className="shrink-0 text-amber-600 mt-0.5" />
@@ -612,7 +787,8 @@ export default function ResultPublishingView({
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* CONFIRM UNPUBLISH / RETRACT MODAL */}
       {unpublishModalExam && (
@@ -702,14 +878,17 @@ export default function ResultPublishingView({
               </div>
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
                 <span className="text-[10px] text-slate-400 uppercase font-bold block">Division</span>
-                <strong className="text-slate-800 text-xs">{previewResult.division || 'First Division'}</strong>
+                <strong className="text-slate-800 text-xs">{previewResult.division || 'Not Classified'}</strong>
               </div>
             </div>
 
-            <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl flex items-center justify-between text-xs">
-              <span className="text-blue-900 font-bold">Result Status:</span>
-              <span className="px-2.5 py-0.5 rounded-md font-black bg-blue-600 text-white uppercase text-[10px]">
-                {previewResult.result_status || 'PASS'}
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-xs">
+              <span className="text-slate-700 font-bold">Result Status:</span>
+              <span className={cn(
+                "px-2.5 py-0.5 rounded-md font-black uppercase text-[10px] border",
+                getResultStatusBadge(previewResult.result_status).className
+              )}>
+                {getResultStatusBadge(previewResult.result_status).label}
               </span>
             </div>
 
