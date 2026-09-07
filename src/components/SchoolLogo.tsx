@@ -1,4 +1,7 @@
 import React from 'react';
+import sjsLogoIcon from '@/assets/sjs_logo_icon.jpg';
+import sjsFavicon from '@/assets/sjs_favicon.png';
+import sjsLogoBanner from '@/assets/sjs_logo.png';
 
 interface SchoolLogoProps {
   className?: string;
@@ -166,17 +169,17 @@ export function SchoolCrest({ className = 'w-10 h-10', variant = 'default' }: { 
 }
 
 /**
- * Official Live St. Joseph's Logo Image Component (Direct from Live Website S3)
+ * Official Live St. Joseph's Logo Image Component (from https://sjsbrlschool.edu.in/)
  */
 export function SchoolLiveLogo({ className = 'w-12 h-12' }: { className?: string }) {
   return (
     <div className={`relative shrink-0 select-none flex items-center justify-center ${className}`}>
       <img
-        src="https://entab-s3-bucket1.s3.ap-south-1.amazonaws.com/SJSKBUP/public/Images/logo_icon.JPG"
+        src={sjsFavicon || sjsLogoIcon}
         alt="St. Joseph’s School Crest"
-        className="w-full h-full object-contain rounded-full"
+        className="w-full h-full object-contain rounded-full drop-shadow-sm"
         onError={(e) => {
-          (e.target as HTMLElement).setAttribute('src', 'https://sjsbrlschool.edu.in/favicon.png');
+          (e.target as HTMLElement).setAttribute('src', 'https://entab-s3-bucket1.s3.ap-south-1.amazonaws.com/SJSKBUP/public/Images/logo_icon.JPG');
         }}
       />
     </div>
