@@ -1,0 +1,87 @@
+{
+  "generatedAt": "2026-09-06T17:57:05.302Z",
+  "pass": 10,
+  "fail": 0,
+  "results": [
+    {
+      "module": "Library",
+      "page": "Library",
+      "action": "Page load reads catalog + ledger + roll",
+      "status": "PASS",
+      "detail": "26 books, 9 categories, 18 issues",
+      "ms": 535
+    },
+    {
+      "module": "Library",
+      "page": "Library/Books",
+      "action": "Add book with a brand new category",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 174
+    },
+    {
+      "module": "Library",
+      "page": "Library/Issues",
+      "action": "Issue book to a student decrements stock",
+      "status": "PASS",
+      "detail": "4 -> 3 available",
+      "ms": 722
+    },
+    {
+      "module": "Library",
+      "page": "Library/Issues",
+      "action": "Ledger resolves the borrower and the title",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 161
+    },
+    {
+      "module": "Library",
+      "page": "Library/Issues",
+      "action": "Overdue return raises a fine and restores stock",
+      "status": "PASS",
+      "detail": "₹20 fine, still unpaid",
+      "ms": 1182
+    },
+    {
+      "module": "Library",
+      "page": "Library/Fines",
+      "action": "Collect settles the fine without touching the loan",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 304
+    },
+    {
+      "module": "Library",
+      "page": "Library/Categories",
+      "action": "Rename restamps every book in the category",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 257
+    },
+    {
+      "module": "Library",
+      "page": "Library/Categories",
+      "action": "Delete empties the category into General",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 236
+    },
+    {
+      "module": "Library",
+      "page": "Library/Fines",
+      "action": "Waive clears the charge but keeps the loan",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 239
+    },
+    {
+      "module": "Library",
+      "page": "Library/Student360",
+      "action": "Student drawer finds the loans by student_id",
+      "status": "PASS",
+      "detail": "1 loans for Ritesh Ram",
+      "ms": 123
+    }
+  ]
+}

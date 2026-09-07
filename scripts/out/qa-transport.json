@@ -1,0 +1,103 @@
+{
+  "generatedAt": "2026-09-06T18:22:05.838Z",
+  "pass": 12,
+  "fail": 0,
+  "results": [
+    {
+      "module": "Transport",
+      "page": "Transport",
+      "action": "Page load reads every fleet table",
+      "status": "PASS",
+      "detail": "5 routes, 5 vehicles, 5 drivers, 248 allotments",
+      "ms": 630
+    },
+    {
+      "module": "Transport",
+      "page": "Transport/Vehicles",
+      "action": "Fleet state and both document dates persist",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 129
+    },
+    {
+      "module": "Transport",
+      "page": "Transport/Vehicles",
+      "action": "Fleet state vocabulary is enforced",
+      "status": "PASS",
+      "detail": "rejected as expected",
+      "ms": 144
+    },
+    {
+      "module": "Transport",
+      "page": "Transport/Drivers",
+      "action": "Driver saves name, number, licence and address",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 125
+    },
+    {
+      "module": "Transport",
+      "page": "Transport/Drivers",
+      "action": "Duty status vocabulary is enforced",
+      "status": "PASS",
+      "detail": "rejected as expected",
+      "ms": 136
+    },
+    {
+      "module": "Transport",
+      "page": "Transport/Drivers",
+      "action": "Assigning a bus releases its previous driver",
+      "status": "PASS",
+      "detail": "one driver per bus",
+      "ms": 361
+    },
+    {
+      "module": "Transport",
+      "page": "Transport/Routes",
+      "action": "Route carries its serving bus",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 116
+    },
+    {
+      "module": "Transport",
+      "page": "Transport/Routes",
+      "action": "Route crew derives through the bus",
+      "status": "PASS",
+      "detail": "QA_AUTOTEST_QA Driver B_mtq52ajh4181",
+      "ms": 247
+    },
+    {
+      "module": "Transport",
+      "page": "Transport/Allotments",
+      "action": "Allot a student with pick-up and drop",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 238
+    },
+    {
+      "module": "Transport",
+      "page": "Transport/Allotments",
+      "action": "A student cannot hold two allotments",
+      "status": "PASS",
+      "detail": "rejected as expected",
+      "ms": 243
+    },
+    {
+      "module": "Transport",
+      "page": "Transport/Allotments",
+      "action": "Ledger resolves student, route, vehicle and driver",
+      "status": "PASS",
+      "detail": "Satish Ansari -> QA_AUTOTEST_QA Route_mtq52ati4835 -> QA_AUTOTEST_QA Driver B_mtq52ajh4181",
+      "ms": 366
+    },
+    {
+      "module": "Transport",
+      "page": "Transport/Vehicles",
+      "action": "Seat occupancy counts real riders",
+      "status": "PASS",
+      "detail": "1/40 seats taken",
+      "ms": 226
+    }
+  ]
+}

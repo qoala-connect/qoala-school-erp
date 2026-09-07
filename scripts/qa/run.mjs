@@ -10,6 +10,8 @@ const MODULES = {
   staff: () => import('./t_staff.mjs'),
   attendance: () => import('./t_attendance.mjs'),
   operations: () => import('./t_operations.mjs'),
+  library: () => import('./t_library.mjs'),
+  transport: () => import('./t_transport.mjs'),
   system: () => import('./t_system.mjs'),
 };
 

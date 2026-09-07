@@ -29,7 +29,7 @@ import FeeReceiptModal from '@/components/fees/FeeReceiptModal';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
-import { cn } from '@/lib/utils';
+import { cn, formatFeeHeadName } from '@/lib/utils';
 
 interface Student360DrawerProps {
   isOpen: boolean;
@@ -176,7 +176,7 @@ export default function Student360Drawer({
             total_amount, discount_amount, scholarship_amount, fine_amount,
             net_amount, amount_paid, due_date, status,
             fee_categories:fee_category_id (id, category_name),
-            fee_payments (id, receipt_number, amount_paid, payment_date, payment_mode)
+            fee_payments (id, receipt_number, amount_paid, payment_date, payment_mode, voided_at)
           `)
           .eq('student_id', student.id)
           .order('due_date', { ascending: false });
@@ -190,19 +190,22 @@ export default function Student360Drawer({
         const ledgers = (feeLedgers || []).map((l: any) => {
           const total     = Number(l.total_amount || 0);
           const discount  = Number(l.discount_amount || 0);
-          const netAmount = Number(l.net_amount ?? (total - discount));
+          const fine      = Number(l.fine_amount || 0);
+          const schol     = Number(l.scholarship_amount || 0);
+          // Fallback mirrors the generated column: gross + late fee - concessions.
+          const netAmount = Number(l.net_amount ?? (total + fine - discount - schol));
           const paid      = Number(l.amount_paid || 0);
           return {
             id: l.id,
             student_id: l.student_id || student.id,
             fee_category_id: l.fee_category_id,
             academic_year_id: l.academic_year_id,
-            category_name: l.fee_categories?.category_name || 'Composite School Fee',
-            fee_category_name: l.fee_categories?.category_name || 'Composite School Fee',
+            category_name: formatFeeHeadName(l.fee_categories?.category_name) || 'Composite School Fee',
+            fee_category_name: formatFeeHeadName(l.fee_categories?.category_name) || 'Composite School Fee',
             total_amount: total,
             discount_amount: discount,
-            scholarship_amount: Number(l.scholarship_amount || 0),
-            fine_amount: Number(l.fine_amount || 0),
+            scholarship_amount: schol,
+            fine_amount: fine,
             net_amount: netAmount,
             amount_paid: paid,
             remaining_amount: Math.max(0, netAmount - paid),
@@ -219,14 +222,17 @@ export default function Student360Drawer({
               father_name: student.father_name,
               phone: student.phone,
             },
-            receipts: l.fee_payments || []
+            // Voided receipts are excluded: the balance already ignores them,
+            // so listing them makes the ledger look like it lost a payment.
+            receipts: (l.fee_payments || []).filter((p: any) => !p.voided_at)
           };
         });
 
         const totalBilled = ledgers.reduce((acc, cur) => acc + cur.net_amount, 0);
         const totalPaid = ledgers.reduce((acc, cur) => acc + cur.amount_paid, 0);
         const totalDiscount = ledgers.reduce((acc, cur) => acc + cur.discount_amount, 0);
-        const totalDue = Math.max(0, totalBilled - totalPaid);
+        // Clamped per ledger, so a settled fee cannot absorb another's dues.
+        const totalDue = ledgers.reduce((acc, cur) => acc + cur.remaining_amount, 0);
 
         setFeeData({
           total_billed: totalBilled,
@@ -303,7 +309,7 @@ export default function Student360Drawer({
         const { data: books } = await supabase
           .from('book_issues')
           .select('*, library_books(title, author, isbn)')
-          .or(`user_id.eq.${student.id},borrower_name.ilike.%${student.name}%`)
+          .or(`student_id.eq.${student.id},borrower_name.ilike.%${student.name}%`)
           .order('issue_date', { ascending: false });
 
         const mapped = (books || []).map((b: any) => ({
@@ -1119,6 +1125,7 @@ export default function Student360Drawer({
                                               const latestPayment: any = l.receipts?.[0] || {};
                                               setSelectedReceiptFee({
                                                 id: l.id,
+                                                payment_id: latestPayment.id,
                                                 receipt_number: latestPayment.receipt_number || `RCP/${student.admission_number || '2026'}`,
                                                 total_amount: Number(latestPayment.amount_paid || l.amount_paid),
                                                 paid_amount: Number(latestPayment.amount_paid || l.amount_paid),
@@ -1127,13 +1134,18 @@ export default function Student360Drawer({
                                                 category_name: l.fee_category_name,
                                                 payment_mode: latestPayment.payment_mode || 'Cash',
                                                 payment_date: latestPayment.payment_date || new Date().toISOString().split('T')[0],
+                                                transaction_id: latestPayment.transaction_id || null,
+                                                remarks: latestPayment.remarks || null,
                                                 academic_year: student.academic_year || '2026-27',
+                                                student_id: student.id,
                                                 students: {
+                                                  id: student.id,
                                                   name: student.name,
                                                   class: `${student.class} - ${student.section}`,
                                                   roll_number: student.roll_number,
                                                   admission_number: student.admission_number,
                                                   father_name: student.father_name,
+                                                  mother_name: student.mother_name,
                                                   phone: student.phone
                                                 }
                                               });

@@ -91,6 +91,18 @@ export interface FeeSummaryMetrics {
   partialInvoices: number;
 }
 
+export interface StudentFeeAccountSummary {
+  studentId: string;
+  totalAssignedFee: number;
+  totalPaid: number;
+  currentDue: number;
+  totalOutstanding: number;
+  overdueAmount: number;
+  nextDueDate: string | null;
+  nextDueAmount: number;
+  ledgers: StudentFeeLedger[];
+}
+
 export interface CollectFeeInput {
   studentFeeId?: string;
   studentId: string;
@@ -116,3 +128,44 @@ export interface CollectFeeResult {
   balance: number;
   status: string;
 }
+
+export interface FeeReceiptData {
+  id?: string;
+  payment_id?: string;
+  student_fee_id?: string;
+  receipt_number: string;
+  amount_paid: number;
+  paid_amount?: number;
+  total_amount?: number;
+  net_amount?: number;
+  discount_amount?: number;
+  fine_amount?: number;
+  remaining_amount?: number;
+  total_outstanding_dues?: number;
+  payment_mode?: string;
+  payment_date?: string;
+  due_date?: string;
+  transaction_id?: string | null;
+  bank_name?: string | null;
+  remarks?: string | null;
+  category_name?: string;
+  installment_name?: string;
+  academic_year?: string;
+  created_by?: string | null;
+  cashier_name?: string | null;
+  student_id?: string;
+  students?: {
+    id?: string;
+    name?: string;
+    roll_number?: string;
+    admission_number?: string;
+    enrollment_number?: string;
+    class?: string;
+    section?: string;
+    father_name?: string;
+    mother_name?: string;
+    guardian_name?: string;
+    phone?: string;
+  };
+}
+

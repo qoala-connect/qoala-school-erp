@@ -1,0 +1,287 @@
+{
+  "generatedAt": "2026-09-06T18:50:47.364Z",
+  "pass": 35,
+  "fail": 0,
+  "results": [
+    {
+      "module": "Fees",
+      "page": "Fees/Structure",
+      "action": "Load fee categories (select fee_categories)",
+      "status": "PASS",
+      "detail": "7 categories",
+      "ms": 132
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Structure",
+      "action": "Create fee category (insert fee_categories)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 129
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Structure",
+      "action": "Edit fee category — every frequency option (update fee_categories)",
+      "status": "PASS",
+      "detail": "5 frequencies",
+      "ms": 869
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Structure",
+      "action": "Set class fee amount (upsert fee_structure)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 271
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Structure",
+      "action": "Batch save class fees (upsert fee_structure x N)",
+      "status": "PASS",
+      "detail": "3 rows",
+      "ms": 260
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Ledgers",
+      "action": "Assign fee to student (insert student_fees)",
+      "status": "PASS",
+      "detail": "net=1900",
+      "ms": 142
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Ledgers",
+      "action": "Load ledger rows (select student_fees join)",
+      "status": "PASS",
+      "detail": "100 rows",
+      "ms": 154
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Collection",
+      "action": "Collect payment — every payment mode (rpc collect_fee)",
+      "status": "PASS",
+      "detail": "4 modes, 4 unique receipts",
+      "ms": 545
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Transactions",
+      "action": "Load transactions (select fee_payments join)",
+      "status": "PASS",
+      "detail": "100 rows",
+      "ms": 132
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Transactions",
+      "action": "Void payment (rpc void_fee_payment)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 241
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Transactions",
+      "action": "Void rolls the ledger back by exactly the voided amount",
+      "status": "PASS",
+      "detail": "amount_paid=300 matches 3 live payments",
+      "ms": 231
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Reports",
+      "action": "Load collection summary (select student_fees aggregate)",
+      "status": "PASS",
+      "detail": "billed=12956725 collected=9910971 over 533 ledgers",
+      "ms": 131
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Reports",
+      "action": "Load overdue report (select student_fees filtered)",
+      "status": "PASS",
+      "detail": "166 overdue",
+      "ms": 135
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Discounts",
+      "action": "Create discount (insert discounts)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 367
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Scholarships",
+      "action": "Create scholarship (insert scholarships)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 239
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Structure",
+      "action": "Delete fee structure item (delete fee_structure)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 239
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Structure",
+      "action": "Deactivate category in use (update fee_categories.is_active)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 235
+    },
+    {
+      "module": "Operations",
+      "page": "Library/Books",
+      "action": "Add book (insert library_books)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 131
+    },
+    {
+      "module": "Operations",
+      "page": "Library/Issues",
+      "action": "Issue book (insert book_issues)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 133
+    },
+    {
+      "module": "Operations",
+      "page": "Library/Books",
+      "action": "Edit + delete book (update/delete library_books)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 117
+    },
+    {
+      "module": "Operations",
+      "page": "Transport/Routes",
+      "action": "Add route (insert transport_routes)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 127
+    },
+    {
+      "module": "Operations",
+      "page": "Transport/Vehicles",
+      "action": "Add vehicle (insert vehicles)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 119
+    },
+    {
+      "module": "Operations",
+      "page": "Transport/Drivers",
+      "action": "Add driver (insert drivers)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 124
+    },
+    {
+      "module": "Operations",
+      "page": "Transport/Allotments",
+      "action": "Allot transport to student (insert student_transport)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 244
+    },
+    {
+      "module": "Operations",
+      "page": "Inventory/Assets",
+      "action": "Add asset (insert assets)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 117
+    },
+    {
+      "module": "Operations",
+      "page": "Inventory/Stock",
+      "action": "Add stock item (insert inventory)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 124
+    },
+    {
+      "module": "Operations",
+      "page": "Hostel/Hostels",
+      "action": "Add hostel (insert hostels)",
+      "status": "PASS",
+      "detail": "4 hostel types",
+      "ms": 590
+    },
+    {
+      "module": "Operations",
+      "page": "Hostel/Rooms",
+      "action": "Add room (insert rooms)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 122
+    },
+    {
+      "module": "Operations",
+      "page": "Communication/Notices",
+      "action": "Publish notice (insert notices)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 125
+    },
+    {
+      "module": "Operations",
+      "page": "Communication/SMS",
+      "action": "Send SMS campaign (insert sms_logs)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 118
+    },
+    {
+      "module": "Operations",
+      "page": "Communication/Email",
+      "action": "Send email broadcast (insert email_logs)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 120
+    },
+    {
+      "module": "Operations",
+      "page": "OnlineClasses",
+      "action": "Schedule online class (insert online_classes)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 121
+    },
+    {
+      "module": "Operations",
+      "page": "SchoolCalendar",
+      "action": "Add calendar event (insert holidays)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 121
+    },
+    {
+      "module": "Operations",
+      "page": "Certificates",
+      "action": "Issue certificate (insert certificates)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 122
+    },
+    {
+      "module": "Operations",
+      "page": "FrontOffice",
+      "action": "Update visitor log status (update front_office_logs)",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 235
+    }
+  ]
+}

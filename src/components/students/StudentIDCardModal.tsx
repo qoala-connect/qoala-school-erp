@@ -18,7 +18,7 @@ interface StudentIDCardModalProps {
 const SCHOOL_NAME   = "St. Joseph's School";
 const SCHOOL_ADDR   = 'Barhalganj, Gorakhpur (U.P.) - 273402';
 const SCHOOL_PHONE  = '+91-8853242676';
-const CBSE_AFF_NO   = '2130842';
+const CBSE_AFF_NO   = '2131498';
 const PRINCIPAL     = 'Principal';
 
 export default function StudentIDCardModal({ isOpen, onClose, student, medical, transport }: StudentIDCardModalProps) {

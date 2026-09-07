@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-06T00:32:02.539Z",
-  "pass": 17,
+  "generatedAt": "2026-09-06T18:54:17.214Z",
+  "pass": 19,
   "fail": 0,
   "results": [
     {
@@ -9,7 +9,7 @@
       "action": "Load fee categories (select fee_categories)",
       "status": "PASS",
       "detail": "7 categories",
-      "ms": 137
+      "ms": 126
     },
     {
       "module": "Fees",
@@ -17,7 +17,7 @@
       "action": "Create fee category (insert fee_categories)",
       "status": "PASS",
       "detail": "ok",
-      "ms": 130
+      "ms": 295
     },
     {
       "module": "Fees",
@@ -25,7 +25,7 @@
       "action": "Edit fee category — every frequency option (update fee_categories)",
       "status": "PASS",
       "detail": "5 frequencies",
-      "ms": 766
+      "ms": 711
     },
     {
       "module": "Fees",
@@ -33,7 +33,7 @@
       "action": "Set class fee amount (upsert fee_structure)",
       "status": "PASS",
       "detail": "ok",
-      "ms": 246
+      "ms": 242
     },
     {
       "module": "Fees",
@@ -41,7 +41,7 @@
       "action": "Batch save class fees (upsert fee_structure x N)",
       "status": "PASS",
       "detail": "3 rows",
-      "ms": 241
+      "ms": 249
     },
     {
       "module": "Fees",
@@ -49,7 +49,7 @@
       "action": "Assign fee to student (insert student_fees)",
       "status": "PASS",
       "detail": "net=1900",
-      "ms": 130
+      "ms": 121
     },
     {
       "module": "Fees",
@@ -57,7 +57,7 @@
       "action": "Load ledger rows (select student_fees join)",
       "status": "PASS",
       "detail": "100 rows",
-      "ms": 131
+      "ms": 127
     },
     {
       "module": "Fees",
@@ -65,7 +65,15 @@
       "action": "Collect payment — every payment mode (rpc collect_fee)",
       "status": "PASS",
       "detail": "4 modes, 4 unique receipts",
-      "ms": 494
+      "ms": 484
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Collection",
+      "action": "An instalment leaves the fee’s own discount and late fee alone",
+      "status": "PASS",
+      "detail": "discount 500 / fine 100 retained, balance 2600",
+      "ms": 477
     },
     {
       "module": "Fees",
@@ -73,7 +81,7 @@
       "action": "Load transactions (select fee_payments join)",
       "status": "PASS",
       "detail": "100 rows",
-      "ms": 127
+      "ms": 132
     },
     {
       "module": "Fees",
@@ -81,7 +89,7 @@
       "action": "Void payment (rpc void_fee_payment)",
       "status": "PASS",
       "detail": "ok",
-      "ms": 244
+      "ms": 231
     },
     {
       "module": "Fees",
@@ -89,22 +97,30 @@
       "action": "Void rolls the ledger back by exactly the voided amount",
       "status": "PASS",
       "detail": "amount_paid=300 matches 3 live payments",
-      "ms": 253
+      "ms": 238
     },
     {
       "module": "Fees",
       "page": "Fees/Reports",
       "action": "Load collection summary (select student_fees aggregate)",
       "status": "PASS",
-      "detail": "billed=12497625 collected=9870871 over 507 ledgers",
-      "ms": 133
+      "detail": "billed=12960325 collected=9911971 over 534 ledgers",
+      "ms": 129
+    },
+    {
+      "module": "Fees",
+      "page": "Fees/Reports",
+      "action": "Dashboard KPIs ignore voided receipts and do not fan out billing",
+      "status": "PASS",
+      "detail": "billed=12975525.02 collected=9911971.17 receipts=445",
+      "ms": 546
     },
     {
       "module": "Fees",
       "page": "Fees/Reports",
       "action": "Load overdue report (select student_fees filtered)",
       "status": "PASS",
-      "detail": "142 overdue",
+      "detail": "166 overdue",
       "ms": 121
     },
     {
@@ -113,7 +129,7 @@
       "action": "Create discount (insert discounts)",
       "status": "PASS",
       "detail": "ok",
-      "ms": 247
+      "ms": 225
     },
     {
       "module": "Fees",
@@ -121,7 +137,7 @@
       "action": "Create scholarship (insert scholarships)",
       "status": "PASS",
       "detail": "ok",
-      "ms": 247
+      "ms": 224
     },
     {
       "module": "Fees",
@@ -129,7 +145,7 @@
       "action": "Delete fee structure item (delete fee_structure)",
       "status": "PASS",
       "detail": "ok",
-      "ms": 237
+      "ms": 220
     },
     {
       "module": "Fees",
@@ -137,7 +153,7 @@
       "action": "Deactivate category in use (update fee_categories.is_active)",
       "status": "PASS",
       "detail": "ok",
-      "ms": 236
+      "ms": 252
     }
   ]
 }

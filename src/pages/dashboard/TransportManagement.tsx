@@ -21,6 +21,7 @@ interface TransitRoute {
   end_point: string;
   fare_amount: number;
   stops_count: number;
+  vehicle_id: string; // the bus that runs this line
 }
 
 interface FleetVehicle {
@@ -28,15 +29,22 @@ interface FleetVehicle {
   vehicle_no: string; // e.g. UP-53-AT-9021
   model: string; // e.g. Tata Winger / School Bus
   capacity: number;
-  gps_status: 'Online' | 'Offline';
+  status: 'Active' | 'Maintenance' | 'Retired';
+  registration_expiry: string;
   insurance_expiry: string;
+  last_service_date: string;
+  gps_device_id: string;
 }
 
 interface DriverProfile {
   id: string;
   name: string;
   license_no: string;
+  license_expiry: string;
   phone: string;
+  address: string;
+  experience_years: number;
+  vehicle_id: string; // the bus this driver is behind the wheel of
   status: 'On-Duty' | 'On-Leave';
 }
 
@@ -49,7 +57,18 @@ interface TransitAllotment {
   vehicle_id: string;
   boarding_point: string;
   pickup_time: string;
+  drop_time: string;
 }
+
+// A document within this many days of lapsing gets flagged in the fleet and
+// driver tables — the school needs warning before a bus is off the road.
+const EXPIRY_WARNING_DAYS = 60;
+
+const daysUntil = (date?: string) => {
+  if (!date) return null;
+  const diff = new Date(`${String(date).slice(0, 10)}T00:00:00`).getTime() - new Date(new Date().toISOString().slice(0, 10)).getTime();
+  return Math.round(diff / 86400000);
+};
 
 interface EnrolledStudent {
   id: string;
@@ -108,56 +127,68 @@ export default function TransportManagement() {
         supabase.from('students').select('id, name, class, section').eq('status', 'active').order('name').limit(2000)
       ]);
 
-      if (stdRes.data) {
-        setStudents(stdRes.data.map((s: any) => ({
-          id: s.id, name: s.name || 'Student', class: s.class || '', section: s.section || ''
-        })));
+      // supabase-js resolves rather than throws, so a failed request arrives as
+      // `.error`. Unchecked, a broken query was indistinguishable from an
+      // empty fleet.
+      for (const [what, res] of [
+        ['routes', routesRes], ['vehicles', vehRes], ['drivers', drvRes], ['allotments', altRes]
+      ] as const) {
+        if (res.error) throw new Error(`${what}: ${res.error.message}`);
       }
 
-      if (routesRes.data) {
-        setRoutes(routesRes.data.map((r: any) => ({
-          id: r.id,
-          name: r.route_name || 'Route',
-          start_point: r.start_point || 'Start',
-          end_point: r.end_point || 'School Campus',
-          fare_amount: Number(r.fare_amount || 0),
-          stops_count: Number(r.stops_count || 1)
-        })));
-      }
+      setStudents((stdRes.data || []).map((s: any) => ({
+        id: s.id, name: s.name || 'Student', class: s.class || '', section: s.section || ''
+      })));
 
-      if (vehRes.data) {
-        setVehicles(vehRes.data.map((v: any) => ({
-          id: v.id,
-          vehicle_no: v.vehicle_number || 'N/A',
-          model: v.vehicle_model || 'Bus',
-          capacity: Number(v.capacity || 30),
-          gps_status: v.status === 'Active' ? 'Online' : 'Offline',
-          insurance_expiry: v.registration_expiry || '2027-01-01'
-        })));
-      }
+      setRoutes((routesRes.data || []).map((r: any) => ({
+        id: r.id,
+        name: r.route_name || 'Route',
+        start_point: r.start_point || 'Start',
+        end_point: r.end_point || 'School Campus',
+        fare_amount: Number(r.fare_amount || 0),
+        stops_count: Number(r.stops_count || 0),
+        vehicle_id: r.vehicle_id || ''
+      })));
 
-      if (drvRes.data) {
-        setDrivers(drvRes.data.map((d: any) => ({
-          id: d.id,
-          name: d.name || 'Driver',
-          license_no: d.license_number || 'N/A',
-          phone: d.phone || 'N/A',
-          status: d.status || 'On-Duty'
-        })));
-      }
+      setVehicles((vehRes.data || []).map((v: any) => ({
+        id: v.id,
+        vehicle_no: v.vehicle_number || 'N/A',
+        model: v.vehicle_model || 'Bus',
+        capacity: Number(v.capacity || 30),
+        // Real column now. This used to read a `status` that did not exist on
+        // the table, so every bus in the fleet rendered as GPS "Offline".
+        status: (v.status || 'Active') as FleetVehicle['status'],
+        registration_expiry: v.registration_expiry || '',
+        // Insurance and registration are separate documents; the page used to
+        // print the registration date under the insurance heading.
+        insurance_expiry: v.insurance_expiry || '',
+        last_service_date: v.last_service_date || '',
+        gps_device_id: v.gps_device_id || ''
+      })));
 
-      if (altRes.data) {
-        setAllotments(altRes.data.map((a: any) => ({
-          id: a.id,
-          student_id: a.student_id || a.students?.id || '',
-          student_name: a.students?.name || 'Student',
-          student_class: a.students?.class ? `Grade ${a.students.class}-${a.students.section || 'A'}` : 'N/A',
-          route_id: a.route_id || a.route || '',
-          vehicle_id: a.vehicle_id || '',
-          boarding_point: a.boarding_point || a.pickup_point || 'Campus',
-          pickup_time: a.pickup_time || '07:30 AM'
-        })));
-      }
+      setDrivers((drvRes.data || []).map((d: any) => ({
+        id: d.id,
+        name: d.name || 'Driver',
+        license_no: d.license_number || 'N/A',
+        license_expiry: d.license_expiry || '',
+        phone: d.phone || 'N/A',
+        address: d.address || '',
+        experience_years: Number(d.experience_years || 0),
+        vehicle_id: d.vehicle_id || '',
+        status: (d.status === 'On-Leave' ? 'On-Leave' : 'On-Duty') as DriverProfile['status']
+      })));
+
+      setAllotments((altRes.data || []).map((a: any) => ({
+        id: a.id,
+        student_id: a.student_id || a.students?.id || '',
+        student_name: a.students?.name || 'Student',
+        student_class: a.students?.class ? `Grade ${a.students.class}-${a.students.section || 'A'}` : 'N/A',
+        route_id: a.route_id || '',
+        vehicle_id: a.vehicle_id || '',
+        boarding_point: a.boarding_point || a.pickup_point || 'Campus',
+        pickup_time: a.pickup_time || '07:30 AM',
+        drop_time: a.drop_time || ''
+      })));
 
     } catch (error: any) {
       console.error('Error fetching transport tables:', error);
@@ -175,7 +206,12 @@ export default function TransportManagement() {
   // CRUD handlers
   const handleOpenAdd = () => {
     setEditingItem(null);
-    setFormData({});
+    setFormData(
+      activeTab === 'vehicles' ? { status: 'Active', capacity: 30 } :
+      activeTab === 'drivers' ? { status: 'On-Duty', experience_years: 0 } :
+      activeTab === 'routes' ? { stops_count: 1, fare_amount: 0 } :
+      { pickup_time: '07:30 AM', drop_time: '03:30 PM' }
+    );
     setShowAddModal(true);
   };
 
@@ -185,19 +221,41 @@ export default function TransportManagement() {
     setShowAddModal(true);
   };
 
+  const TABLE_FOR_TAB: Record<TabType, string> = {
+    routes: 'transport_routes',
+    vehicles: 'vehicles',
+    drivers: 'drivers',
+    allotments: 'student_transport'
+  };
+
+  // Retiring a route or a bus that children are still booked onto would strand
+  // them, so say how many and make the caller confirm that specifically.
+  const ridersOn = (ids: string[]) =>
+    allotments.filter(a => ids.includes(activeTab === 'routes' ? a.route_id : a.vehicle_id)).length;
+
+  const confirmRetire = (ids: string[]) => {
+    if (activeTab === 'routes' || activeTab === 'vehicles') {
+      const riders = ridersOn(ids);
+      if (riders > 0) {
+        return window.confirm(
+          `${riders} student${riders === 1 ? ' is' : 's are'} still allotted to ` +
+          `${ids.length === 1 ? 'this' : 'these'} ${activeTab === 'routes' ? 'route' : 'vehicle'}${ids.length === 1 ? '' : 's'}. ` +
+          `Deleting will leave ${riders === 1 ? 'that allotment' : 'those allotments'} without transport. Continue?`
+        );
+      }
+    }
+    return window.confirm(`Delete ${ids.length === 1 ? 'this transport record' : `these ${ids.length} fleet records`}?`);
+  };
+
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you absolutely sure you want to delete this transport record?')) return;
+    if (!confirmRetire([id])) return;
 
     try {
-      const table = 
-        activeTab === 'routes' ? 'transport_routes' :
-        activeTab === 'vehicles' ? 'vehicles' :
-        activeTab === 'drivers' ? 'drivers' : 'student_transport';
-
-      const { error } = await supabase.from(table).delete().eq('id', id);
+      const { error } = await supabase.from(TABLE_FOR_TAB[activeTab]).delete().eq('id', id);
       if (error) throw error;
 
       toast.success('Transport record deleted successfully!');
+      setSelectedItems(prev => prev.filter(i => i !== id));
       await loadData();
     } catch (err: any) {
       toast.error('Deletion failed: ' + err.message);
@@ -209,42 +267,57 @@ export default function TransportManagement() {
     setIsSubmitting(true);
 
     try {
+      let error = null;
+
       if (activeTab === 'routes') {
         const payload = {
           route_name: formData.name,
           start_point: formData.start_point,
           end_point: formData.end_point,
           fare_amount: Number(formData.fare_amount || 0),
-          stops_count: Number(formData.stops_count || 1)
+          stops_count: Number(formData.stops_count || 1),
+          vehicle_id: formData.vehicle_id || null
         };
-        if (editingItem) {
-          await supabase.from('transport_routes').update(payload).eq('id', editingItem.id);
-        } else {
-          await supabase.from('transport_routes').insert([payload]);
-        }
+        ({ error } = editingItem
+          ? await supabase.from('transport_routes').update(payload).eq('id', editingItem.id)
+          : await supabase.from('transport_routes').insert([payload]));
       } else if (activeTab === 'vehicles') {
         const payload = {
           vehicle_number: formData.vehicle_no,
           vehicle_model: formData.model,
           capacity: Number(formData.capacity || 30),
-          registration_expiry: formData.insurance_expiry
+          status: formData.status || 'Active',
+          registration_expiry: formData.registration_expiry || null,
+          insurance_expiry: formData.insurance_expiry || null,
+          last_service_date: formData.last_service_date || null,
+          gps_device_id: formData.gps_device_id || null
         };
-        if (editingItem) {
-          await supabase.from('vehicles').update(payload).eq('id', editingItem.id);
-        } else {
-          await supabase.from('vehicles').insert([payload]);
-        }
+        ({ error } = editingItem
+          ? await supabase.from('vehicles').update(payload).eq('id', editingItem.id)
+          : await supabase.from('vehicles').insert([payload]));
       } else if (activeTab === 'drivers') {
         const payload = {
           name: formData.name,
           license_number: formData.license_no,
+          license_expiry: formData.license_expiry || null,
           phone: formData.phone,
+          address: formData.address || null,
+          experience_years: Number(formData.experience_years || 0),
+          // One driver per bus: clear anyone else already assigned to it below.
+          vehicle_id: formData.vehicle_id || null,
           status: formData.status || 'On-Duty'
         };
+        let savedId = editingItem?.id;
         if (editingItem) {
-          await supabase.from('drivers').update(payload).eq('id', editingItem.id);
+          ({ error } = await supabase.from('drivers').update(payload).eq('id', editingItem.id));
         } else {
-          await supabase.from('drivers').insert([payload]);
+          const res = await supabase.from('drivers').insert([payload]).select('id').single();
+          error = res.error;
+          savedId = res.data?.id;
+        }
+        if (!error && payload.vehicle_id && savedId) {
+          await supabase.from('drivers').update({ vehicle_id: null })
+            .eq('vehicle_id', payload.vehicle_id).neq('id', savedId);
         }
       } else if (activeTab === 'allotments') {
         if (!formData.student_id) {
@@ -254,17 +327,26 @@ export default function TransportManagement() {
         }
         const payload = {
           student_id: formData.student_id,
-          route_id: formData.route_id,
-          vehicle_id: formData.vehicle_id,
+          route_id: formData.route_id || null,
+          // The bus follows the route unless one was picked explicitly.
+          vehicle_id: formData.vehicle_id
+            || routes.find(r => r.id === formData.route_id)?.vehicle_id
+            || null,
           boarding_point: formData.boarding_point,
-          pickup_time: formData.pickup_time
+          pickup_time: formData.pickup_time,
+          drop_time: formData.drop_time || null
         };
-        if (editingItem) {
-          await supabase.from('student_transport').update(payload).eq('id', editingItem.id);
-        } else {
-          await supabase.from('student_transport').insert([payload]);
+        ({ error } = editingItem
+          ? await supabase.from('student_transport').update(payload).eq('id', editingItem.id)
+          : await supabase.from('student_transport').insert([payload]));
+
+        // student_transport_student_unique — one allotment per student.
+        if (error && /duplicate key|unique/i.test(error.message)) {
+          throw new Error('That student already has a transport allotment. Edit the existing one instead.');
         }
       }
+
+      if (error) throw error;
 
       toast.success(editingItem ? 'Registry modified successfully!' : 'New entity registered under Fleet Registry!');
       setShowAddModal(false);
@@ -294,15 +376,10 @@ export default function TransportManagement() {
   };
 
   const handleBulkDelete = async () => {
-    if (!window.confirm(`Are you sure you want to delete these ${selectedItems.length} selected fleet records?`)) return;
-    
-    try {
-      const table = 
-        activeTab === 'routes' ? 'transport_routes' :
-        activeTab === 'vehicles' ? 'vehicles' :
-        activeTab === 'drivers' ? 'drivers' : 'student_transport';
+    if (!confirmRetire(selectedItems)) return;
 
-      const { error } = await supabase.from(table).delete().in('id', selectedItems);
+    try {
+      const { error } = await supabase.from(TABLE_FOR_TAB[activeTab]).delete().in('id', selectedItems);
       if (error) throw error;
 
       setSelectedItems([]);
@@ -313,19 +390,90 @@ export default function TransportManagement() {
     }
   };
 
-  // Export action
+  // Export action — real CSV of whichever tab is active, built from the same
+  // filtered rows already on screen. This used to be a 1-second fake spinner
+  // that announced a download and produced no file.
   const handleExport = () => {
-    toast.promise(new Promise(resolve => setTimeout(resolve, 1000)), {
-      loading: 'Compiling transit rosters...',
-      success: 'Roster saved to local download stream!',
-      error: 'Export failed'
-    });
+    const q = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    let header = '';
+    let rows: string[] = [];
+    let filename = '';
+
+    if (activeTab === 'routes') {
+      header = 'Route,Start Point,End Point,Stops,Fare,Vehicle,Driver,Students\n';
+      rows = filteredRoutes.map(r => {
+        const v = vehicles.find(x => x.id === r.vehicle_id);
+        return [r.name, r.start_point, r.end_point, r.stops_count, r.fare_amount,
+          v?.vehicle_no || '', driverForVehicle(r.vehicle_id)?.name || '', ridersOnRoute(r.id)].map(q).join(',');
+      });
+      filename = 'Transit_Routes';
+    } else if (activeTab === 'vehicles') {
+      header = 'Vehicle No,Model,Capacity,Allotted,Status,GPS Device,Registration Expiry,Insurance Expiry,Last Service\n';
+      rows = filteredVehicles.map(v => [v.vehicle_no, v.model, v.capacity, ridersOnVehicle(v.id),
+        v.status, v.gps_device_id, v.registration_expiry, v.insurance_expiry, v.last_service_date].map(q).join(','));
+      filename = 'Fleet_Vehicles';
+    } else if (activeTab === 'drivers') {
+      header = 'Driver,License No,License Expiry,Phone,Address,Experience (yrs),Assigned Vehicle,Duty Status\n';
+      rows = filteredDrivers.map(d => [d.name, d.license_no, d.license_expiry, d.phone, d.address,
+        d.experience_years, vehicles.find(v => v.id === d.vehicle_id)?.vehicle_no || '', d.status].map(q).join(','));
+      filename = 'Certified_Drivers';
+    } else {
+      header = 'Student,Class,Route,Vehicle,Driver,Boarding Point,Pick-Up,Drop\n';
+      rows = filteredAllotments.map(a => [a.student_name, a.student_class,
+        routes.find(r => r.id === a.route_id)?.name || '',
+        vehicles.find(v => v.id === a.vehicle_id)?.vehicle_no || '',
+        driverForVehicle(a.vehicle_id)?.name || '',
+        a.boarding_point, a.pickup_time, a.drop_time].map(q).join(','));
+      filename = 'Transit_Allotments';
+    }
+
+    const blob = new Blob([header + rows.join('\n')], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `${filename}_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    toast.success('Export downloaded.');
   };
 
   // Print Action
   const handlePrint = () => {
     window.print();
   };
+
+  // A route's crew is derived, never stored twice: the route names the bus,
+  // and the driver is whoever is assigned to that bus.
+  const driverForVehicle = (vehicleId: string) =>
+    vehicleId ? drivers.find(d => d.vehicle_id === vehicleId) : undefined;
+
+  const ridersOnVehicle = (vehicleId: string) =>
+    allotments.filter(a => a.vehicle_id === vehicleId).length;
+
+  const ridersOnRoute = (routeId: string) =>
+    allotments.filter(a => a.route_id === routeId).length;
+
+  // Documents about to lapse, across both the fleet and the driver roster.
+  const expiringSoon = useMemo(() => {
+    const near = (d?: string) => {
+      const n = daysUntil(d);
+      return n !== null && n <= EXPIRY_WARNING_DAYS;
+    };
+    return [
+      ...vehicles.filter(v => near(v.insurance_expiry) || near(v.registration_expiry)),
+      ...drivers.filter(d => near(d.license_expiry))
+    ];
+  }, [vehicles, drivers]);
+
+  // A student can hold only one allotment (student_transport_student_unique),
+  // so the picker offers the unallotted — plus whoever is being edited.
+  const selectableStudents = useMemo(() => {
+    const taken = new Set(allotments.map(a => a.student_id));
+    if (editingItem?.student_id) taken.delete(editingItem.student_id);
+    return students.filter(s => !taken.has(s.id));
+  }, [students, allotments, editingItem]);
 
   // Filtered lists for rendering
   const filteredRoutes = useMemo(() => {
@@ -337,11 +485,12 @@ export default function TransportManagement() {
   }, [routes, searchQuery]);
 
   const filteredVehicles = useMemo(() => {
-    return vehicles.filter(v => 
-      v.vehicle_no.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      v.model.toLowerCase().includes(searchQuery.toLowerCase())
+    const q = searchQuery.toLowerCase();
+    return vehicles.filter(v =>
+      (v.vehicle_no.toLowerCase().includes(q) || v.model.toLowerCase().includes(q)) &&
+      (statusFilter === 'all' || v.status === statusFilter)
     );
-  }, [vehicles, searchQuery]);
+  }, [vehicles, searchQuery, statusFilter]);
 
   const filteredDrivers = useMemo(() => {
     return drivers.filter(d => 
@@ -397,33 +546,51 @@ export default function TransportManagement() {
         }
       />
 
+      {/* Load failure — previously recorded in state but never shown, so a
+          broken query looked exactly like an empty fleet. */}
+      {errorState && (
+        <div className="flex items-start gap-3 bg-rose-50 border border-rose-100 text-rose-700 rounded-2xl px-4 py-3">
+          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+          <div className="flex-1">
+            <p className="text-xs font-bold">Fleet records could not be loaded</p>
+            <p className="text-[11px] font-medium text-rose-600/80 mt-0.5">{errorState}</p>
+          </div>
+          <button
+            onClick={loadData}
+            className="px-3 py-1 bg-white border border-rose-200 rounded-lg text-[10px] font-black uppercase tracking-wider hover:bg-rose-600 hover:text-white transition-all"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* 2. Summary KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <AdminStatCard
           label="Registered Routes"
           value={routes.length}
-          subtext="Coverage sectors"
+          subtext={`${routes.reduce((a, r) => a + r.stops_count, 0)} stops covered`}
           icon={MapPin}
           variant="emerald"
         />
         <AdminStatCard
-          label="Fleet Vehicles"
-          value={vehicles.length}
-          subtext="Active school buses/vans"
+          label="Fleet On Road"
+          value={vehicles.filter(v => v.status === 'Active').length}
+          subtext={`${vehicles.filter(v => v.status !== 'Active').length} off road of ${vehicles.length} total`}
           icon={Bus}
           variant="primary"
         />
         <AdminStatCard
           label="Transit Allotments"
           value={allotments.length}
-          subtext="Enrolled students"
+          subtext={`${vehicles.reduce((a, v) => a + v.capacity, 0)} seats in fleet`}
           icon={User}
           variant="violet"
         />
         <AdminStatCard
-          label="Driver Compliance"
-          value={drivers.filter(d => d.status === 'On-Duty').length}
-          subtext="Staff on-duty active"
+          label="Papers Expiring"
+          value={expiringSoon.length}
+          subtext={`Within ${EXPIRY_WARNING_DAYS} days — licences & insurance`}
           icon={ShieldCheck}
           variant="rose"
         />
@@ -479,6 +646,19 @@ export default function TransportManagement() {
           </div>
 
           {/* Conditional filter dropdowns */}
+          {activeTab === 'vehicles' && (
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs font-semibold text-slate-600 outline-none h-[38px] cursor-pointer"
+            >
+              <option value="all">All Fleet States</option>
+              <option value="Active">Active</option>
+              <option value="Maintenance">Maintenance</option>
+              <option value="Retired">Retired</option>
+            </select>
+          )}
+
           {activeTab === 'drivers' && (
             <select
               value={statusFilter}
@@ -560,39 +740,60 @@ export default function TransportManagement() {
                     </th>
                     <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Route Sector</th>
                     <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Starting Point</th>
-                    <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Terminal Point</th>
-                    <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Stops Count</th>
+                    <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Assigned Crew</th>
+                    <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Stops</th>
+                    <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Riders</th>
                     <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Route Fare</th>
                     <th className="py-4 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100/60 text-xs">
-                  {filteredRoutes.map((route) => (
+                  {filteredRoutes.map((route) => {
+                    const bus = vehicles.find(v => v.id === route.vehicle_id);
+                    const driver = driverForVehicle(route.vehicle_id);
+                    return (
                     <tr key={route.id} className="hover:bg-slate-50/40 transition-colors">
                       <td className="py-4 px-6">
-                        <input 
+                        <input
                           type="checkbox"
                           checked={selectedItems.includes(route.id)}
                           onChange={() => handleToggleSelectOne(route.id)}
                           className="rounded text-violet-600 focus:ring-violet-500 w-4 h-4"
                         />
                       </td>
-                      <td className="py-4 px-4 font-bold text-slate-900 flex items-center gap-2">
-                        <Bus className="w-4 h-4 text-violet-500 shrink-0" />
-                        {route.name}
+                      <td className="py-4 px-4 font-bold text-slate-900">
+                        <div className="flex items-center gap-2">
+                          <Bus className="w-4 h-4 text-violet-500 shrink-0" />
+                          {route.name}
+                        </div>
                       </td>
-                      <td className="py-4 px-4 font-semibold text-slate-500">{route.start_point}</td>
-                      <td className="py-4 px-4 font-semibold text-slate-500">{route.end_point}</td>
-                      <td className="py-4 px-4 text-center font-bold text-slate-600 bg-slate-50/60 rounded-md w-12 mx-auto">{route.stops_count} stops</td>
+                      <td className="py-4 px-4 font-semibold text-slate-500">
+                        {route.start_point}
+                        <span className="block text-[10px] text-slate-400 font-medium">to {route.end_point}</span>
+                      </td>
+                      <td className="py-4 px-4">
+                        {bus ? (
+                          <>
+                            <span className="font-mono font-bold text-violet-600">{bus.vehicle_no}</span>
+                            <span className="block text-[10px] font-semibold text-slate-500">
+                              {driver ? driver.name : <span className="text-amber-600">No driver assigned</span>}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">Unassigned</span>
+                        )}
+                      </td>
+                      <td className="py-4 px-4 text-center font-bold text-slate-600">{route.stops_count}</td>
+                      <td className="py-4 px-4 text-center font-bold text-slate-600">{ridersOnRoute(route.id)}</td>
                       <td className="py-4 px-4 text-right font-mono font-extrabold text-emerald-600">₹{route.fare_amount.toLocaleString()} <span className="text-[9px] text-slate-400 font-normal">/mo</span></td>
                       <td className="py-4 px-6 text-right space-x-1 whitespace-nowrap">
-                        <button 
+                        <button
                           onClick={() => handleOpenEdit(route)}
                           className="p-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-500 hover:text-violet-600 rounded-lg transition-all"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
-                        <button 
+                        <button
                           onClick={() => handleDelete(route.id)}
                           className="p-1.5 bg-white hover:bg-rose-50 border border-slate-200 text-slate-400 hover:text-rose-600 rounded-lg transition-all"
                         >
@@ -600,7 +801,8 @@ export default function TransportManagement() {
                         </button>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </motion.table>
             )}
@@ -625,47 +827,92 @@ export default function TransportManagement() {
                       />
                     </th>
                     <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Vehicle Registration</th>
-                    <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Model / Description</th>
-                    <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Passenger Capacity</th>
-                    <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">GPS Tracking State</th>
-                    <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Insurance Expiry</th>
+                    <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Model / Driver</th>
+                    <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Seat Occupancy</th>
+                    <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Fleet State</th>
+                    <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Insurance / Registration</th>
                     <th className="py-4 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100/60 text-xs">
-                  {filteredVehicles.map((v) => (
+                  {filteredVehicles.map((v) => {
+                    const driver = driverForVehicle(v.id);
+                    const riders = ridersOnVehicle(v.id);
+                    const insuranceIn = daysUntil(v.insurance_expiry);
+                    const regIn = daysUntil(v.registration_expiry);
+                    return (
                     <tr key={v.id} className="hover:bg-slate-50/40 transition-colors">
                       <td className="py-4 px-6">
-                        <input 
+                        <input
                           type="checkbox"
                           checked={selectedItems.includes(v.id)}
                           onChange={() => handleToggleSelectOne(v.id)}
                           className="rounded text-violet-600 focus:ring-violet-500 w-4 h-4"
                         />
                       </td>
-                      <td className="py-4 px-4 font-mono font-bold text-violet-600 uppercase tracking-wider">{v.vehicle_no}</td>
-                      <td className="py-4 px-4 font-bold text-slate-800">{v.model}</td>
-                      <td className="py-4 px-4 text-center font-semibold text-slate-500">{v.capacity} Seater</td>
-                      <td className="py-4 px-4 text-center">
-                        <span className={cn(
-                          "px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border flex items-center justify-center gap-1 w-20 mx-auto",
-                          v.gps_status === 'Online' 
-                            ? "bg-emerald-50 text-emerald-600 border-emerald-100" 
-                            : "bg-rose-50 text-rose-600 border-rose-100"
-                        )}>
-                          <span className={cn("w-1.5 h-1.5 rounded-full", v.gps_status === 'Online' ? "bg-emerald-500 animate-pulse" : "bg-rose-500")} />
-                          {v.gps_status}
+                      <td className="py-4 px-4 font-mono font-bold text-violet-600 uppercase tracking-wider">
+                        {v.vehicle_no}
+                        {v.gps_device_id && (
+                          <span className="block text-[9px] text-slate-400 font-medium normal-case tracking-normal">{v.gps_device_id}</span>
+                        )}
+                      </td>
+                      <td className="py-4 px-4 font-bold text-slate-800">
+                        {v.model}
+                        <span className="block text-[10px] font-semibold text-slate-500">
+                          {driver ? driver.name : <span className="text-amber-600">No driver assigned</span>}
                         </span>
                       </td>
-                      <td className="py-4 px-4 text-center font-mono text-slate-500">{v.insurance_expiry}</td>
+                      <td className="py-4 px-4 text-center">
+                        <span className={cn(
+                          "font-bold",
+                          riders > v.capacity ? "text-rose-600" : "text-slate-600"
+                        )}>
+                          {riders} / {v.capacity}
+                        </span>
+                        <span className="block text-[9px] text-slate-400 mt-0.5">
+                          {riders > v.capacity ? `${riders - v.capacity} over capacity` : `${v.capacity - riders} seats free`}
+                        </span>
+                      </td>
+                      <td className="py-4 px-4 text-center">
+                        <span className={cn(
+                          "px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border inline-flex items-center justify-center gap-1",
+                          v.status === 'Active' ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
+                          v.status === 'Maintenance' ? "bg-amber-50 text-amber-600 border-amber-100" :
+                          "bg-slate-100 text-slate-500 border-slate-200"
+                        )}>
+                          <span className={cn(
+                            "w-1.5 h-1.5 rounded-full",
+                            v.status === 'Active' ? "bg-emerald-500 animate-pulse" :
+                            v.status === 'Maintenance' ? "bg-amber-500" : "bg-slate-400"
+                          )} />
+                          {v.status}
+                        </span>
+                      </td>
+                      <td className="py-4 px-4 text-center font-mono text-[11px]">
+                        <span className={cn(
+                          "font-bold",
+                          insuranceIn === null ? "text-slate-300" :
+                          insuranceIn < 0 ? "text-rose-600" :
+                          insuranceIn <= EXPIRY_WARNING_DAYS ? "text-amber-600" : "text-slate-500"
+                        )}>
+                          {v.insurance_expiry || 'Not on file'}
+                          {insuranceIn !== null && insuranceIn < 0 && ' · lapsed'}
+                        </span>
+                        <span className={cn(
+                          "block text-[10px]",
+                          regIn !== null && regIn < 0 ? "text-rose-500" : "text-slate-400"
+                        )}>
+                          Reg: {v.registration_expiry || 'Not on file'}
+                        </span>
+                      </td>
                       <td className="py-4 px-6 text-right space-x-1 whitespace-nowrap">
-                        <button 
+                        <button
                           onClick={() => handleOpenEdit(v)}
                           className="p-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-500 hover:text-violet-600 rounded-lg transition-all"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
-                        <button 
+                        <button
                           onClick={() => handleDelete(v.id)}
                           className="p-1.5 bg-white hover:bg-rose-50 border border-slate-200 text-slate-400 hover:text-rose-600 rounded-lg transition-all"
                         >
@@ -673,7 +920,8 @@ export default function TransportManagement() {
                         </button>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </motion.table>
             )}
@@ -698,47 +946,84 @@ export default function TransportManagement() {
                       />
                     </th>
                     <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Driver Name</th>
-                    <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">License Serial</th>
-                    <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Mobile Contacts</th>
+                    <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Licence / Validity</th>
+                    <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Mobile Contact</th>
+                    <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Assigned Bus</th>
                     <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Duty Status</th>
                     <th className="py-4 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100/60 text-xs">
-                  {filteredDrivers.map((driver) => (
+                  {filteredDrivers.map((driver) => {
+                    const bus = vehicles.find(v => v.id === driver.vehicle_id);
+                    const route = routes.find(r => r.vehicle_id === driver.vehicle_id);
+                    const licenceIn = daysUntil(driver.license_expiry);
+                    return (
                     <tr key={driver.id} className="hover:bg-slate-50/40 transition-colors">
                       <td className="py-4 px-6">
-                        <input 
+                        <input
                           type="checkbox"
                           checked={selectedItems.includes(driver.id)}
                           onChange={() => handleToggleSelectOne(driver.id)}
                           className="rounded text-violet-600 focus:ring-violet-500 w-4 h-4"
                         />
                       </td>
-                      <td className="py-4 px-4 font-bold text-slate-900 flex items-center gap-2">
-                        <User className="w-4 h-4 text-slate-400 shrink-0" />
-                        {driver.name}
+                      <td className="py-4 px-4 font-bold text-slate-900">
+                        <div className="flex items-center gap-2">
+                          <User className="w-4 h-4 text-slate-400 shrink-0" />
+                          <div>
+                            {driver.name}
+                            <span className="block text-[10px] font-medium text-slate-400">
+                              {driver.experience_years > 0 ? `${driver.experience_years} yrs experience` : 'Experience not on file'}
+                              {driver.address ? ` · ${driver.address}` : ''}
+                            </span>
+                          </div>
+                        </div>
                       </td>
-                      <td className="py-4 px-4 font-mono text-slate-500 bg-slate-50 px-2 py-0.5 rounded-lg w-fit">{driver.license_no}</td>
+                      <td className="py-4 px-4">
+                        <span className="font-mono text-slate-500">{driver.license_no}</span>
+                        <span className={cn(
+                          "block text-[10px] font-bold",
+                          licenceIn === null ? "text-slate-300" :
+                          licenceIn < 0 ? "text-rose-600" :
+                          licenceIn <= EXPIRY_WARNING_DAYS ? "text-amber-600" : "text-slate-400"
+                        )}>
+                          {driver.license_expiry
+                            ? licenceIn !== null && licenceIn < 0
+                              ? `Expired ${driver.license_expiry}`
+                              : `Valid to ${driver.license_expiry}`
+                            : 'Expiry not on file'}
+                        </span>
+                      </td>
                       <td className="py-4 px-4 text-center font-mono font-semibold text-slate-600">{driver.phone}</td>
+                      <td className="py-4 px-4">
+                        {bus ? (
+                          <>
+                            <span className="font-mono font-bold text-violet-600">{bus.vehicle_no}</span>
+                            <span className="block text-[10px] font-medium text-slate-400">{route?.name || 'No route assigned'}</span>
+                          </>
+                        ) : (
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Unassigned</span>
+                        )}
+                      </td>
                       <td className="py-4 px-4 text-center">
                         <span className={cn(
                           "px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border",
-                          driver.status === 'On-Duty' 
-                            ? "bg-emerald-50 text-emerald-600 border-emerald-100" 
+                          driver.status === 'On-Duty'
+                            ? "bg-emerald-50 text-emerald-600 border-emerald-100"
                             : "bg-rose-50 text-rose-600 border-rose-100"
                         )}>
                           {driver.status}
                         </span>
                       </td>
                       <td className="py-4 px-6 text-right space-x-1 whitespace-nowrap">
-                        <button 
+                        <button
                           onClick={() => handleOpenEdit(driver)}
                           className="p-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-500 hover:text-violet-600 rounded-lg transition-all"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
-                        <button 
+                        <button
                           onClick={() => handleDelete(driver.id)}
                           className="p-1.5 bg-white hover:bg-rose-50 border border-slate-200 text-slate-400 hover:text-rose-600 rounded-lg transition-all"
                         >
@@ -746,7 +1031,8 @@ export default function TransportManagement() {
                         </button>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </motion.table>
             )}
@@ -773,9 +1059,9 @@ export default function TransportManagement() {
                     <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Enrolled Student</th>
                     <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Class / Div</th>
                     <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Allotted Route Sector</th>
-                    <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Allotted Fleet Vehicle</th>
+                    <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Vehicle / Driver</th>
                     <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Boarding Point Stop</th>
-                    <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Pick-Up Time</th>
+                    <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Pick-Up / Drop</th>
                     <th className="py-4 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
                   </tr>
                 </thead>
@@ -795,11 +1081,21 @@ export default function TransportManagement() {
                         </td>
                         <td className="py-4 px-4 font-bold text-slate-900">{a.student_name}</td>
                         <td className="py-4 px-4 font-semibold text-slate-500">{a.student_class}</td>
-                        <td className="py-4 px-4 font-semibold text-violet-600">{r?.name || 'Central Roster'}</td>
-                        <td className="py-4 px-4 font-mono font-bold text-slate-500">{v?.vehicle_no || 'Central Bus'}</td>
+                        <td className="py-4 px-4 font-semibold text-violet-600">{r?.name || 'Unassigned'}</td>
+                        <td className="py-4 px-4">
+                          <span className="font-mono font-bold text-slate-500">{v?.vehicle_no || 'Unassigned'}</span>
+                          <span className="block text-[10px] font-medium text-slate-400">
+                            {driverForVehicle(a.vehicle_id)?.name || 'No driver'}
+                          </span>
+                        </td>
                         <td className="py-4 px-4 text-center font-bold text-slate-600">{a.boarding_point}</td>
-                        <td className="py-4 px-4 text-center font-mono text-emerald-600 font-extrabold flex items-center justify-center gap-1">
-                          <Clock size={11} /> {a.pickup_time}
+                        <td className="py-4 px-4 text-center">
+                          <span className="font-mono text-emerald-600 font-extrabold inline-flex items-center gap-1">
+                            <Clock size={11} /> {a.pickup_time}
+                          </span>
+                          <span className="block text-[10px] font-mono font-bold text-slate-400 mt-0.5">
+                            {a.drop_time ? `Drop ${a.drop_time}` : 'Drop not set'}
+                          </span>
                         </td>
                         <td className="py-4 px-6 text-right space-x-1 whitespace-nowrap">
                           <button 
@@ -925,14 +1221,35 @@ export default function TransportManagement() {
                       </div>
                       <div className="space-y-1">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider pl-1">Route Fare (₹)</label>
-                        <input 
-                          type="number" 
+                        <input
+                          type="number"
                           required
                           value={formData.fare_amount || 0}
                           onChange={(e) => setFormData({ ...formData, fare_amount: parseFloat(e.target.value) })}
                           className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs text-slate-800 focus:ring-2 focus:ring-violet-500/20 h-[36px] outline-none"
                         />
                       </div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider pl-1">Bus Serving This Route</label>
+                      <select
+                        value={formData.vehicle_id || ''}
+                        onChange={(e) => setFormData({ ...formData, vehicle_id: e.target.value })}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs text-slate-800 focus:ring-2 focus:ring-violet-500/20 h-[36px] outline-none"
+                      >
+                        <option value="">Not assigned yet...</option>
+                        {vehicles.map(v => (
+                          <option key={v.id} value={v.id}>
+                            {v.vehicle_no} — {v.model} ({v.capacity} seats)
+                          </option>
+                        ))}
+                      </select>
+                      {/* The crew follows the bus, so naming it here names the driver too. */}
+                      <p className="text-[10px] text-slate-400 font-medium pl-1">
+                        {formData.vehicle_id
+                          ? `Driver on this bus: ${driverForVehicle(formData.vehicle_id)?.name || 'none assigned yet'}`
+                          : 'The route’s driver is whoever is assigned to the bus you pick.'}
+                      </p>
                     </div>
                   </div>
                 )}
@@ -966,21 +1283,67 @@ export default function TransportManagement() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider pl-1">Passenger Capacity</label>
-                        <input 
-                          type="number" 
+                        <input
+                          type="number"
                           required
+                          min={1}
                           value={formData.capacity || 20}
                           onChange={(e) => setFormData({ ...formData, capacity: parseInt(e.target.value) })}
                           className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs text-slate-800 focus:ring-2 focus:ring-violet-500/20 h-[36px] outline-none"
                         />
                       </div>
                       <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider pl-1">Fleet State</label>
+                        <select
+                          value={formData.status || 'Active'}
+                          onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs text-slate-800 focus:ring-2 focus:ring-violet-500/20 h-[36px] outline-none"
+                        >
+                          <option value="Active">Active — on road</option>
+                          <option value="Maintenance">Maintenance — off road</option>
+                          <option value="Retired">Retired — out of service</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      {/* Insurance and registration lapse on different dates; the
+                          page used to store one and label it the other. */}
+                      <div className="space-y-1">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider pl-1">Insurance Expiry Date</label>
-                        <input 
-                          type="date" 
-                          required
+                        <input
+                          type="date"
                           value={formData.insurance_expiry || ''}
                           onChange={(e) => setFormData({ ...formData, insurance_expiry: e.target.value })}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs text-slate-800 focus:ring-2 focus:ring-violet-500/20 h-[36px] outline-none"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider pl-1">Registration Expiry Date</label>
+                        <input
+                          type="date"
+                          value={formData.registration_expiry || ''}
+                          onChange={(e) => setFormData({ ...formData, registration_expiry: e.target.value })}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs text-slate-800 focus:ring-2 focus:ring-violet-500/20 h-[36px] outline-none"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider pl-1">Last Serviced On</label>
+                        <input
+                          type="date"
+                          value={formData.last_service_date || ''}
+                          onChange={(e) => setFormData({ ...formData, last_service_date: e.target.value })}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs text-slate-800 focus:ring-2 focus:ring-violet-500/20 h-[36px] outline-none"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider pl-1">GPS Device ID</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. GPS-TRK-1080"
+                          value={formData.gps_device_id || ''}
+                          onChange={(e) => setFormData({ ...formData, gps_device_id: e.target.value })}
                           className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs text-slate-800 focus:ring-2 focus:ring-violet-500/20 h-[36px] outline-none"
                         />
                       </div>
@@ -1014,15 +1377,80 @@ export default function TransportManagement() {
                         />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider pl-1">Mobile Contacts</label>
-                        <input 
-                          type="text" 
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider pl-1">Licence Valid Until</label>
+                        <input
+                          type="date"
+                          value={formData.license_expiry || ''}
+                          onChange={(e) => setFormData({ ...formData, license_expiry: e.target.value })}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs text-slate-800 focus:ring-2 focus:ring-violet-500/20 h-[36px] outline-none"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider pl-1">Mobile Number</label>
+                        <input
+                          type="tel"
                           required
-                          placeholder="e.g. +91 94500..."
+                          inputMode="tel"
+                          placeholder="e.g. 9450881215"
                           value={formData.phone || ''}
                           onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                           className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs text-slate-800 focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 outline-none transition-all h-[36px]"
                         />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider pl-1">Years of Experience</label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={formData.experience_years ?? 0}
+                          onChange={(e) => setFormData({ ...formData, experience_years: parseInt(e.target.value) })}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs text-slate-800 focus:ring-2 focus:ring-violet-500/20 h-[36px] outline-none"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider pl-1">Residential Address</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Gola Bazar, Gorakhpur"
+                        value={formData.address || ''}
+                        onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs text-slate-800 focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 outline-none transition-all h-[36px]"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider pl-1">Assigned Bus</label>
+                        <select
+                          value={formData.vehicle_id || ''}
+                          onChange={(e) => setFormData({ ...formData, vehicle_id: e.target.value })}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs text-slate-800 focus:ring-2 focus:ring-violet-500/20 h-[36px] outline-none"
+                        >
+                          <option value="">Not assigned yet...</option>
+                          {vehicles.map(v => {
+                            const held = drivers.find(d => d.vehicle_id === v.id && d.id !== editingItem?.id);
+                            return (
+                              <option key={v.id} value={v.id}>
+                                {v.vehicle_no}{held ? ` — reassign from ${held.name}` : ''}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </div>
+                      <div className="space-y-1">
+                        {/* The status column existed and drove the roster badge and
+                            filter, but no control ever set it. */}
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider pl-1">Duty Status</label>
+                        <select
+                          value={formData.status || 'On-Duty'}
+                          onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs text-slate-800 focus:ring-2 focus:ring-violet-500/20 h-[36px] outline-none"
+                        >
+                          <option value="On-Duty">On-Duty</option>
+                          <option value="On-Leave">On-Leave</option>
+                        </select>
                       </div>
                     </div>
                   </div>
@@ -1039,39 +1467,75 @@ export default function TransportManagement() {
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs text-slate-800 focus:ring-2 focus:ring-violet-500/20 h-[36px] outline-none"
                       >
                         <option value="">Select Student...</option>
-                        {students.map(s => (
+                        {selectableStudents.map(s => (
                           <option key={s.id} value={s.id}>{s.name} — Class {s.class}{s.section ? `-${s.section}` : ''}</option>
                         ))}
                       </select>
+                      {/* One allotment per student, so those already on a bus are
+                          not offered again — editing reaches them instead. */}
+                      <p className="text-[10px] text-slate-400 font-medium pl-1">
+                        {selectableStudents.length} of {students.length} students are not yet allotted transport.
+                      </p>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider pl-1">Allotted Route</label>
-                        <select 
-                          value={formData.route_id || ''} 
-                          onChange={(e) => setFormData({ ...formData, route_id: e.target.value })}
+                        <select
+                          value={formData.route_id || ''}
+                          onChange={(e) => {
+                            // Picking a route puts the child on that route's bus
+                            // unless the operator overrides it below.
+                            const route = routes.find(r => r.id === e.target.value);
+                            setFormData({ ...formData, route_id: e.target.value, vehicle_id: route?.vehicle_id || '' });
+                          }}
                           className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs text-slate-800 focus:ring-2 focus:ring-violet-500/20 h-[36px] outline-none"
                         >
                           <option value="">Select Route...</option>
                           {routes.map(r => (
-                            <option key={r.id} value={r.id}>{r.name}</option>
+                            <option key={r.id} value={r.id}>{r.name} — ₹{r.fare_amount.toLocaleString()}/mo</option>
                           ))}
                         </select>
                       </div>
                       <div className="space-y-1">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider pl-1">Allotted Vehicle</label>
-                        <select 
-                          value={formData.vehicle_id || ''} 
+                        <select
+                          value={formData.vehicle_id || ''}
                           onChange={(e) => setFormData({ ...formData, vehicle_id: e.target.value })}
                           className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs text-slate-800 focus:ring-2 focus:ring-violet-500/20 h-[36px] outline-none"
                         >
                           <option value="">Select Vehicle...</option>
-                          {vehicles.map(v => (
-                            <option key={v.id} value={v.id}>{v.vehicle_no}</option>
-                          ))}
+                          {vehicles.map(v => {
+                            const free = v.capacity - ridersOnVehicle(v.id);
+                            return (
+                              <option key={v.id} value={v.id}>
+                                {v.vehicle_no} — {free > 0 ? `${free} seats free` : 'full'}
+                              </option>
+                            );
+                          })}
                         </select>
                       </div>
                     </div>
+                    {formData.vehicle_id && (
+                      <p className="text-[11px] font-semibold text-slate-500 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5">
+                        Driver on this bus:{' '}
+                        <span className="font-black text-slate-700">
+                          {driverForVehicle(formData.vehicle_id)?.name || 'none assigned'}
+                        </span>
+                        {driverForVehicle(formData.vehicle_id)?.phone
+                          ? ` · ${driverForVehicle(formData.vehicle_id)?.phone}`
+                          : ''}
+                        {(() => {
+                          const bus = vehicles.find(v => v.id === formData.vehicle_id);
+                          if (!bus) return null;
+                          const free = bus.capacity - ridersOnVehicle(bus.id);
+                          return free <= 0 ? (
+                            <span className="block text-rose-600 mt-0.5">
+                              This bus is already at capacity ({bus.capacity} seats).
+                            </span>
+                          ) : null;
+                        })()}
+                      </p>
+                    )}
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider pl-1">Boarding Stop Point</label>
@@ -1086,8 +1550,8 @@ export default function TransportManagement() {
                       </div>
                       <div className="space-y-1">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider pl-1">Morning Pick-Up Time</label>
-                        <input 
-                          type="text" 
+                        <input
+                          type="text"
                           required
                           placeholder="e.g. 07:30 AM"
                           value={formData.pickup_time || ''}
@@ -1095,6 +1559,16 @@ export default function TransportManagement() {
                           className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs text-slate-800 focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 outline-none transition-all h-[36px]"
                         />
                       </div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider pl-1">Afternoon Drop Time</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 03:30 PM"
+                        value={formData.drop_time || ''}
+                        onChange={(e) => setFormData({ ...formData, drop_time: e.target.value })}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs text-slate-800 focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 outline-none transition-all h-[36px]"
+                      />
                     </div>
                   </div>
                 )}

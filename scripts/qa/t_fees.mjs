@@ -111,6 +111,47 @@ export default async function run() {
     return `${modes.length} modes, ${receipts.size} unique receipts`;
   });
 
+  await check('Fees/Collection', 'An instalment leaves the fee’s own discount and late fee alone', async () => {
+    // Migration 03b made the collect_fee concession parameters default to
+    // NULL so "not supplied" means "unchanged". The browser was still
+    // sending 0 for an untouched box, which reset a standing concession to
+    // zero on every payment and quietly re-billed the parent for it.
+    assert(student, 'no student');
+    // Its own fee head, so this ledger does not collide with the one the
+    // void test looks up by (student, category, year).
+    const cat = ok(await sb.from('fee_categories').insert({
+      category_name: uniq('ConcessionCat').slice(0, 40), frequency: 'Annual',
+      amount: 4000, is_active: true,
+    }).select().single(), 'insert fee_categories');
+    trashIt('fee_categories', cat.id);
+
+    const due = '2031-04-30';
+    const before = ok(await sb.from('student_fees').insert([{
+      student_id: student.id, fee_category_id: cat.id, academic_year_id: yr.id,
+      total_amount: 4000, discount_amount: 500, fine_amount: 100, due_date: due,
+    }]).select().single(), 'insert student_fees');
+    trashIt('student_fees', before.id);
+    assert(Number(before.net_amount) === 3600, `net should be 3600, got ${before.net_amount}`);
+
+    const res = ok(await sb.rpc('collect_fee', {
+      _student_id: student.id, _fee_category_id: cat.id, _amount: 1000,
+      _payment_mode: 'cash', _academic_year_id: yr.id, _due_date: due,
+      _payment_date: new Date().toISOString().slice(0, 10),
+      _total_amount: null, _discount_amount: null, _fine_amount: null,
+      _transaction_id: null, _remarks: 'QA concession retention',
+    }), 'rpc collect_fee without concessions');
+    const row = Array.isArray(res) ? res[0] : res;
+    trashIt('fee_payments', row.payment_id);
+
+    const after = ok(await sb.from('student_fees').select('*').eq('id', before.id).single(), 'reread');
+    assert(Number(after.discount_amount) === 500, `discount was reset to ${after.discount_amount}`);
+    assert(Number(after.fine_amount) === 100, `late fee was reset to ${after.fine_amount}`);
+    assert(Number(after.net_amount) === 3600, `net changed to ${after.net_amount}`);
+    assert(Number(after.amount_paid) === 1000, `amount_paid is ${after.amount_paid}`);
+    assert(Number(row.balance) === 2600, `balance should be 2600, got ${row.balance}`);
+    return 'discount 500 / fine 100 retained, balance 2600';
+  });
+
   // --- Page: Fees > Recent Transactions
   await check('Fees/Transactions', 'Load transactions (select fee_payments join)', async () => {
     const data = ok(await sb.from('fee_payments')
@@ -154,6 +195,32 @@ export default async function run() {
     const billed = data.reduce((a, x) => a + Number(x.net_amount || 0), 0);
     const collected = data.reduce((a, x) => a + Number(x.amount_paid || 0), 0);
     return `billed=${billed.toFixed(0)} collected=${collected.toFixed(0)} over ${data.length} ledgers`;
+  });
+
+  await check('Fees/Reports', 'Dashboard KPIs ignore voided receipts and do not fan out billing', async () => {
+    // The views used to read collections straight off fee_payments, so a
+    // voided receipt still counted as money in hand and a fee settled in
+    // instalments was billed once per instalment.
+    const ledgers = ok(await sb.from('student_fees').select('id, net_amount, amount_paid'), 'ledgers');
+    const billed = ledgers.reduce((a, x) => a + Number(x.net_amount || 0), 0);
+    const collected = ledgers.reduce((a, x) => a + Number(x.amount_paid || 0), 0);
+    const round = (n) => Number(Number(n).toFixed(2));
+
+    const view = ok(await sb.from('dashboard_fee_view').select('*'), 'dashboard_fee_view')[0];
+    assert(round(view.total_fee) === round(billed),
+      `dashboard_fee_view.total_fee ${view.total_fee} != ledger total ${round(billed)}`);
+    assert(round(view.total_collection) === round(collected),
+      `dashboard_fee_view.total_collection ${view.total_collection} != ledger total ${round(collected)} (voided receipts counted?)`);
+
+    const live = ok(await sb.from('fee_payments').select('id').is('voided_at', null), 'live receipts');
+    assert(Number(view.total_receipts) === live.length,
+      `total_receipts ${view.total_receipts} != ${live.length} non-voided receipts`);
+
+    const monthly = ok(await sb.from('dashboard_fee_monthly').select('*'), 'dashboard_fee_monthly');
+    const monthlyBilled = monthly.reduce((a, m) => a + Number(m.total_fee || 0), 0);
+    assert(round(monthlyBilled) === round(billed),
+      `dashboard_fee_monthly billed ${round(monthlyBilled)} != ${round(billed)} — join fan-out`);
+    return `billed=${round(billed)} collected=${round(collected)} receipts=${live.length}`;
   });
 
   await check('Fees/Reports', 'Load overdue report (select student_fees filtered)', async () => {

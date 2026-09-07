@@ -20,7 +20,9 @@ interface Message {
   sender: 'ai' | 'user';
   text: string;
   time: string;
+  imageUrl?: string;
   structuredData?: StructuredPayload[];
+  suggestedFollowUps?: string[];
 }
 
 export default function AIAssistant() {
@@ -31,11 +33,20 @@ export default function AIAssistant() {
       id: 'm1',
       sender: 'ai',
       text: "👋 Hello! I am **St. Joseph's School, Barhalganj’s AI Enterprise Assistant** (Powered by Google Gemini & Qoala Labs).\n\nI am connected to live ERP records. How can I assist you with your academic and administrative tasks today?",
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      suggestedFollowUps: [
+        "Show school executive summary",
+        "Predict at-risk students",
+        "Generate teacher substitution plan",
+        "Forecast 30-day fee cashflow"
+      ]
     }
   ]);
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const isStudent = role === 'student' || role === 'parent';
   const isTeacher = role === 'teacher' || role === 'class_teacher';
@@ -53,17 +64,20 @@ export default function AIAssistant() {
     }
     if (isTeacher) {
       return [
-        'Show my assigned classes, sections, and student roster.',
+        '🔮 Predict at-risk students based on low attendance and failing exam marks',
         'Who is absent in my assigned classes today?',
-        'Show my weekly teaching periods and classroom allocations.',
-        'Show pending examination mark entry tasks for my subjects.'
+        'Send SMS alert to parents of students who are absent today',
+        'Show my assigned classes, sections, and student roster.',
+        'Show my weekly teaching periods and classroom allocations.'
       ];
     }
     return [
+      '🔮 Predict at-risk students based on low attendance and failing exam marks',
+      '👥 Generate teacher substitution plan for absent faculty members today',
+      '💰 Forecast fee collection cashflow and recovery for the next 30 days',
       'Show the executive school KPI summary (strength, staff, attendance, admissions).',
       'Which students have pending tuition fees across classes?',
-      'Show today’s school-wide attendance overview and absentee count.',
-      'What is the current status of new admission applications?'
+      'Dispatch fee payment reminders to all overdue accounts'
     ];
   }, [isStudent, isTeacher]);
 
@@ -176,10 +190,88 @@ export default function AIAssistant() {
     }
   ];
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload an image file (PNG, JPG, WebP)');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('File size must be under 10MB');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setSelectedImage(reader.result as string);
+      toast.info('Document attached. Click Send to run Gemini Vision OCR.');
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
   const handleSendMessage = async (e?: React.FormEvent, directText?: string) => {
     if (e) e.preventDefault();
     const messageToSend = (directText || inputMessage).trim();
-    if (!messageToSend || isTyping) return;
+    if ((!messageToSend && !selectedImage) || isTyping || isAnalyzingImage) return;
+
+    if (selectedImage) {
+      const userMsg: Message = {
+        id: `user_${Date.now()}`,
+        sender: 'user',
+        text: messageToSend || 'Analyze uploaded document / marksheet.',
+        imageUrl: selectedImage,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+
+      setMessages(prev => [...prev, userMsg]);
+      const img = selectedImage;
+      setSelectedImage(null);
+      if (!directText) setInputMessage('');
+      setIsAnalyzingImage(true);
+
+      try {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (session?.access_token) {
+          headers['Authorization'] = `Bearer ${session.access_token}`;
+        }
+
+        const res = await fetch('/api/ai/vision/analyze', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            imageBase64: img,
+            documentType: messageToSend.toLowerCase().includes('medical') ? 'medical_leave' : 'handwritten_marks',
+            prompt: messageToSend || 'Analyze this document, extract student names, marks, dates, and provide actionable recommendations.'
+          })
+        });
+
+        const data = await res.json().catch(() => ({}));
+        const replyText = data.summary || "Document processed successfully.";
+
+        const aiMsg: Message = {
+          id: `ai_${Date.now()}`,
+          sender: 'ai',
+          text: replyText,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          suggestedFollowUps: [
+            "Record extracted marks into Examination register",
+            "Regularize medical leave on attendance roster",
+            "Send confirmation notification to parents"
+          ]
+        };
+
+        setMessages(prev => [...prev, aiMsg]);
+      } catch (err) {
+        toast.error('Failed to analyze image with Gemini Vision');
+      } finally {
+        setIsAnalyzingImage(false);
+      }
+      return;
+    }
 
     const userMsg: Message = {
       id: `user_${Date.now()}`,
@@ -222,7 +314,8 @@ export default function AIAssistant() {
         sender: 'ai',
         text: replyText,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        structuredData: data.structuredData
+        structuredData: data.structuredData,
+        suggestedFollowUps: data.suggestedFollowUps
       };
 
       setMessages(prev => [...prev, aiMsg]);
@@ -316,6 +409,17 @@ export default function AIAssistant() {
                         ? 'bg-violet-600 text-white rounded-tr-none' 
                         : 'bg-slate-50 text-slate-800 border border-slate-200/70 rounded-tl-none'
                     )}>
+                      {/* Image Attachment */}
+                      {msg.imageUrl && (
+                        <div className="mb-2 overflow-hidden rounded-xl border border-slate-200/80 bg-slate-900/5">
+                          <img 
+                            src={msg.imageUrl} 
+                            alt="Uploaded document" 
+                            className="max-h-48 w-auto rounded-lg object-contain"
+                          />
+                        </div>
+                      )}
+
                       <div className={cn("prose prose-xs max-w-none break-words", msg.sender === 'user' ? 'text-white' : 'text-slate-800')}>
                         <Markdown>{msg.text}</Markdown>
                       </div>
@@ -329,6 +433,28 @@ export default function AIAssistant() {
                         />
                       ))}
 
+                      {/* Dynamic Context-Aware Follow-up Chips */}
+                      {msg.sender === 'ai' && Array.isArray(msg.suggestedFollowUps) && msg.suggestedFollowUps.length > 0 && (
+                        <div className="mt-3 pt-2 border-t border-slate-200/80 space-y-1.5">
+                          <div className="flex items-center gap-1 text-[9.5px] font-extrabold uppercase text-slate-400">
+                            <MessageSquare size={10} className="text-violet-500" />
+                            <span>Suggested Next Questions:</span>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {msg.suggestedFollowUps.map((fu, fIdx) => (
+                              <button
+                                key={fIdx}
+                                onClick={() => handleSendMessage(undefined, fu)}
+                                disabled={isTyping}
+                                className="px-2.5 py-1 bg-white hover:bg-violet-50 hover:text-violet-700 hover:border-violet-300 text-slate-700 border border-slate-200 rounded-lg text-[10.5px] font-semibold transition-all cursor-pointer text-left disabled:opacity-50"
+                              >
+                                {fu}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                       <span className={cn(
                         "text-[8px] font-bold block mt-1.5 text-right",
                         msg.sender === 'user' ? 'text-violet-200' : 'text-slate-400'
@@ -339,31 +465,80 @@ export default function AIAssistant() {
                   </div>
                 ))}
 
-                {isTyping && (
+                {(isTyping || isAnalyzingImage) && (
                   <div className="flex gap-2 items-center text-slate-400 text-xs font-semibold pl-1">
-                    <Bot size={14} className="animate-bounce" />
-                    <span>Gemini is querying school ERP records...</span>
+                    <Bot size={14} className="animate-bounce text-violet-600" />
+                    <span>
+                      {isAnalyzingImage ? "Gemini Vision is analyzing uploaded document OCR..." : "Gemini is querying school ERP records..."}
+                    </span>
                   </div>
                 )}
               </div>
 
               {/* Input section */}
-              <form onSubmit={handleSendMessage} className="p-4 border-t border-slate-100 bg-slate-50/20 flex gap-2">
-                <input 
-                  type="text"
-                  placeholder="Ask anything about attendance, fees, exams, timetable, or students..."
-                  value={inputMessage}
-                  onChange={(e) => setInputMessage(e.target.value)}
-                  className="flex-1 bg-white border border-slate-200 rounded-xl py-2 px-3 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-violet-500/10 focus:border-violet-500 transition-all font-medium"
+              <div className="p-3 border-t border-slate-100 bg-slate-50/20">
+                {selectedImage && (
+                  <div className="mb-2 p-1.5 bg-violet-50 border border-violet-200 rounded-xl flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <img 
+                        src={selectedImage} 
+                        alt="Attachment preview" 
+                        className="w-8 h-8 rounded-lg object-cover border border-violet-300 shrink-0" 
+                      />
+                      <div className="min-w-0">
+                        <p className="text-[10.5px] font-bold text-violet-900 truncate">Document Image Attached</p>
+                        <p className="text-[9px] text-violet-600 font-medium">Ready for Gemini OCR analysis</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedImage(null)}
+                      className="p-1 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
+                      title="Remove attachment"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleFileSelect}
                 />
-                <button
-                  type="submit"
-                  disabled={!inputMessage.trim() || isTyping}
-                  className="p-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl transition-all cursor-pointer shadow-sm shadow-violet-500/10 disabled:opacity-40"
-                >
-                  <Send size={15} />
-                </button>
-              </form>
+
+                <form onSubmit={handleSendMessage} className="flex gap-2 items-center">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="p-2.5 bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 rounded-xl transition-all cursor-pointer shrink-0 shadow-2xs"
+                    title="Upload Document / Marks Sheet / Medical Certificate for OCR"
+                  >
+                    📎
+                  </button>
+                  <input 
+                    type="text"
+                    placeholder={
+                      selectedImage
+                        ? "Add prompt or click Send for OCR..."
+                        : "Ask anything about attendance, fees, exams, timetable, or students..."
+                    }
+                    value={inputMessage}
+                    onChange={(e) => setInputMessage(e.target.value)}
+                    disabled={isTyping || isAnalyzingImage}
+                    className="flex-1 bg-white border border-slate-200 rounded-xl py-2 px-3 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-violet-500/10 focus:border-violet-500 transition-all font-medium"
+                  />
+                  <button
+                    type="submit"
+                    disabled={(!inputMessage.trim() && !selectedImage) || isTyping || isAnalyzingImage}
+                    className="p-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl transition-all cursor-pointer shadow-sm shadow-violet-500/10 disabled:opacity-40"
+                  >
+                    <Send size={15} />
+                  </button>
+                </form>
+              </div>
             </div>
 
             {/* Right helpful recommendations panel */}

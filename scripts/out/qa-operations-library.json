@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-06T18:51:26.581Z",
-  "pass": 20,
+  "generatedAt": "2026-09-06T18:19:51.630Z",
+  "pass": 28,
   "fail": 0,
   "results": [
     {
@@ -9,7 +9,7 @@
       "action": "Add book (insert library_books)",
       "status": "PASS",
       "detail": "ok",
-      "ms": 177
+      "ms": 157
     },
     {
       "module": "Operations",
@@ -17,7 +17,7 @@
       "action": "Issue book (insert book_issues)",
       "status": "PASS",
       "detail": "ok",
-      "ms": 126
+      "ms": 266
     },
     {
       "module": "Operations",
@@ -25,7 +25,7 @@
       "action": "Edit + delete book (update/delete library_books)",
       "status": "PASS",
       "detail": "ok",
-      "ms": 136
+      "ms": 139
     },
     {
       "module": "Operations",
@@ -33,7 +33,7 @@
       "action": "Add route (insert transport_routes)",
       "status": "PASS",
       "detail": "ok",
-      "ms": 133
+      "ms": 139
     },
     {
       "module": "Operations",
@@ -41,7 +41,7 @@
       "action": "Add vehicle (insert vehicles)",
       "status": "PASS",
       "detail": "ok",
-      "ms": 132
+      "ms": 139
     },
     {
       "module": "Operations",
@@ -49,7 +49,7 @@
       "action": "Add driver (insert drivers)",
       "status": "PASS",
       "detail": "ok",
-      "ms": 121
+      "ms": 118
     },
     {
       "module": "Operations",
@@ -57,7 +57,7 @@
       "action": "Allot transport to student (insert student_transport)",
       "status": "PASS",
       "detail": "ok",
-      "ms": 254
+      "ms": 276
     },
     {
       "module": "Operations",
@@ -65,7 +65,7 @@
       "action": "Add asset (insert assets)",
       "status": "PASS",
       "detail": "ok",
-      "ms": 115
+      "ms": 145
     },
     {
       "module": "Operations",
@@ -73,23 +73,7 @@
       "action": "Add stock item (insert inventory)",
       "status": "PASS",
       "detail": "ok",
-      "ms": 117
-    },
-    {
-      "module": "Operations",
-      "page": "Inventory/Vendors",
-      "action": "Add + edit vendor (insert/update vendors)",
-      "status": "PASS",
-      "detail": "ok",
-      "ms": 259
-    },
-    {
-      "module": "Operations",
-      "page": "Inventory/Orders",
-      "action": "Raise purchase order — every status (insert/update purchase_orders)",
-      "status": "PASS",
-      "detail": "4 statuses",
-      "ms": 884
+      "ms": 291
     },
     {
       "module": "Operations",
@@ -97,7 +81,7 @@
       "action": "Add hostel (insert hostels)",
       "status": "PASS",
       "detail": "4 hostel types",
-      "ms": 806
+      "ms": 672
     },
     {
       "module": "Operations",
@@ -105,7 +89,7 @@
       "action": "Add room (insert rooms)",
       "status": "PASS",
       "detail": "ok",
-      "ms": 128
+      "ms": 147
     },
     {
       "module": "Operations",
@@ -113,7 +97,7 @@
       "action": "Publish notice (insert notices)",
       "status": "PASS",
       "detail": "ok",
-      "ms": 111
+      "ms": 139
     },
     {
       "module": "Operations",
@@ -121,7 +105,7 @@
       "action": "Send SMS campaign (insert sms_logs)",
       "status": "PASS",
       "detail": "ok",
-      "ms": 116
+      "ms": 127
     },
     {
       "module": "Operations",
@@ -129,7 +113,7 @@
       "action": "Send email broadcast (insert email_logs)",
       "status": "PASS",
       "detail": "ok",
-      "ms": 126
+      "ms": 140
     },
     {
       "module": "Operations",
@@ -137,7 +121,7 @@
       "action": "Schedule online class (insert online_classes)",
       "status": "PASS",
       "detail": "ok",
-      "ms": 131
+      "ms": 150
     },
     {
       "module": "Operations",
@@ -145,7 +129,7 @@
       "action": "Add calendar event (insert holidays)",
       "status": "PASS",
       "detail": "ok",
-      "ms": 132
+      "ms": 142
     },
     {
       "module": "Operations",
@@ -153,7 +137,7 @@
       "action": "Issue certificate (insert certificates)",
       "status": "PASS",
       "detail": "ok",
-      "ms": 115
+      "ms": 148
     },
     {
       "module": "Operations",
@@ -161,7 +145,87 @@
       "action": "Update visitor log status (update front_office_logs)",
       "status": "PASS",
       "detail": "ok",
+      "ms": 263
+    },
+    {
+      "module": "Library",
+      "page": "Library",
+      "action": "Page load reads catalog + ledger + roll",
+      "status": "PASS",
+      "detail": "26 books, 11 categories, 18 issues",
+      "ms": 269
+    },
+    {
+      "module": "Library",
+      "page": "Library/Books",
+      "action": "Add book with a brand new category",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 139
+    },
+    {
+      "module": "Library",
+      "page": "Library/Issues",
+      "action": "Issue book to a student decrements stock",
+      "status": "PASS",
+      "detail": "4 -> 3 available",
+      "ms": 523
+    },
+    {
+      "module": "Library",
+      "page": "Library/Issues",
+      "action": "Ledger resolves the borrower and the title",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 141
+    },
+    {
+      "module": "Library",
+      "page": "Library/Issues",
+      "action": "Overdue return raises a fine and restores stock",
+      "status": "PASS",
+      "detail": "₹20 fine, still unpaid",
+      "ms": 876
+    },
+    {
+      "module": "Library",
+      "page": "Library/Fines",
+      "action": "Collect settles the fine without touching the loan",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 267
+    },
+    {
+      "module": "Library",
+      "page": "Library/Categories",
+      "action": "Rename restamps every book in the category",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 388
+    },
+    {
+      "module": "Library",
+      "page": "Library/Categories",
+      "action": "Delete empties the category into General",
+      "status": "PASS",
+      "detail": "ok",
       "ms": 239
+    },
+    {
+      "module": "Library",
+      "page": "Library/Fines",
+      "action": "Waive clears the charge but keeps the loan",
+      "status": "PASS",
+      "detail": "ok",
+      "ms": 268
+    },
+    {
+      "module": "Library",
+      "page": "Library/Student360",
+      "action": "Student drawer finds the loans by student_id",
+      "status": "PASS",
+      "detail": "1 loans for Ritesh Ram",
+      "ms": 135
     }
   ]
 }

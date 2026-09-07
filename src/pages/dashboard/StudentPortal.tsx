@@ -47,7 +47,7 @@ import OfficialTimetableModal from '@/components/academics/OfficialTimetableModa
 import StudentSyllabusTab from '@/components/portal/StudentSyllabusTab';
 import StudentHomeworkTab from '@/components/portal/StudentHomeworkTab';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { cn } from '@/lib/utils';
+import { cn, formatFeeHeadName } from '@/lib/utils';
 import { toast } from 'sonner';
 
 type PortalTab = 'overview' | 'homework' | 'assignments' | 'syllabus' | 'attendance' | 'fees' | 'examination' | 'timetable' | 'transport' | 'personal';
@@ -78,8 +78,14 @@ interface RealAssignment {
 interface RealFeeItem {
   id: string;
   category_name: string;
+  /** Gross fee before any concession. Shown as a struck-through reference. */
+  gross_amount: number;
+  /** What is actually payable: gross + late fee - discount - scholarship. */
+  net_amount: number;
+  /** Kept as an alias of net_amount so existing callers stay correct. */
   total_amount: number;
   amount_paid: number;
+  remaining_amount: number;
   due_date: string;
   status: string;
   payments: Array<{
@@ -242,23 +248,42 @@ export default function StudentPortal() {
 
       // Process Fees
       if (studentFeesRes.data) {
-        const feesMapped: RealFeeItem[] = studentFeesRes.data.map(sf => ({
-          id: sf.id,
-          category_name: sf.fee_categories?.category_name || sf.fee_categories?.name || 'School Fee',
-          total_amount: Number(sf.total_amount || sf.net_amount || 0),
-          amount_paid: Number(sf.amount_paid || 0),
-          due_date: sf.due_date || '2026-08-31',
-          status: sf.status || (Number(sf.amount_paid) >= Number(sf.total_amount) ? 'paid' : 'pending'),
-          payments: (sf.fee_payments || []).map((p: any) => ({
-            id: p.id,
-            payment_date: p.payment_date,
-            amount_paid: Number(p.amount_paid),
-            payment_mode: p.payment_mode || 'UPI Online',
-            receipt_number: p.receipt_number || 'REC-2026',
-            transaction_id: p.transaction_id,
-            remarks: p.remarks
-          }))
-        }));
+        // Bill off net_amount, never total_amount. total_amount is the gross
+        // figure before discount, scholarship and late fee, so a student on a
+        // concession was shown more billed than was ever payable and the
+        // outstanding line never reached zero however much they paid.
+        const feesMapped: RealFeeItem[] = studentFeesRes.data.map(sf => {
+          const gross = Number(sf.total_amount || 0);
+          const net = Number(
+            sf.net_amount ??
+            (gross + Number(sf.fine_amount || 0) - Number(sf.discount_amount || 0) - Number(sf.scholarship_amount || 0))
+          );
+          const paid = Number(sf.amount_paid || 0);
+          const remaining = Math.max(0, Math.round((net - paid) * 100) / 100);
+
+          return {
+            id: sf.id,
+            category_name: formatFeeHeadName(sf.fee_categories?.category_name || sf.fee_categories?.name) || 'School Fee',
+            gross_amount: gross,
+            net_amount: net,
+            total_amount: net,
+            amount_paid: paid,
+            remaining_amount: remaining,
+            due_date: sf.due_date || '2026-08-31',
+            status: sf.status || (remaining <= 0 && net > 0 ? 'paid' : paid > 0 ? 'partial' : 'pending'),
+            // A voided receipt is money the school gave back; listing it would
+            // read to a parent as a payment that the balance then ignored.
+            payments: (sf.fee_payments || []).filter((p: any) => !p.voided_at).map((p: any) => ({
+              id: p.id,
+              payment_date: p.payment_date,
+              amount_paid: Number(p.amount_paid),
+              payment_mode: p.payment_mode || 'UPI Online',
+              receipt_number: p.receipt_number || 'REC-2026',
+              transaction_id: p.transaction_id,
+              remarks: p.remarks
+            }))
+          };
+        });
         setFeesList(feesMapped);
       }
 
@@ -363,9 +388,10 @@ export default function StudentPortal() {
   const attendanceRate = totalAttDays > 0 ? Math.round((presentDays / totalAttDays) * 100) : 100;
 
   // Calculate Real Fee Balances
-  const totalBilled = feesList.reduce((acc, curr) => acc + curr.total_amount, 0);
+  const totalBilled = feesList.reduce((acc, curr) => acc + curr.net_amount, 0);
   const totalPaid = feesList.reduce((acc, curr) => acc + curr.amount_paid, 0);
-  const totalOutstanding = Math.max(0, totalBilled - totalPaid);
+  // Clamped per ledger, so one over-settled fee cannot cancel out another's dues.
+  const totalOutstanding = feesList.reduce((acc, curr) => acc + curr.remaining_amount, 0);
 
   // Latest Exam Performance
   const latestExamResult = examResults[0];
@@ -1058,22 +1084,26 @@ export default function StudentPortal() {
                               <button
                                 onClick={() => setSelectedReceiptFee({
                                   id: fee.id,
+                                  payment_id: p.id,
                                   receipt_number: p.receipt_number,
                                   total_amount: p.amount_paid,
                                   paid_amount: p.amount_paid,
                                   amount_paid: p.amount_paid,
-                                  remaining_amount: Math.max(0, (Number((fee as any).net_amount ?? fee.total_amount ?? 0)) - Number(fee.amount_paid || 0)),
+                                  remaining_amount: fee.remaining_amount,
                                   category_name: fee.category_name,
                                   payment_mode: p.payment_mode,
                                   payment_date: p.payment_date,
                                   transaction_id: p.transaction_id,
-                                  academic_year: student.academic_year,
+                                  academic_year: student.academic_year || '2026-27',
+                                  student_id: student.id,
                                   students: {
+                                    id: student.id,
                                     name: student.name,
                                     class: `${student.class} - ${student.section}`,
                                     roll_number: student.roll_number,
                                     admission_number: student.admission_number,
                                     father_name: student.father_name,
+                                    mother_name: student.mother_name,
                                     phone: student.phone
                                   }
                                 })}

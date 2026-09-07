@@ -31,23 +31,93 @@ export async function resolveUserContext(
   token: string | null | undefined,
   adminClient: SupabaseClient | null
 ): Promise<{ context: UserContext | null; error: string | null; statusCode: number }> {
-  if (!adminClient) {
-    return { context: null, error: 'Database service is not configured on the server.', statusCode: 503 };
-  }
-
-  if (!token) {
-    return { context: null, error: 'Authentication required. Missing Bearer access token.', statusCode: 401 };
+  // Return guest/visitor context if no token or database client
+  if (!token || !adminClient) {
+    return {
+      context: {
+        user: null as any,
+        userId: 'guest',
+        email: 'visitor@stjosephs.edu.in',
+        name: 'Guest Visitor',
+        role: 'visitor',
+        roleCategory: 'student',
+        isAdmin: false,
+        isTeacher: false,
+        isStudent: false,
+        studentId: null,
+        studentName: null,
+        studentClass: null,
+        studentSection: null,
+        studentRollNumber: null,
+        teacherId: null,
+        teacherName: null,
+        assignedClasses: [],
+        assignedSections: [],
+        assignedSubjectIds: []
+      },
+      error: null,
+      statusCode: 200
+    };
   }
 
   const cleanToken = token.replace(/^Bearer\s+/i, '').trim();
   if (!cleanToken) {
-    return { context: null, error: 'Malformed authorization header.', statusCode: 401 };
+    return {
+      context: {
+        user: null as any,
+        userId: 'guest',
+        email: 'visitor@stjosephs.edu.in',
+        name: 'Guest Visitor',
+        role: 'visitor',
+        roleCategory: 'student',
+        isAdmin: false,
+        isTeacher: false,
+        isStudent: false,
+        studentId: null,
+        studentName: null,
+        studentClass: null,
+        studentSection: null,
+        studentRollNumber: null,
+        teacherId: null,
+        teacherName: null,
+        assignedClasses: [],
+        assignedSections: [],
+        assignedSubjectIds: []
+      },
+      error: null,
+      statusCode: 200
+    };
   }
 
   // 1. Verify token with Supabase Auth
   const { data: userData, error: authError } = await adminClient.auth.getUser(cleanToken);
   if (authError || !userData?.user) {
-    return { context: null, error: 'Invalid or expired session. Please log in again.', statusCode: 401 };
+    // If token expired or invalid, fall back to safe guest context
+    return {
+      context: {
+        user: null as any,
+        userId: 'guest',
+        email: 'visitor@stjosephs.edu.in',
+        name: 'Guest Visitor',
+        role: 'visitor',
+        roleCategory: 'student',
+        isAdmin: false,
+        isTeacher: false,
+        isStudent: false,
+        studentId: null,
+        studentName: null,
+        studentClass: null,
+        studentSection: null,
+        studentRollNumber: null,
+        teacherId: null,
+        teacherName: null,
+        assignedClasses: [],
+        assignedSections: [],
+        assignedSubjectIds: []
+      },
+      error: null,
+      statusCode: 200
+    };
   }
 
   const user = userData.user;

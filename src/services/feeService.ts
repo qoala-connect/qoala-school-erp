@@ -1,11 +1,13 @@
 import { supabase } from '@/lib/supabase';
+import { formatFeeHeadName } from '@/lib/utils';
 import { 
   StudentFeeLedger, 
   FeeCategory, 
   FeeStructureItem, 
   CollectFeeInput, 
   CollectFeeResult, 
-  FeePaymentRecord 
+  FeePaymentRecord,
+  StudentFeeAccountSummary 
 } from '@/types/fee';
 
 export interface FeeFilters {
@@ -110,7 +112,7 @@ export const feeService = {
     }
 
     let records: StudentFeeLedger[] = data.map((row: any) => {
-      const categoryName = row.fee_categories?.category_name || 'School Fee';
+      const categoryName = formatFeeHeadName(row.fee_categories?.category_name) || 'School Fee';
       const payments: FeePaymentRecord[] = (row.fee_payments || []).filter((p: any) => !p.voided_at);
       const paidAmount = Number(row.amount_paid ?? payments.reduce((sum, p) => sum + Number(p.amount_paid || 0), 0));
       const totalAmount = Number(row.total_amount || 0);
@@ -188,7 +190,7 @@ export const feeService = {
 
     return (data || []).map((c: any) => ({
       id: c.id,
-      category_name: c.category_name,
+      category_name: formatFeeHeadName(c.category_name),
       description: c.description,
       frequency: c.frequency || 'Monthly',
       amount: Number(c.amount || 0),
@@ -206,7 +208,7 @@ export const feeService = {
       const { data, error } = await supabase
         .from('fee_categories')
         .update({
-          category_name: category.category_name,
+          category_name: formatFeeHeadName(category.category_name),
           description: category.description,
           frequency: category.frequency,
           amount: category.amount,
@@ -223,7 +225,7 @@ export const feeService = {
       const { data, error } = await supabase
         .from('fee_categories')
         .insert([{
-          category_name: category.category_name,
+          category_name: formatFeeHeadName(category.category_name),
           description: category.description,
           frequency: category.frequency || 'Monthly',
           amount: category.amount || 0,
@@ -437,8 +439,8 @@ export const feeService = {
           amount: input.amount,
           payment_mode: input.paymentMode,
           total_amount: input.totalAmount || input.amount,
-          discount_amount: input.discountAmount || 0,
-          fine_amount: input.fineAmount || 0,
+          discount_amount: input.discountAmount ?? null,
+          fine_amount: input.fineAmount ?? null,
           due_date: input.dueDate || null,
           payment_date: new Date().toISOString().split('T')[0],
           transaction_id: input.transactionId || null,
@@ -459,8 +461,19 @@ export const feeService = {
           status: json.status
         };
       }
-    } catch (e) {
-      console.warn('[feeService.collectFee] Server endpoint fallback to RPC:', e);
+
+      // The endpoint answered and refused. Retrying through the RPC only
+      // buries the reason -- and the RPC takes no student_fee_id, so it can
+      // settle a different ledger than the cashier picked. Surface the
+      // refusal instead. 404/405 means the endpoint isn't mounted at all
+      // (static preview build), which is the one case worth falling back on.
+      if (resp.status !== 404 && resp.status !== 405) {
+        const detail = await resp.json().catch(() => null);
+        throw new Error(detail?.error || `Payment failed (HTTP ${resp.status}).`);
+      }
+    } catch (e: any) {
+      if (e instanceof Error && !(e instanceof TypeError)) throw e;
+      console.warn('[feeService.collectFee] Server endpoint unreachable, falling back to RPC:', e);
     }
 
     // 2. Fallback: Supabase RPC
@@ -471,8 +484,10 @@ export const feeService = {
       _payment_mode: input.paymentMode,
       _academic_year_id: input.academicYearId || null,
       _total_amount: input.totalAmount || input.amount,
-      _discount_amount: input.discountAmount || 0,
-      _fine_amount: input.fineAmount || 0,
+      // NULL means "leave the stored figure alone" (migration 03b). Coercing
+      // an unsupplied concession to 0 here reset it on every payment.
+      _discount_amount: input.discountAmount ?? null,
+      _fine_amount: input.fineAmount ?? null,
       _due_date: input.dueDate || null,
       _payment_date: new Date().toISOString().split('T')[0],
       _transaction_id: input.transactionId || null,
@@ -594,6 +609,8 @@ export const feeService = {
           fine_amount,
           due_date,
           status,
+          academic_year_id,
+          academic_years ( id, name ),
           fee_categories ( category_name ),
           students (
             id,
@@ -617,5 +634,230 @@ export const feeService = {
     }
 
     return data || [];
+  },
+
+  /**
+   * Compute a student's total outstanding dues across all fee ledgers in the database
+   */
+  async getStudentTotalOutstanding(studentId: string): Promise<number> {
+    if (!studentId) return 0;
+    try {
+      const { data, error } = await supabase
+        .from('student_fees')
+        .select('id, net_amount, total_amount, amount_paid, status')
+        .eq('student_id', studentId);
+
+      if (error || !data) return 0;
+
+      const totalDues = data.reduce((sum, row: any) => {
+        const net = Number(row.net_amount ?? row.total_amount ?? 0);
+        const paid = Number(row.amount_paid || 0);
+        return sum + Math.max(0, net - paid);
+      }, 0);
+
+      return Math.round(totalDues * 100) / 100;
+    } catch (e) {
+      console.warn('[feeService.getStudentTotalOutstanding] Error calculating student dues:', e);
+      return 0;
+    }
+  },
+
+  /**
+   * Fetch complete payment receipt details by receipt number or payment ID
+   */
+  async fetchPaymentReceipt(paymentIdOrReceiptNo: string): Promise<any | null> {
+    if (!paymentIdOrReceiptNo) return null;
+    try {
+      let query = supabase
+        .from('fee_payments')
+        .select(`
+          id,
+          student_fee_id,
+          payment_date,
+          amount_paid,
+          payment_mode,
+          transaction_id,
+          receipt_number,
+          remarks,
+          created_by,
+          created_at,
+          voided_at,
+          student_fees (
+            id,
+            student_id,
+            total_amount,
+            net_amount,
+            amount_paid,
+            discount_amount,
+            fine_amount,
+            due_date,
+            status,
+            fee_categories ( id, category_name, frequency ),
+            academic_years ( id, name ),
+            students (
+              id,
+              name,
+              admission_number,
+              roll_number,
+              class,
+              section,
+              father_name,
+              mother_name,
+              guardian_name,
+              phone
+            )
+          )
+        `);
+
+      if (paymentIdOrReceiptNo.includes('-') && paymentIdOrReceiptNo.length === 36) {
+        query = query.eq('id', paymentIdOrReceiptNo);
+      } else {
+        query = query.eq('receipt_number', paymentIdOrReceiptNo);
+      }
+
+      const { data, error } = await query.maybeSingle();
+      if (error || !data) return null;
+      return data;
+    } catch (e) {
+      console.warn('[feeService.fetchPaymentReceipt] Error fetching receipt:', e);
+      return null;
+    }
+  },
+
+  /**
+   * Get full Student Fee Account summary with ledger schedule and payment status
+   */
+  async getStudentFeeAccount(studentId: string, academicYearId?: string): Promise<StudentFeeAccountSummary> {
+    if (!studentId) {
+      return {
+        studentId: '',
+        totalAssignedFee: 0,
+        totalPaid: 0,
+        currentDue: 0,
+        totalOutstanding: 0,
+        overdueAmount: 0,
+        nextDueDate: null,
+        nextDueAmount: 0,
+        ledgers: []
+      };
+    }
+
+    let query = supabase
+      .from('student_fees')
+      .select(`
+        id,
+        student_id,
+        fee_category_id,
+        total_amount,
+        net_amount,
+        amount_paid,
+        discount_amount,
+        fine_amount,
+        scholarship_amount,
+        status,
+        created_at,
+        updated_at,
+        due_date,
+        academic_year_id,
+        fee_categories ( id, category_name, frequency ),
+        academic_years ( id, name ),
+        fee_payments ( id, amount_paid, payment_mode, payment_date, receipt_number, transaction_id, voided_at, void_reason, created_by ),
+        students (
+          id,
+          name,
+          roll_number,
+          admission_number,
+          class,
+          section,
+          father_name,
+          phone
+        )
+      `)
+      .eq('student_id', studentId)
+      .order('due_date', { ascending: true })
+      .order('created_at', { ascending: true });
+
+    if (academicYearId && academicYearId !== 'all') {
+      query = query.eq('academic_year_id', academicYearId);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      console.error('[feeService.getStudentFeeAccount] Error fetching ledgers:', error);
+      throw error;
+    }
+
+    const todayStr = new Date().toISOString().slice(0, 10);
+    let totalAssignedFee = 0;
+    let totalPaid = 0;
+    let totalOutstanding = 0;
+    let overdueAmount = 0;
+    let nextDueDate: string | null = null;
+    let nextDueAmount = 0;
+
+    const ledgers: StudentFeeLedger[] = (data || []).map((row: any) => {
+      const categoryName = formatFeeHeadName(row.fee_categories?.category_name) || 'School Fee';
+      const payments: FeePaymentRecord[] = (row.fee_payments || []).filter((p: any) => !p.voided_at);
+      const paidAmount = Number(row.amount_paid ?? payments.reduce((sum, p) => sum + Number(p.amount_paid || 0), 0));
+      const totalAmount = Number(row.total_amount || 0);
+      const netAmount = Number(row.net_amount || totalAmount);
+      const remainingAmount = Math.max(0, netAmount - paidAmount);
+      const lastPayment = payments.length > 0 ? payments[payments.length - 1] : null;
+
+      totalAssignedFee += netAmount;
+      totalPaid += paidAmount;
+      totalOutstanding += remainingAmount;
+
+      if (remainingAmount > 0) {
+        if (row.due_date && row.due_date < todayStr) {
+          overdueAmount += remainingAmount;
+        } else if (row.due_date) {
+          if (!nextDueDate || row.due_date < nextDueDate) {
+            nextDueDate = row.due_date;
+            nextDueAmount = remainingAmount;
+          }
+        }
+      }
+
+      return {
+        id: row.id,
+        student_id: row.student_id,
+        fee_category_id: row.fee_category_id,
+        academic_year_id: row.academic_year_id,
+        total_amount: totalAmount,
+        discount_amount: Number(row.discount_amount || 0),
+        scholarship_amount: Number(row.scholarship_amount || 0),
+        fine_amount: Number(row.fine_amount || 0),
+        net_amount: netAmount,
+        amount_paid: paidAmount,
+        remaining_amount: remainingAmount,
+        due_date: row.due_date,
+        status: row.status,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+        category_name: categoryName,
+        academic_year: row.academic_years?.name || '2026-27',
+        payment_mode: lastPayment?.payment_mode || 'cash',
+        payment_date: lastPayment?.payment_date || row.created_at?.split('T')[0],
+        receipt_number: lastPayment?.receipt_number || `REC-${row.id.substring(0, 6).toUpperCase()}`,
+        students: row.students,
+        fee_payments: row.fee_payments || []
+      };
+    });
+
+    const currentDue = Math.max(0, totalOutstanding);
+
+    return {
+      studentId,
+      totalAssignedFee: Math.round(totalAssignedFee * 100) / 100,
+      totalPaid: Math.round(totalPaid * 100) / 100,
+      currentDue: Math.round(currentDue * 100) / 100,
+      totalOutstanding: Math.round(totalOutstanding * 100) / 100,
+      overdueAmount: Math.round(overdueAmount * 100) / 100,
+      nextDueDate,
+      nextDueAmount: Math.round(nextDueAmount * 100) / 100,
+      ledgers
+    };
   }
 };
+

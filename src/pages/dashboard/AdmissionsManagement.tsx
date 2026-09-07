@@ -1034,8 +1034,8 @@ export default function AdmissionsManagement() {
           ) : (
             <>
               {/* Desktop / tablet enterprise table with crystal-clear column geometry and zero awkward clipping */}
-              <div className="hidden lg:block w-full overflow-hidden">
-                <table className="w-full text-left table-fixed border-collapse">
+              <div className="hidden lg:block w-full overflow-x-auto custom-scrollbar">
+                <table className="w-full text-left border-collapse min-w-[980px]">
                   <thead>
                     <tr className="border-b border-slate-200 bg-slate-50/90 text-[11px] uppercase tracking-wider text-slate-500 font-extrabold select-none">
                       <th scope="col" className="py-3.5 pl-5 pr-2 w-12 text-center">
@@ -1052,28 +1052,28 @@ export default function AdmissionsManagement() {
                         />
                       </th>
                       {visibleColumns.applicant && (
-                        <th scope="col" className="py-3.5 px-3 min-w-[200px]"><SortButton field="name" label="Applicant" /></th>
+                        <th scope="col" className="py-3.5 px-3 min-w-[220px]"><SortButton field="name" label="Applicant" /></th>
                       )}
                       {visibleColumns.class && (
-                        <th scope="col" className="py-3.5 px-3 w-28"><SortButton field="class" label="Class & Sec" /></th>
+                        <th scope="col" className="py-3.5 px-3 w-28 min-w-[100px]"><SortButton field="class" label="Class & Sec" /></th>
                       )}
                       {visibleColumns.session && (
-                        <th scope="col" className="py-3.5 px-3 w-28">Session</th>
+                        <th scope="col" className="py-3.5 px-3 w-28 min-w-[100px]">Session</th>
                       )}
                       {visibleColumns.guardian && (
-                        <th scope="col" className="py-3.5 px-3 min-w-[170px]">Guardian & Contact</th>
+                        <th scope="col" className="py-3.5 px-3 min-w-[180px]">Guardian & Contact</th>
                       )}
                       {visibleColumns.documents && (
-                        <th scope="col" className="py-3.5 px-3 w-32">Verification</th>
+                        <th scope="col" className="py-3.5 px-3 w-36 min-w-[130px]">Verification</th>
                       )}
                       {visibleColumns.status && (
-                        <th scope="col" className="py-3.5 px-3 w-32"><SortButton field="status" label="Status" /></th>
+                        <th scope="col" className="py-3.5 px-3 w-36 min-w-[130px]"><SortButton field="status" label="Status" /></th>
                       )}
                       {visibleColumns.applied_on && (
-                        <th scope="col" className="py-3.5 px-3 w-28"><SortButton field="created_at" label="Applied On" /></th>
+                        <th scope="col" className="py-3.5 px-3 w-36 min-w-[130px] whitespace-nowrap"><SortButton field="created_at" label="Applied On" /></th>
                       )}
                       {visibleColumns.actions && (
-                        <th scope="col" className="py-3.5 pr-5 pl-3 w-40 text-right">Actions</th>
+                        <th scope="col" className="py-3.5 pr-5 pl-3 min-w-[190px] w-52 text-right">Actions</th>
                       )}
                     </tr>
                   </thead>
@@ -1108,7 +1108,7 @@ export default function AdmissionsManagement() {
                           </td>
 
                           {visibleColumns.applicant && (
-                            <td className={cn('px-3', isCompactDensity ? 'py-2.5' : 'py-3.5')}>
+                            <td className={cn('px-3 min-w-[220px]', isCompactDensity ? 'py-2.5' : 'py-3.5')}>
                               <div className="flex items-center gap-3 min-w-0">
                                 <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 text-white font-extrabold text-sm flex items-center justify-center shrink-0 shadow-xs ring-2 ring-blue-900/10">
                                   {admission.photo_url ? (
@@ -1146,7 +1146,7 @@ export default function AdmissionsManagement() {
                           )}
 
                           {visibleColumns.class && (
-                            <td className={cn('px-3', isCompactDensity ? 'py-2.5' : 'py-3.5')}>
+                            <td className={cn('px-3 w-28 min-w-[100px]', isCompactDensity ? 'py-2.5' : 'py-3.5')}>
                               <div className="text-xs sm:text-[13px] font-bold text-slate-900 whitespace-nowrap">Class {admission.class}</div>
                               <div className="text-[11px] font-semibold text-slate-500 mt-0.5 whitespace-nowrap">
                                 <span className="px-1.5 py-0.2 rounded-md bg-slate-100 text-slate-700 border border-slate-200/80">
@@ -1157,7 +1157,7 @@ export default function AdmissionsManagement() {
                           )}
 
                           {visibleColumns.session && (
-                            <td className={cn('px-3', isCompactDensity ? 'py-2.5' : 'py-3.5')}>
+                            <td className={cn('px-3 w-28 min-w-[100px]', isCompactDensity ? 'py-2.5' : 'py-3.5')}>
                               <span className="text-xs font-semibold text-slate-700 whitespace-nowrap bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200/80">
                                 {admission.academic_year}
                               </span>
@@ -1165,11 +1165,11 @@ export default function AdmissionsManagement() {
                           )}
 
                           {visibleColumns.guardian && (
-                            <td className={cn('px-3', isCompactDensity ? 'py-2.5' : 'py-3.5')}>
+                            <td className={cn('px-3 min-w-[180px]', isCompactDensity ? 'py-2.5' : 'py-3.5')}>
                               <div className="text-xs sm:text-[13px] font-bold text-slate-800 truncate" title={admission.father_name}>
                                 {admission.father_name}
                               </div>
-                              <div className="text-[11px] text-slate-600 flex items-center gap-1.5 mt-1 font-medium">
+                              <div className="text-[11px] text-slate-600 flex items-center gap-1.5 mt-1 font-medium whitespace-nowrap">
                                 {admission.phone ? (
                                   <>
                                     <a
@@ -1200,7 +1200,7 @@ export default function AdmissionsManagement() {
                           )}
 
                           {visibleColumns.documents && (
-                            <td className={cn('px-3', isCompactDensity ? 'py-2.5' : 'py-3.5')}>
+                            <td className={cn('px-3 w-36 min-w-[130px]', isCompactDensity ? 'py-2.5' : 'py-3.5')}>
                               {total > 0 ? (
                                 <div className="w-28 space-y-1">
                                   <div className="flex items-center justify-between text-[10px] font-bold text-slate-700">
@@ -1223,7 +1223,7 @@ export default function AdmissionsManagement() {
                           )}
 
                           {visibleColumns.status && (
-                            <td className={cn('px-3', isCompactDensity ? 'py-2.5' : 'py-3.5')}>
+                            <td className={cn('px-3 w-36 min-w-[130px] whitespace-nowrap', isCompactDensity ? 'py-2.5' : 'py-3.5')}>
                               <StatusBadge status={admission.status} size="sm" />
                               {isEnrolled && admission.student_id && (
                                 <button
@@ -1240,14 +1240,14 @@ export default function AdmissionsManagement() {
                           )}
 
                           {visibleColumns.applied_on && (
-                            <td className={cn('px-3', isCompactDensity ? 'py-2.5' : 'py-3.5')}>
+                            <td className={cn('px-3 w-36 min-w-[130px] whitespace-nowrap', isCompactDensity ? 'py-2.5' : 'py-3.5')}>
                               <span className="text-xs font-semibold text-slate-600 whitespace-nowrap">{formatDate(admission.created_at)}</span>
                             </td>
                           )}
 
                           {visibleColumns.actions && (
-                            <td className={cn('pr-5 pl-3 text-right', isCompactDensity ? 'py-2.5' : 'py-3.5')} onClick={(e) => e.stopPropagation()}>
-                              <div className="flex items-center justify-end gap-1.5">
+                            <td className={cn('pr-5 pl-3 text-right min-w-[190px] w-52 whitespace-nowrap', isCompactDensity ? 'py-2.5' : 'py-3.5')} onClick={(e) => e.stopPropagation()}>
+                              <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
                                 {/* 1-Click Fast-Track Enrol Button for Pending */}
                                 {isPending && can('student.create') && (
                                   <button

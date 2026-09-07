@@ -34,11 +34,14 @@ interface BookCategory {
 interface BookIssue {
   id: string;
   book_id: string;
+  student_id: string | null;
   borrower_name: string;
   borrower_role: 'Student' | 'Staff';
   issue_date: string;
   due_date: string;
-  return_date?: string;
+  return_date?: string | null;
+  fine_amount: number;
+  fine_paid: boolean;
   status: 'Issued' | 'Returned' | 'Overdue';
 }
 
@@ -46,9 +49,31 @@ interface LibraryFine {
   id: string;
   issue_id: string;
   borrower_name: string;
+  book_title: string;
+  days_overdue: number;
   fine_amount: number;
   status: 'Pending' | 'Collected';
 }
+
+interface StudentOption {
+  id: string;
+  name: string;
+  class: string;
+  section: string;
+}
+
+// Loans run 14 days by default and accrue ₹2 for every day past the due date.
+const LOAN_DAYS = 14;
+const FINE_PER_DAY = 2;
+
+const toDateOnly = (value: string) => new Date(`${String(value).slice(0, 10)}T00:00:00`);
+
+const daysOverdue = (dueDate: string, against?: string | null) => {
+  if (!dueDate) return 0;
+  const end = against ? toDateOnly(against) : toDateOnly(new Date().toISOString());
+  const diff = Math.floor((end.getTime() - toDateOnly(dueDate).getTime()) / 86400000);
+  return diff > 0 ? diff : 0;
+};
 
 type TabType = 'books' | 'categories' | 'issues' | 'fines';
 
@@ -75,6 +100,7 @@ export default function LibraryManagement() {
   const [categories, setCategories] = useState<BookCategory[]>([]);
   const [issues, setIssues] = useState<BookIssue[]>([]);
   const [fines, setFines] = useState<LibraryFine[]>([]);
+  const [students, setStudents] = useState<StudentOption[]>([]);
 
   // Bulk selection states
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
@@ -86,62 +112,82 @@ export default function LibraryManagement() {
   // Form Field States
   const [formData, setFormData] = useState<any>({});
 
-  // Fetch / Seed initial data from real Supabase tables
+  // Fetch initial data from real Supabase tables
   const loadData = async () => {
     setIsSyncing(true);
     setErrorState(null);
     try {
-      const [booksRes, issuesRes] = await Promise.all([
+      const [booksRes, issuesRes, studentsRes] = await Promise.all([
         supabase.from('library_books').select('*').order('title'),
-        supabase.from('book_issues').select('*, library_books(title), students(name)')
+        supabase
+          .from('book_issues')
+          .select('*, library_books(title), students(name)')
+          .order('issue_date', { ascending: false }),
+        supabase.from('students').select('id, name, class, section').order('name')
       ]);
 
-      if (booksRes.data) {
-        setBooks(booksRes.data.map((b: any) => ({
-          id: b.id,
-          title: b.title || 'Untitled Book',
-          author: b.author || 'Unknown',
-          category_id: b.category || 'General',
-          isbn: b.isbn || 'N/A',
-          shelf_location: b.rack_number || 'Shelf A',
-          total_copies: Number(b.copies_total || 1),
-          issued_copies: Number(b.copies_total || 1) - Number(b.copies_available || 1)
-        })));
+      // supabase-js resolves rather than throws, so a failed request shows up
+      // as `.error` — unchecked, it silently left the ledger empty forever.
+      if (booksRes.error) throw booksRes.error;
+      if (issuesRes.error) throw issuesRes.error;
 
-        // Extract unique categories
-        const uniqueCats = Array.from(new Set(booksRes.data.map((b: any) => b.category || 'General')));
-        setCategories(uniqueCats.map((cat, idx) => ({
-          id: `cat-${idx}`,
-          name: cat,
-          section_code: `SEC-${String.fromCharCode(65 + (idx % 26))}`
-        })));
-      }
+      const bookRows = booksRes.data || [];
+      setBooks(bookRows.map((b: any) => ({
+        id: b.id,
+        title: b.title || 'Untitled Book',
+        author: b.author || 'Unknown',
+        // There is no book_categories table — a book's category IS the
+        // category name, so the name doubles as the category id. Keying
+        // synthetic `cat-N` ids here is what used to make every book render
+        // as "General Course" and every category count as 0 books.
+        category_id: b.category || 'General',
+        isbn: b.isbn || 'N/A',
+        shelf_location: b.rack_number || 'Unshelved',
+        total_copies: Number(b.copies_total ?? 1),
+        issued_copies: Number(b.copies_total ?? 1) - Number(b.copies_available ?? 1)
+      })));
 
-      if (issuesRes.data) {
-        setIssues(issuesRes.data.map((i: any) => ({
+      const uniqueCats = Array.from(new Set(bookRows.map((b: any) => b.category || 'General'))).sort();
+      setCategories(uniqueCats.map((cat: any, idx: number) => ({
+        id: cat,
+        name: cat,
+        section_code: `SEC-${String.fromCharCode(65 + (idx % 26))}`
+      })));
+
+      const issueRows = issuesRes.data || [];
+      setIssues(issueRows.map((i: any) => {
+        const overdue = !i.return_date && daysOverdue(i.due_date) > 0;
+        return {
           id: i.id,
           book_id: i.book_id || '',
-          borrower_name: i.students?.name || 'Student Member',
-          borrower_role: i.student_id ? 'Student' : 'Staff',
-          issue_date: i.issue_date || new Date().toISOString().substring(0, 10),
-          due_date: i.due_date || new Date().toISOString().substring(0, 10),
+          student_id: i.student_id || null,
+          borrower_name: i.borrower_name || i.students?.name || 'Unnamed Borrower',
+          borrower_role: (i.borrower_role === 'Staff' ? 'Staff' : 'Student') as 'Student' | 'Staff',
+          issue_date: i.issue_date || '',
+          due_date: i.due_date || '',
           return_date: i.return_date || null,
-          status: i.return_date ? 'Returned' : (new Date(i.due_date) < new Date() ? 'Overdue' : 'Issued')
+          fine_amount: Number(i.fine_amount || 0),
+          fine_paid: Boolean(i.fine_paid),
+          status: (i.return_date ? 'Returned' : overdue ? 'Overdue' : 'Issued') as BookIssue['status']
+        };
+      }));
+
+      // Fines are a view over the issues that carry a penalty. Settlement is
+      // tracked by fine_paid, not by return_date — a book can come back while
+      // the fine on it is still owed.
+      setFines(issueRows
+        .filter((i: any) => Number(i.fine_amount || 0) > 0)
+        .map((i: any) => ({
+          id: i.id,
+          issue_id: i.id,
+          borrower_name: i.borrower_name || i.students?.name || 'Unnamed Borrower',
+          book_title: i.library_books?.title || 'Withdrawn Volume',
+          days_overdue: daysOverdue(i.due_date, i.return_date),
+          fine_amount: Number(i.fine_amount || 0),
+          status: (i.fine_paid ? 'Collected' : 'Pending') as 'Pending' | 'Collected'
         })));
 
-        // Extract fines from issues
-        const fineList: LibraryFine[] = issuesRes.data
-          .filter((i: any) => Number(i.fine_amount || 0) > 0)
-          .map((i: any) => ({
-            id: `fine-${i.id}`,
-            issue_id: i.id,
-            borrower_name: i.students?.name || 'Student Member',
-            fine_amount: Number(i.fine_amount || 0),
-            status: (i.return_date ? 'Collected' : 'Pending') as 'Pending' | 'Collected'
-          }));
-        setFines(fineList);
-      }
-
+      setStudents((studentsRes.data || []) as StudentOption[]);
     } catch (error: any) {
       console.error('Error fetching library tables:', error);
       setErrorState(error.message || 'Failed to load library data');
@@ -157,8 +203,25 @@ export default function LibraryManagement() {
 
   // CRUD handlers
   const handleOpenAdd = () => {
+    // Categories and fines are both derived views: a category exists because a
+    // book sits in it, and a fine exists because a loan ran late. Neither can
+    // be conjured on its own, so point the user at the tab that owns the record.
+    if (activeTab === 'categories') {
+      toast.info('Categories come from the catalog — add a book and give it a new category.');
+      return;
+    }
+    if (activeTab === 'fines') {
+      toast.info('Fines are raised against a loan — open the Borrowing Ledger to charge one.');
+      return;
+    }
     setEditingItem(null);
-    setFormData({});
+    setFormData(activeTab === 'issues'
+      ? {
+          borrower_role: 'Student',
+          issue_date: new Date().toISOString().slice(0, 10),
+          due_date: new Date(Date.now() + LOAN_DAYS * 86400000).toISOString().slice(0, 10)
+        }
+      : { total_copies: 1 });
     setShowAddModal(true);
   };
 
@@ -169,14 +232,39 @@ export default function LibraryManagement() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you absolutely sure you want to delete this library record?')) return;
+    const prompts: Record<TabType, string> = {
+      books: 'Remove this title from the catalog? Its borrowing history goes with it.',
+      categories: 'Delete this category? Every book in it moves to "General".',
+      issues: 'Delete this loan record permanently?',
+      fines: 'Waive this fine? The loan record itself is kept.'
+    };
+    if (!window.confirm(prompts[activeTab])) return;
 
     try {
-      const table = activeTab === 'books' ? 'library_books' : 'book_issues';
-      const { error } = await supabase.from(table).delete().eq('id', id);
-      if (error) throw error;
+      if (activeTab === 'books') {
+        const { error } = await supabase.from('library_books').delete().eq('id', id);
+        if (error) throw error;
+      } else if (activeTab === 'issues') {
+        const { error } = await supabase.from('book_issues').delete().eq('id', id);
+        if (error) throw error;
+      } else if (activeTab === 'categories') {
+        // No categories table: a category is deleted by emptying it.
+        const { error } = await supabase
+          .from('library_books')
+          .update({ category: 'General' })
+          .eq('category', id);
+        if (error) throw error;
+      } else {
+        // Waiving a fine clears the charge, it does not delete the loan.
+        const { error } = await supabase
+          .from('book_issues')
+          .update({ fine_amount: 0, fine_paid: false })
+          .eq('id', id);
+        if (error) throw error;
+      }
 
-      toast.success('Library record deleted successfully!');
+      toast.success(activeTab === 'fines' ? 'Fine waived.' : 'Library record deleted successfully!');
+      setSelectedItems(prev => prev.filter(i => i !== id));
       await loadData();
     } catch (err: any) {
       toast.error('Deletion failed: ' + err.message);
@@ -189,35 +277,84 @@ export default function LibraryManagement() {
 
     try {
       if (activeTab === 'books') {
-        const payload = {
-          title: formData.title,
-          author: formData.author,
-          isbn: formData.isbn,
-          category: formData.category_id || 'General',
-          rack_number: formData.shelf_location,
-          copies_total: Number(formData.total_copies || 1),
-          copies_available: Number(formData.total_copies || 1)
-        };
+        const total = Number(formData.total_copies || 1);
+        // "New category…" in the picker reveals a free-text field; that is the
+        // only place a category can be born, since categories live on books.
+        const category = (formData.category_id === '__new__'
+          ? formData.new_category
+          : formData.category_id) || 'General';
+
         if (editingItem) {
-          await supabase.from('library_books').update(payload).eq('id', editingItem.id);
+          // Copies already out on loan must stay accounted for when the total
+          // is adjusted, otherwise availability drifts away from reality.
+          const onLoan = Math.min(editingItem.issued_copies, total);
+          const { error } = await supabase.from('library_books').update({
+            title: formData.title,
+            author: formData.author,
+            isbn: formData.isbn,
+            category,
+            rack_number: formData.shelf_location,
+            copies_total: total,
+            copies_available: Math.max(total - onLoan, 0)
+          }).eq('id', editingItem.id);
+          if (error) throw error;
         } else {
-          await supabase.from('library_books').insert([payload]);
+          const { error } = await supabase.from('library_books').insert([{
+            title: formData.title,
+            author: formData.author,
+            isbn: formData.isbn,
+            category,
+            rack_number: formData.shelf_location,
+            copies_total: total,
+            copies_available: total
+          }]);
+          if (error) throw error;
         }
       } else if (activeTab === 'issues') {
-        const payload = {
+        const isStaff = formData.borrower_role === 'Staff';
+        const student = students.find(s => s.id === formData.student_id);
+        const dueDate = formData.due_date
+          || new Date(Date.now() + LOAN_DAYS * 86400000).toISOString().slice(0, 10);
+
+        const payload: Record<string, any> = {
           book_id: formData.book_id,
-          issue_date: formData.issue_date || new Date().toISOString().substring(0, 10),
-          due_date: formData.due_date || new Date(Date.now() + 14 * 86400000).toISOString().substring(0, 10),
+          student_id: isStaff ? null : (formData.student_id || null),
+          borrower_name: isStaff ? formData.borrower_name : (student?.name || formData.borrower_name),
+          borrower_role: isStaff ? 'Staff' : 'Student',
+          issue_date: formData.issue_date || new Date().toISOString().slice(0, 10),
+          due_date: dueDate,
           // book_issues.status is a lowercase vocabulary (issued/returned/overdue).
-          // The display status is derived from return_date/due_date below, so the
-          // stored value only needs to satisfy the constraint.
-          status: 'issued'
+          status: daysOverdue(dueDate) > 0 ? 'overdue' : 'issued'
         };
+
         if (editingItem) {
-          await supabase.from('book_issues').update(payload).eq('id', editingItem.id);
+          const { error } = await supabase.from('book_issues').update(payload).eq('id', editingItem.id);
+          if (error) throw error;
+          // Moving a loan to a different title has to move the copy with it.
+          if (editingItem.book_id !== formData.book_id && !editingItem.return_date) {
+            await adjustCopies(editingItem.book_id, +1);
+            await adjustCopies(formData.book_id, -1);
+          }
         } else {
-          await supabase.from('book_issues').insert([payload]);
+          const { error } = await supabase.from('book_issues').insert([payload]);
+          if (error) throw error;
+          await adjustCopies(formData.book_id, -1);
         }
+      } else if (activeTab === 'categories') {
+        const nextName = String(formData.name || '').trim();
+        if (!nextName) throw new Error('Category name cannot be empty');
+        // Renaming a derived category means restamping every book in it.
+        const { error } = await supabase
+          .from('library_books')
+          .update({ category: nextName })
+          .eq('category', editingItem.id);
+        if (error) throw error;
+      } else if (activeTab === 'fines') {
+        const { error } = await supabase
+          .from('book_issues')
+          .update({ fine_amount: Number(formData.fine_amount || 0) })
+          .eq('id', editingItem.issue_id);
+        if (error) throw error;
       }
 
       toast.success(editingItem ? 'Catalog revised successfully!' : 'New entity registered under Library registry!');
@@ -228,6 +365,58 @@ export default function LibraryManagement() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Stock movement. copies_available is constrained to 0..copies_total, so the
+  // delta is clamped rather than blindly written.
+  const adjustCopies = async (bookId: string, delta: number) => {
+    if (!bookId) return;
+    const { data, error } = await supabase
+      .from('library_books')
+      .select('copies_total, copies_available')
+      .eq('id', bookId)
+      .maybeSingle();
+    if (error || !data) return;
+
+    const total = Number(data.copies_total ?? 1);
+    const next = Math.min(Math.max(Number(data.copies_available ?? 0) + delta, 0), total);
+    await supabase.from('library_books').update({ copies_available: next }).eq('id', bookId);
+  };
+
+  // Check a book back in: free the copy, stamp the return, and bill any lateness.
+  const handleReturn = async (issue: BookIssue) => {
+    const today = new Date().toISOString().slice(0, 10);
+    const late = daysOverdue(issue.due_date, today);
+    const fine = Math.max(issue.fine_amount, late * FINE_PER_DAY);
+
+    const { error } = await supabase
+      .from('book_issues')
+      .update({ status: 'returned', return_date: today, fine_amount: fine })
+      .eq('id', issue.id);
+
+    if (error) {
+      toast.error('Failed to update return: ' + error.message);
+      return;
+    }
+    await adjustCopies(issue.book_id, +1);
+    toast.success(late > 0
+      ? `Returned ${late} day${late === 1 ? '' : 's'} late — ₹${fine} fine raised.`
+      : 'Book returned successfully!');
+    await loadData();
+  };
+
+  const handleCollectFine = async (fine: LibraryFine) => {
+    const { error } = await supabase
+      .from('book_issues')
+      .update({ fine_paid: true })
+      .eq('id', fine.issue_id);
+
+    if (error) {
+      toast.error('Failed to collect fine: ' + error.message);
+      return;
+    }
+    toast.success(`₹${fine.fine_amount.toLocaleString()} collected from ${fine.borrower_name}.`);
+    await loadData();
   };
 
   // Bulk actions
@@ -248,16 +437,29 @@ export default function LibraryManagement() {
   };
 
   const handleBulkDelete = async () => {
-    if (!window.confirm(`Are you sure you want to delete these ${selectedItems.length} selected library records?`)) return;
-    
+    if (!window.confirm(`Are you sure you want to retire these ${selectedItems.length} selected library records?`)) return;
+
     try {
+      let error = null;
       if (activeTab === 'books') {
-        await supabase.from('library_books').delete().in('id', selectedItems);
+        ({ error } = await supabase.from('library_books').delete().in('id', selectedItems));
       } else if (activeTab === 'issues') {
-        await supabase.from('book_issues').delete().in('id', selectedItems);
+        ({ error } = await supabase.from('book_issues').delete().in('id', selectedItems));
+      } else if (activeTab === 'categories') {
+        ({ error } = await supabase
+          .from('library_books')
+          .update({ category: 'General' })
+          .in('category', selectedItems));
+      } else {
+        ({ error } = await supabase
+          .from('book_issues')
+          .update({ fine_amount: 0, fine_paid: false })
+          .in('id', selectedItems));
       }
+      if (error) throw error;
+
       setSelectedItems([]);
-      toast.success('Records deleted safely!');
+      toast.success(activeTab === 'fines' ? 'Selected fines waived.' : 'Records deleted safely!');
       await loadData();
     } catch (err: any) {
       toast.error('Deletion failed: ' + err.message);
@@ -285,8 +487,8 @@ export default function LibraryManagement() {
       rows = filteredIssues.map(i => `"${i.borrower_name}","${i.borrower_role}","${i.issue_date}","${i.due_date}","${i.return_date || ''}","${i.status}"`);
       filename = 'Borrowing_Ledger';
     } else {
-      header = 'Borrower,Fine Amount,Status\n';
-      rows = filteredFines.map(f => `"${f.borrower_name}","${f.fine_amount}","${f.status}"`);
+      header = 'Borrower,Book,Days Overdue,Fine Amount,Status\n';
+      rows = filteredFines.map(f => `"${f.borrower_name}","${f.book_title}","${f.days_overdue}","${f.fine_amount}","${f.status}"`);
       filename = 'Overdue_Fines';
     }
 
@@ -333,8 +535,9 @@ export default function LibraryManagement() {
   }, [issues, books, searchQuery, statusFilter]);
 
   const filteredFines = useMemo(() => {
-    return fines.filter(f => 
-      f.borrower_name.toLowerCase().includes(searchQuery.toLowerCase()) &&
+    const q = searchQuery.toLowerCase();
+    return fines.filter(f =>
+      (f.borrower_name.toLowerCase().includes(q) || f.book_title.toLowerCase().includes(q)) &&
       (statusFilter === 'all' || f.status === statusFilter)
     );
   }, [fines, searchQuery, statusFilter]);
@@ -374,6 +577,24 @@ export default function LibraryManagement() {
           </>
         }
       />
+
+      {/* Load failure — previously recorded in state but never shown, so a
+          broken query looked exactly like an empty library. */}
+      {errorState && (
+        <div className="flex items-start gap-3 bg-rose-50 border border-rose-100 text-rose-700 rounded-2xl px-4 py-3">
+          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+          <div className="flex-1">
+            <p className="text-xs font-bold">Library records could not be loaded</p>
+            <p className="text-[11px] font-medium text-rose-600/80 mt-0.5">{errorState}</p>
+          </div>
+          <button
+            onClick={loadData}
+            className="px-3 py-1 bg-white border border-rose-200 rounded-lg text-[10px] font-black uppercase tracking-wider hover:bg-rose-600 hover:text-white transition-all"
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       {/* 2. Summary KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -725,19 +946,8 @@ export default function LibraryManagement() {
                         </td>
                         <td className="py-4 px-6 text-right space-x-1 whitespace-nowrap">
                           {issue.status !== 'Returned' && (
-                            <button 
-                              onClick={async () => {
-                                const { error } = await supabase
-                                  .from('book_issues')
-                                  .update({ status: 'returned', return_date: new Date().toISOString() })
-                                  .eq('id', issue.id);
-                                if (error) {
-                                  toast.error('Failed to update return: ' + error.message);
-                                } else {
-                                  toast.success('Book returned successfully!');
-                                  await loadData();
-                                }
-                              }}
+                            <button
+                              onClick={() => handleReturn(issue)}
                               className="px-2 py-1 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-lg border border-emerald-200 text-[10px] font-black uppercase tracking-wider"
                               title="Confirm Return"
                             >
@@ -784,7 +994,8 @@ export default function LibraryManagement() {
                       />
                     </th>
                     <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Borrower Name</th>
-                    <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Linked Issue ID</th>
+                    <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Penalised Volume</th>
+                    <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Days Overdue</th>
                     <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Fine Owed</th>
                     <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Fines Status</th>
                     <th className="py-4 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
@@ -805,7 +1016,10 @@ export default function LibraryManagement() {
                         <User className="w-4 h-4 text-slate-400 shrink-0" />
                         {fine.borrower_name}
                       </td>
-                      <td className="py-4 px-4 text-center font-mono font-bold text-violet-600">#{fine.issue_id}</td>
+                      <td className="py-4 px-4 font-bold text-slate-800">{fine.book_title}</td>
+                      <td className="py-4 px-4 text-center font-mono font-bold text-slate-500">
+                        {fine.days_overdue > 0 ? `${fine.days_overdue} days` : '—'}
+                      </td>
                       <td className="py-4 px-4 text-right font-mono font-extrabold text-rose-600">₹{fine.fine_amount.toLocaleString()}</td>
                       <td className="py-4 px-4 text-center">
                         <span className={cn(
@@ -819,19 +1033,8 @@ export default function LibraryManagement() {
                       </td>
                       <td className="py-4 px-6 text-right space-x-1 whitespace-nowrap">
                         {fine.status === 'Pending' && (
-                          <button 
-                            onClick={async () => {
-                              const { error } = await supabase
-                                .from('book_issues')
-                                .update({ return_date: new Date().toISOString() })
-                                .eq('id', fine.issue_id);
-                              if (error) {
-                                toast.error('Failed to collect fine: ' + error.message);
-                              } else {
-                                toast.success('Penalty collection saved successfully!');
-                                await loadData();
-                              }
-                            }}
+                          <button
+                            onClick={() => handleCollectFine(fine)}
                             className="px-2.5 h-[28px] bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-lg border border-emerald-200 text-[10px] font-black uppercase tracking-wider"
                             title="Collect Cash"
                           >
@@ -937,8 +1140,8 @@ export default function LibraryManagement() {
                       </div>
                       <div className="space-y-1">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider pl-1 font-semibold">Category Classification</label>
-                        <select 
-                          value={formData.category_id || ''} 
+                        <select
+                          value={formData.category_id || ''}
                           required
                           onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
                           className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs text-slate-800 focus:ring-2 focus:ring-violet-500/20 h-[36px] outline-none"
@@ -947,9 +1150,23 @@ export default function LibraryManagement() {
                           {categories.map(c => (
                             <option key={c.id} value={c.id}>{c.name}</option>
                           ))}
+                          <option value="__new__">+ New category...</option>
                         </select>
                       </div>
                     </div>
+                    {formData.category_id === '__new__' && (
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider pl-1 font-semibold">New Category Name</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Competitive Exams"
+                          value={formData.new_category || ''}
+                          onChange={(e) => setFormData({ ...formData, new_category: e.target.value })}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs text-slate-800 focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 outline-none transition-all h-[36px]"
+                        />
+                      </div>
+                    )}
                     <div className="grid grid-cols-3 gap-4">
                       <div className="space-y-1">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider pl-1 font-semibold">ISBN Code</label>
@@ -988,12 +1205,12 @@ export default function LibraryManagement() {
                   </div>
                 )}
 
-                {activeTab === 'categories' && (
+                {activeTab === 'categories' && editingItem && (
                   <div className="space-y-4">
                     <div className="space-y-1">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider pl-1 font-semibold">Category Name</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         required
                         placeholder="e.g. Mathematics & Calculus"
                         value={formData.name || ''}
@@ -1001,39 +1218,56 @@ export default function LibraryManagement() {
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs text-slate-800 focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 outline-none transition-all h-[36px]"
                       />
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider pl-1 font-semibold">Section / Row Code</label>
-                      <input 
-                        type="text" 
-                        required
-                        placeholder="e.g. SEC-A"
-                        value={formData.section_code || ''}
-                        onChange={(e) => setFormData({ ...formData, section_code: e.target.value })}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs text-slate-800 focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 outline-none transition-all h-[36px]"
-                      />
-                    </div>
+                    <p className="text-[11px] font-semibold text-slate-500 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5">
+                      Renaming restamps all{' '}
+                      <span className="font-black text-slate-700">
+                        {books.filter(b => b.category_id === editingItem.id).length}
+                      </span>{' '}
+                      book{books.filter(b => b.category_id === editingItem.id).length === 1 ? '' : 's'} filed under
+                      <span className="font-black text-slate-700"> {editingItem.name}</span>. The section code is
+                      assigned automatically from the shelf order.
+                    </p>
                   </div>
                 )}
 
                 {activeTab === 'issues' && (
                   <div className="space-y-4">
+                    {/* A student borrower is picked from the roll so the loan is
+                        linked by student_id and shows up on their 360 drawer;
+                        staff are typed free-hand since they have no roll entry. */}
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider pl-1 font-semibold">Borrower Individual Name</label>
-                      <input 
-                        type="text" 
-                        required
-                        placeholder="e.g. Amit Kumar Dubey"
-                        value={formData.borrower_name || ''}
-                        onChange={(e) => setFormData({ ...formData, borrower_name: e.target.value })}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs text-slate-800 focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 outline-none transition-all h-[36px]"
-                      />
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider pl-1 font-semibold">Borrower Individual</label>
+                      {formData.borrower_role === 'Staff' ? (
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Shri Rajesh Dubey"
+                          value={formData.borrower_name || ''}
+                          onChange={(e) => setFormData({ ...formData, borrower_name: e.target.value })}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs text-slate-800 focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 outline-none transition-all h-[36px]"
+                        />
+                      ) : (
+                        <select
+                          value={formData.student_id || ''}
+                          required
+                          onChange={(e) => setFormData({ ...formData, student_id: e.target.value })}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs text-slate-800 focus:ring-2 focus:ring-violet-500/20 h-[36px] outline-none"
+                        >
+                          <option value="">Select student from roll...</option>
+                          {students.map(s => (
+                            <option key={s.id} value={s.id}>
+                              {s.name} — Class {s.class}-{s.section}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider pl-1 font-semibold">Borrower Role</label>
-                        <select 
-                          value={formData.borrower_role || 'Student'} 
-                          onChange={(e) => setFormData({ ...formData, borrower_role: e.target.value })}
+                        <select
+                          value={formData.borrower_role || 'Student'}
+                          onChange={(e) => setFormData({ ...formData, borrower_role: e.target.value, student_id: '', borrower_name: '' })}
                           className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs text-slate-800 focus:ring-2 focus:ring-violet-500/20 h-[36px] outline-none"
                         >
                           <option value="Student">Student</option>
@@ -1080,41 +1314,42 @@ export default function LibraryManagement() {
                   </div>
                 )}
 
-                {activeTab === 'fines' && (
+                {activeTab === 'fines' && editingItem && (
                   <div className="space-y-4">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider pl-1 font-semibold">Borrower Name</label>
-                      <input 
-                        type="text" 
-                        required
-                        placeholder="e.g. Amit Kumar"
-                        value={formData.borrower_name || ''}
-                        onChange={(e) => setFormData({ ...formData, borrower_name: e.target.value })}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs text-slate-800 focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 outline-none transition-all h-[36px]"
-                      />
+                    {/* The borrower and the book come from the loan this fine
+                        hangs off, so only the amount is editable here. */}
+                    <div className="grid grid-cols-2 gap-3 bg-slate-50 border border-slate-100 rounded-xl p-3">
+                      <div>
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Borrower</p>
+                        <p className="text-xs font-bold text-slate-800 mt-0.5">{editingItem.borrower_name}</p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Penalised Volume</p>
+                        <p className="text-xs font-bold text-slate-800 mt-0.5">{editingItem.book_title}</p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Days Overdue</p>
+                        <p className="text-xs font-bold text-slate-800 mt-0.5">{editingItem.days_overdue || 0}</p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Accrued at ₹{FINE_PER_DAY}/day</p>
+                        <p className="text-xs font-bold text-slate-800 mt-0.5">₹{(editingItem.days_overdue || 0) * FINE_PER_DAY}</p>
+                      </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider pl-1 font-semibold">Linked Issue ID</label>
-                        <input 
-                          type="text" 
-                          required
-                          placeholder="e.g. i2"
-                          value={formData.issue_id || ''}
-                          onChange={(e) => setFormData({ ...formData, issue_id: e.target.value })}
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs text-slate-800 focus:ring-2 focus:ring-violet-500/20 h-[36px] outline-none"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider pl-1 font-semibold">Fine Owed Amount (₹)</label>
-                        <input 
-                          type="number" 
-                          required
-                          value={formData.fine_amount || 0}
-                          onChange={(e) => setFormData({ ...formData, fine_amount: parseFloat(e.target.value) })}
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs text-slate-800 focus:ring-2 focus:ring-violet-500/20 h-[36px] outline-none"
-                        />
-                      </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider pl-1 font-semibold">Fine Owed Amount (₹)</label>
+                      <input
+                        type="number"
+                        required
+                        min={0}
+                        step="0.01"
+                        value={formData.fine_amount ?? 0}
+                        onChange={(e) => setFormData({ ...formData, fine_amount: parseFloat(e.target.value) })}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs text-slate-800 focus:ring-2 focus:ring-violet-500/20 h-[36px] outline-none"
+                      />
+                      <p className="text-[10px] text-slate-400 font-medium pl-1">
+                        Override the accrued amount to grant a concession, or set 0 to waive it.
+                      </p>
                     </div>
                   </div>
                 )}

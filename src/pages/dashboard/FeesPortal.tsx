@@ -179,7 +179,10 @@ export default function FeesPortal() {
   const metrics = useMemo(() => {
     const totalDemand = fees.reduce((acc, f) => acc + (f.net_amount || f.total_amount || 0), 0);
     const totalCollected = fees.reduce((acc, f) => acc + (f.amount_paid || 0), 0);
-    const totalOutstanding = Math.max(0, totalDemand - totalCollected);
+    // Summed per ledger rather than as (demand - collected): a ledger settled
+    // to the paisa can otherwise absorb another student's dues and the
+    // outstanding card under-reports what is actually owed.
+    const totalOutstanding = fees.reduce((acc, f) => acc + Math.max(0, f.remaining_amount || 0), 0);
     const collectionRate = totalDemand > 0 ? Math.round((totalCollected / totalDemand) * 100) : 0;
 
     const todayStr = new Date().toISOString().split('T')[0];
@@ -399,26 +402,41 @@ export default function FeesPortal() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `SDPS_Fee_Ledgers_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `SJS_Fee_Ledgers_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     toast.success(`Exported ${filteredFees.length} fee ledgers to CSV.`);
   };
 
-  const handlePaymentSuccess = (result: CollectFeeResult, student: any) => {
+  const handlePaymentSuccess = (
+    result: CollectFeeResult, 
+    student: any, 
+    ledger?: StudentFeeLedger | null,
+    paymentMeta?: { paymentMode: string; transactionId?: string; remarks?: string; fineAmount?: number; discountAmount?: number }
+  ) => {
     loadAllData();
-    // Prompt to view / print receipt
+    // Prompt to view / print receipt with exact payment transaction details
     setReceiptTargetFee({
       id: result.studentFeeId,
+      payment_id: result.paymentId,
       receipt_number: result.receiptNumber,
       paid_amount: result.amountPaid,
       amount_paid: result.amountPaid,
-      total_amount: result.amountPaid,
+      total_amount: result.netAmount || result.amountPaid,
+      net_amount: result.netAmount || result.amountPaid,
+      fine_amount: paymentMeta?.fineAmount ?? ledger?.fine_amount ?? 0,
+      discount_amount: paymentMeta?.discountAmount ?? ledger?.discount_amount ?? 0,
+      total_paid: result.totalPaid,
       remaining_amount: result.balance,
+      payment_mode: paymentMeta?.paymentMode || 'Cash',
+      transaction_id: paymentMeta?.transactionId || null,
+      remarks: paymentMeta?.remarks || null,
       payment_date: new Date().toISOString().split('T')[0],
-      category_name: 'Academic Fee',
-      students: student
+      category_name: ledger?.category_name || 'Academic Fee',
+      academic_year: currentYear?.name || '2026-27',
+      students: student,
+      student_id: student?.id
     });
     setIsReceiptModalOpen(true);
   };
@@ -1154,7 +1172,33 @@ export default function FeesPortal() {
 
                             <button
                               onClick={() => {
-                                setReceiptTargetFee(fee);
+                                const validPayments = (fee.fee_payments || []).filter((p: any) => !p.voided_at);
+                                if (validPayments.length === 0 && fee.amount_paid <= 0) {
+                                  toast.info(`No payments recorded for ${fee.students?.name || 'this student'}. Please collect fee first.`);
+                                  return;
+                                }
+                                const latestPayment = validPayments.length > 0 ? validPayments[validPayments.length - 1] : null;
+                                setReceiptTargetFee({
+                                  id: fee.id,
+                                  payment_id: latestPayment?.id,
+                                  receipt_number: latestPayment?.receipt_number || fee.receipt_number,
+                                  paid_amount: Number(latestPayment?.amount_paid || fee.amount_paid),
+                                  amount_paid: Number(latestPayment?.amount_paid || fee.amount_paid),
+                                  total_amount: fee.total_amount,
+                                  net_amount: fee.net_amount,
+                                  fine_amount: fee.fine_amount,
+                                  discount_amount: fee.discount_amount,
+                                  remaining_amount: fee.remaining_amount,
+                                  payment_mode: latestPayment?.payment_mode || fee.payment_mode || 'Cash',
+                                  payment_date: latestPayment?.payment_date || fee.payment_date,
+                                  transaction_id: latestPayment?.transaction_id || null,
+                                  remarks: latestPayment?.remarks || null,
+                                  category_name: fee.category_name,
+                                  academic_year: fee.academic_year,
+                                  students: fee.students,
+                                  student_id: fee.student_id,
+                                  created_by: latestPayment?.created_by
+                                });
                                 setIsReceiptModalOpen(true);
                               }}
                               className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition-colors cursor-pointer"
@@ -1289,16 +1333,24 @@ export default function FeesPortal() {
                             onClick={() => {
                               setReceiptTargetFee({
                                 id: t.student_fee_id,
+                                payment_id: t.id,
                                 receipt_number: t.receipt_number,
                                 transaction_id: t.transaction_id,
                                 paid_amount: Number(t.amount_paid),
                                 amount_paid: Number(t.amount_paid),
-                                total_amount: Number(t.amount_paid),
+                                total_amount: Number(t.student_fees?.total_amount || t.amount_paid),
+                                net_amount: Number(t.student_fees?.net_amount || t.student_fees?.total_amount || t.amount_paid),
+                                fine_amount: Number(t.student_fees?.fine_amount || 0),
+                                discount_amount: Number(t.student_fees?.discount_amount || 0),
                                 remaining_amount: Math.max(0, (Number(t.student_fees?.net_amount || t.student_fees?.total_amount || t.amount_paid)) - Number(t.student_fees?.amount_paid || t.amount_paid)),
                                 payment_date: t.payment_date,
                                 payment_mode: t.payment_mode,
+                                remarks: t.remarks,
                                 category_name: t.student_fees?.fee_categories?.category_name || 'Academic Fee',
-                                students: t.student_fees?.students
+                                academic_year: t.student_fees?.academic_years?.name || currentYear?.name || '2026-27',
+                                students: t.student_fees?.students,
+                                student_id: t.student_fees?.students?.id || t.student_fees?.student_id,
+                                created_by: t.created_by
                               });
                               setIsReceiptModalOpen(true);
                             }}

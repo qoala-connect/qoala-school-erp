@@ -9,7 +9,7 @@ export default async function run() {
   const { sb } = await asAdmin();
   const r = await refs();
   const student = r.students[0];
-  let bookId = null, routeId = null, vehicleId = null, driverId = null, hostelId = null;
+  let bookId = null, routeId = null, vehicleId = null, driverId = null, hostelId = null, vendorId = null;
 
   // ============================================================== LIBRARY
   await check('Library/Books', 'Add book (insert library_books)', async () => {
@@ -101,22 +101,65 @@ export default async function run() {
     const payload = {
       asset_name: uniq('Asset').slice(0, 40), asset_tag: 'QA-AST-' + Math.floor(Math.random() * 9999),
       category: 'Furniture', purchase_date: new Date().toISOString().substring(0, 10),
-      purchase_cost: 5000, condition: 'Good', status: 'operational',
+      purchase_cost: 5000, quantity: 12, condition: 'Good', status: 'operational',
     };
     const data = ok(await sb.from('assets').insert([payload]).select().single(), 'insert assets');
     trashIt('assets', data.id);
+    // The form has always asked for a quantity; it had nowhere to go until
+    // migration 34, and every asset rendered as "1 units".
+    assert(Number(data.quantity) === 12, `quantity did not persist (got ${data.quantity})`);
     return 'ok';
   });
 
   await check('Inventory/Stock', 'Add stock item (insert inventory)', async () => {
     // InventoryManagement.tsx handleSave, activeTab === 'stock'
     const payload = {
+      item_code: 'QA-STK-' + Math.floor(Math.random() * 999999),
       item_name: uniq('Item').slice(0, 40), quantity_total: 25, quantity_available: 25,
-      min_quantity: 10, status: 'In Stock',
+      min_quantity: 10, unit_price: 150, status: 'In Stock',
     };
     const data = ok(await sb.from('inventory').insert([payload]).select().single(), 'insert inventory');
     trashIt('inventory', data.id);
+    // The page used to render a hardcoded unit price of 100 for every item.
+    assert(Number(data.unit_price) === 150, `unit_price did not persist (got ${data.unit_price})`);
+    assert(data.item_code === payload.item_code, 'item_code did not persist');
     return 'ok';
+  });
+
+  await check('Inventory/Vendors', 'Add + edit vendor (insert/update vendors)', async () => {
+    // InventoryManagement.tsx handleSave, activeTab === 'vendors'
+    const payload = {
+      vendor_name: uniq('Vendor').slice(0, 60), contact_person: 'QA Contact',
+      phone: '+91 90000 00001', email: 'qa.vendor@example.com',
+      address: 'Barhalganj, Gorakhpur', status: 'Active',
+    };
+    const data = ok(await sb.from('vendors').insert([payload]).select().single(), 'insert vendors');
+    vendorId = data.id; trashIt('vendors', vendorId);
+    const edited = ok(await sb.from('vendors').update({ status: 'Blacklisted' })
+      .eq('id', vendorId).select().single(), 'update vendors');
+    assert(edited.status === 'Blacklisted', 'vendor status did not persist');
+    return 'ok';
+  });
+
+  await check('Inventory/Orders', 'Raise purchase order — every status (insert/update purchase_orders)', async () => {
+    // InventoryManagement.tsx handleSave, activeTab === 'orders'
+    assert(vendorId, 'no vendor');
+    const { data: vendor } = await sb.from('vendors').select('vendor_name').eq('id', vendorId).single();
+    const payload = {
+      order_code: 'QA-PO-' + Math.floor(Math.random() * 999999),
+      vendor_id: vendorId, vendor_name: vendor.vendor_name,
+      item_ordered: 'QA line item', quantity: 5, total_price: 12500, status: 'Draft',
+    };
+    const data = ok(await sb.from('purchase_orders').insert([payload]).select().single(), 'insert purchase_orders');
+    trashIt('purchase_orders', data.id);
+
+    // Exactly the options in the "PO Status" <select>.
+    for (const st of ['Sent', 'Received', 'Cancelled']) {
+      ok(await sb.from('purchase_orders').update({ status: st }).eq('id', data.id).select().single(), `status "${st}"`);
+    }
+    const { error } = await sb.from('purchase_orders').update({ status: 'Shipped' }).eq('id', data.id);
+    assert(error, 'a status outside the PO vocabulary was accepted');
+    return '4 statuses';
   });
 
   // =============================================================== HOSTEL

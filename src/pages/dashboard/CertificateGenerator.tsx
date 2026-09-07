@@ -42,9 +42,10 @@ type CertificateType = 'excellence' | 'transfer' | 'bonafide' | 'character' | 'm
 // Border themes
 type BorderTheme = 'navy_gold' | 'emerald_gold' | 'maroon_silver' | 'cosmic_cyan' | 'minimal_slate';
 
-const SCHOOL_NAME     = 'R.M. Memorial Public School';
-const SCHOOL_SHORT    = 'RMMPS';
-const CBSE_AFF_NO     = '2130842';
+const SCHOOL_NAME     = 'St. Joseph’s School, Barhalganj';
+const SCHOOL_SHORT    = 'SJSB';
+const CBSE_AFF_NO     = '2131498';
+const SCHOOL_ADDRESS  = 'Barhalganj, Gorakhpur (U.P.) - 273402';
 
 interface IssuedCertificate {
   id: string;
@@ -347,7 +348,7 @@ export default function CertificateGenerator() {
       case 'transfer':
         return `This is to certify that ${studentName}, son/daughter of Mr. ${fatherName} and Mrs. ${motherName}, was a bonafide student of ${SCHOOL_NAME}. Admitted on ${dateOfAdmission} and has successfully withdrawn admission with effect from ${dateOfLeaving}. Last class studied: ${lastClassStudied}. Result: ${whetherPassed}. Reason for leaving: ${reasonForLeaving}. All school dues have been cleared. Conduct and character during tenure was exemplary.`;
       case 'bonafide':
-        return `This is to certify that ${studentName}, son/daughter of Mr. ${fatherName}, is a bonafide student of ${SCHOOL_NAME} (CBSE Aff. No. ${CBSE_AFF_NO}), Gorakhpur Road, Deoria (U.P.). The student is currently enrolled in ${classSection} during the academic session ${academicYear}. To the best of our knowledge, the student bears an outstanding moral character.`;
+        return `This is to certify that ${studentName}, son/daughter of Mr. ${fatherName}, is a bonafide student of ${SCHOOL_NAME} (CBSE Aff. No. ${CBSE_AFF_NO}), ${SCHOOL_ADDRESS}. The student is currently enrolled in ${classSection} during the academic session ${academicYear}. To the best of our knowledge, the student bears an outstanding moral character.`;
       case 'character':
         return `This is to certify that ${studentName} of ${classSection} has been a student of this institution. During the academic tenure, the student displayed admirable character, observed school regulations with utmost discipline, and actively participated in co-curricular and community welfare activities.`;
       case 'migration':
@@ -912,7 +913,7 @@ export default function CertificateGenerator() {
                       {SCHOOL_NAME}
                     </div>
                     <div className="text-[8.5px] font-bold text-slate-400 uppercase tracking-widest mt-1">
-                      CBSE Affiliated • Aff. No. {CBSE_AFF_NO} • Gorakhpur Road, Deoria (U.P.)
+                      CBSE Affiliated • Aff. No. {CBSE_AFF_NO} • {SCHOOL_ADDRESS}
                     </div>
                   </div>
                 </div>

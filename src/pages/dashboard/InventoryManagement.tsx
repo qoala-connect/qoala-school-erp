@@ -56,6 +56,13 @@ interface PurchaseOrder {
 
 type TabType = 'assets' | 'stock' | 'vendors' | 'orders';
 
+const RECORD_LABEL: Record<TabType, string> = {
+  assets: 'Fixed Asset',
+  stock: 'Stock Item',
+  vendors: 'Vendor',
+  orders: 'Purchase Order'
+};
+
 export default function InventoryManagement() {
   const location = useLocation();
   const requestedTab = (location.state as any)?.activeTab as TabType | undefined;
@@ -90,10 +97,15 @@ export default function InventoryManagement() {
     setIsSyncing(true);
     setErrorState(null);
     try {
-      const [assetsRes, invRes] = await Promise.all([
+      const [assetsRes, invRes, vendorsRes, ordersRes] = await Promise.all([
         supabase.from('assets').select('*').order('asset_name'),
-        supabase.from('inventory').select('*').order('item_name')
+        supabase.from('inventory').select('*').order('item_name'),
+        supabase.from('vendors').select('*').order('vendor_name'),
+        supabase.from('purchase_orders').select('*').order('order_code')
       ]);
+
+      const firstError = [assetsRes, invRes, vendorsRes, ordersRes].find(r => r.error)?.error;
+      if (firstError) throw firstError;
 
       if (assetsRes.data) {
         setAssets(assetsRes.data.map((a: any) => ({
@@ -101,22 +113,53 @@ export default function InventoryManagement() {
           code: a.asset_tag || 'AST-001',
           name: a.asset_name || 'Campus Asset',
           category: (a.category as any) || 'Furniture',
-          quantity: 1,
+          quantity: Number(a.quantity ?? 1),
           purchase_date: a.purchase_date || new Date().toISOString().substring(0, 10),
           condition: (a.condition as any) || 'Good',
-          value: Number(a.purchase_cost || 5000)
+          value: Number(a.purchase_cost || 0)
         })));
       }
 
       if (invRes.data) {
-        setStock(invRes.data.map((i: any) => ({
-          id: i.id,
-          code: `STK-${i.id.substring(0, 6)}`,
-          name: i.item_name || 'Stock Item',
-          quantity: Number(i.quantity_total || 0),
-          reorder_level: Number(i.min_quantity || 10),
-          unit_price: 100,
-          status: Number(i.quantity_total || 0) === 0 ? 'Out-of-Stock' : Number(i.quantity_total || 0) <= Number(i.min_quantity || 10) ? 'Low-Stock' : 'In-Stock'
+        setStock(invRes.data.map((i: any) => {
+          // The register tracks what is on hand, not what was ever bought:
+          // quantity_available is the figure the storekeeper reorders against.
+          const available = Number(i.quantity_available ?? i.quantity_total ?? 0);
+          const reorder = Number(i.min_quantity ?? 0);
+          return {
+            id: i.id,
+            code: i.item_code || `STK-${String(i.id).substring(0, 6).toUpperCase()}`,
+            name: i.item_name || 'Stock Item',
+            quantity: available,
+            reorder_level: reorder,
+            unit_price: Number(i.unit_price || 0),
+            status: available <= 0 ? 'Out-of-Stock' : available <= reorder ? 'Low-Stock' : 'In-Stock'
+          };
+        }));
+      }
+
+      if (vendorsRes.data) {
+        setVendors(vendorsRes.data.map((v: any) => ({
+          id: v.id,
+          name: v.vendor_name || 'Supplier',
+          contact_person: v.contact_person || '--',
+          phone: v.phone || '--',
+          email: v.email || '--',
+          address: v.address || '--',
+          status: (v.status as any) || 'Active'
+        })));
+      }
+
+      if (ordersRes.data) {
+        setOrders(ordersRes.data.map((o: any) => ({
+          id: o.id,
+          order_code: o.order_code,
+          vendor_name: o.vendor_name || 'Unassigned Vendor',
+          item_ordered: o.item_ordered || '--',
+          quantity: Number(o.quantity || 0),
+          total_price: Number(o.total_price || 0),
+          status: (o.status as any) || 'Draft',
+          delivery_date: o.delivery_date || undefined
         })));
       }
 
@@ -144,7 +187,8 @@ export default function InventoryManagement() {
           asset_tag: formData.code,
           category: formData.category || 'Furniture',
           purchase_date: formData.purchase_date || new Date().toISOString().substring(0, 10),
-          purchase_cost: Number(formData.value || 5000),
+          purchase_cost: Number(formData.value || 0),
+          quantity: Number(formData.quantity || 1),
           condition: formData.condition || 'Good',
           // assets.status vocabulary is operational | under maintenance | damaged | written off.
           status: 'operational'
@@ -158,12 +202,18 @@ export default function InventoryManagement() {
           if (error) throw error;
         }
       } else if (activeTab === 'stock') {
+        const onHand = Number(formData.quantity || 0);
+        const reorder = Number(formData.reorder_level || 0);
         const payload: any = {
+          item_code: formData.code || null,
           item_name: formData.name,
-          quantity_total: Number(formData.quantity || 0),
-          quantity_available: Number(formData.quantity || 0),
-          min_quantity: Number(formData.reorder_level || 10),
-          status: Number(formData.quantity || 0) <= 0 ? 'Out of Stock' : 'In Stock'
+          quantity_total: onHand,
+          quantity_available: onHand,
+          min_quantity: reorder,
+          unit_price: Number(formData.unit_price || 0),
+          // inventory.status uses a spaced vocabulary; the table's own badge
+          // vocabulary is hyphenated, so the two must not be interchanged.
+          status: onHand <= 0 ? 'Out of Stock' : onHand <= reorder ? 'Low Stock' : 'In Stock'
         };
 
         if (editingItem) {
@@ -171,6 +221,45 @@ export default function InventoryManagement() {
           if (error) throw error;
         } else {
           const { error } = await supabase.from('inventory').insert([payload]);
+          if (error) throw error;
+        }
+      } else if (activeTab === 'vendors') {
+        const payload: any = {
+          vendor_name: formData.name,
+          contact_person: formData.contact_person || null,
+          phone: formData.phone || null,
+          email: formData.email || null,
+          address: formData.address || null,
+          status: formData.status || 'Active'
+        };
+
+        if (editingItem) {
+          const { error } = await supabase.from('vendors').update(payload).eq('id', editingItem.id);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.from('vendors').insert([payload]);
+          if (error) throw error;
+        }
+      } else if (activeTab === 'orders') {
+        const vendorName = formData.vendor_name || vendors[0]?.name || '';
+        const payload: any = {
+          order_code: formData.order_code,
+          // vendor_id links the PO to the directory; vendor_name is stored
+          // alongside it so a delisted supplier is still named on the order.
+          vendor_id: vendors.find(v => v.name === vendorName)?.id || null,
+          vendor_name: vendorName,
+          item_ordered: formData.item_ordered,
+          quantity: Number(formData.quantity || 1),
+          total_price: Number(formData.total_price || 0),
+          status: formData.status || 'Draft',
+          delivery_date: formData.delivery_date || null
+        };
+
+        if (editingItem) {
+          const { error } = await supabase.from('purchase_orders').update(payload).eq('id', editingItem.id);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.from('purchase_orders').insert([payload]);
           if (error) throw error;
         }
       }
@@ -190,7 +279,10 @@ export default function InventoryManagement() {
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this record?')) return;
     try {
-      const table = activeTab === 'assets' ? 'assets' : 'inventory';
+      const table =
+        activeTab === 'assets'  ? 'assets' :
+        activeTab === 'stock'   ? 'inventory' :
+        activeTab === 'vendors' ? 'vendors' : 'purchase_orders';
       const { error } = await supabase.from(table).delete().eq('id', id);
       if (error) throw error;
 
@@ -311,62 +403,96 @@ export default function InventoryManagement() {
     setSelectedItems(prev => prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]);
   };
 
+  // Mirrors what the module actually reads and writes. It used to print a
+  // set of inventory_* tables that exist nowhere in the database, so anyone
+  // who ran it got four empty tables the page never touches.
   const generateSQL = () => {
     return `-- ==========================================================
--- ST. JOSEPH'S SCHOOL, BARHALGANJ - INVENTORY SCHEMAS
--- ADDITIVE PRODUCTION MIGRATIONS
+-- ST. JOSEPH'S SCHOOL, BARHALGANJ - INVENTORY SCHEMA
+-- Tables this module reads and writes.
+-- Applied by supabase_inventory_module_34.sql
 -- ==========================================================
 
-CREATE TABLE IF NOT EXISTS inventory_assets (
-  id TEXT PRIMARY KEY,
-  code TEXT NOT NULL UNIQUE,
-  name TEXT NOT NULL,
-  category TEXT CHECK (category IN ('Furniture', 'Electronics', 'Lab Equipment', 'Sports', 'Other')),
-  quantity INTEGER NOT NULL DEFAULT 1,
-  purchase_date DATE,
-  condition TEXT CHECK (condition IN ('Excellent', 'Good', 'Damaged', 'Scrapped')),
-  value NUMERIC(12,2) DEFAULT 0.00,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+-- Fixed assets registry
+CREATE TABLE IF NOT EXISTS public.assets (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  asset_name    varchar NOT NULL,
+  asset_tag     varchar UNIQUE,
+  category      varchar,
+  quantity      integer NOT NULL DEFAULT 1 CHECK (quantity >= 0),
+  condition     text NOT NULL DEFAULT 'Good',
+  status        varchar DEFAULT 'operational'
+                CHECK (status IN ('operational','under maintenance','damaged','written off')),
+  purchase_date date,
+  purchase_cost numeric(12,2) DEFAULT 0.00,
+  location      varchar,
+  created_at    timestamptz DEFAULT now(),
+  updated_at    timestamptz DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS inventory_stock (
-  id TEXT PRIMARY KEY,
-  code TEXT NOT NULL UNIQUE,
-  name TEXT NOT NULL,
-  quantity INTEGER NOT NULL DEFAULT 0,
-  reorder_level INTEGER DEFAULT 10,
-  unit_price NUMERIC(10,2) DEFAULT 0.00,
-  status TEXT CHECK (status IN ('In-Stock', 'Low-Stock', 'Out-of-Stock')),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+-- Consumable stock register
+CREATE TABLE IF NOT EXISTS public.inventory (
+  id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  item_code          varchar(40) UNIQUE,
+  item_name          varchar NOT NULL UNIQUE,
+  item_category      varchar,
+  quantity_total     integer DEFAULT 0 CHECK (quantity_total >= 0),
+  quantity_available integer DEFAULT 0,
+  min_quantity       integer NOT NULL DEFAULT 0,
+  unit_price         numeric DEFAULT 0.00,
+  status             text NOT NULL DEFAULT 'In Stock',
+  created_at         timestamptz DEFAULT now(),
+  updated_at         timestamptz DEFAULT now(),
+  CHECK (quantity_available >= 0 AND quantity_available <= quantity_total)
 );
 
-CREATE TABLE IF NOT EXISTS inventory_vendors (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  contact_person TEXT,
-  phone TEXT,
-  email TEXT,
-  address TEXT,
-  status TEXT CHECK (status IN ('Active', 'Blacklisted')) DEFAULT 'Active',
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+-- Approved suppliers
+CREATE TABLE IF NOT EXISTS public.vendors (
+  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  vendor_name    varchar(160) NOT NULL UNIQUE,
+  contact_person varchar(120),
+  phone          varchar(40),
+  email          varchar(160),
+  address        text,
+  status         text NOT NULL DEFAULT 'Active'
+                 CHECK (status IN ('Active','Blacklisted')),
+  created_at     timestamptz DEFAULT now(),
+  updated_at     timestamptz DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS inventory_orders (
-  id TEXT PRIMARY KEY,
-  order_code TEXT NOT NULL UNIQUE,
-  vendor_name TEXT NOT NULL,
-  item_ordered TEXT NOT NULL,
-  quantity INTEGER NOT NULL,
-  total_price NUMERIC(12,2) NOT NULL,
-  status TEXT CHECK (status IN ('Draft', 'Sent', 'Received', 'Cancelled')) DEFAULT 'Draft',
-  delivery_date DATE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);`;
+-- Purchase orders raised against those suppliers
+CREATE TABLE IF NOT EXISTS public.purchase_orders (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_code    varchar(40) NOT NULL UNIQUE,
+  vendor_id     uuid REFERENCES public.vendors(id) ON DELETE SET NULL,
+  vendor_name   varchar(160) NOT NULL,
+  item_ordered  text NOT NULL,
+  quantity      integer NOT NULL DEFAULT 1 CHECK (quantity > 0),
+  total_price   numeric(12,2) NOT NULL DEFAULT 0.00 CHECK (total_price >= 0),
+  status        text NOT NULL DEFAULT 'Draft'
+                CHECK (status IN ('Draft','Sent','Received','Cancelled')),
+  delivery_date date,
+  created_at    timestamptz DEFAULT now(),
+  updated_at    timestamptz DEFAULT now()
+);
+
+-- All four are gated on: is_admin() OR auth_has_permission('inventory.manage')`;
   };
 
   const netAssetValue = useMemo(() => {
     return assets.reduce((sum, item) => sum + item.value, 0);
   }, [assets]);
+
+  // Consumables are valued at what is still on the shelf, not what was bought.
+  const stockOnHandValue = useMemo(() => {
+    return stock.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
+  }, [stock]);
+
+  const openOrdersValue = useMemo(() => {
+    return orders
+      .filter(o => o.status === 'Draft' || o.status === 'Sent')
+      .reduce((sum, o) => sum + o.total_price, 0);
+  }, [orders]);
 
   return (
     <div className="space-y-5 max-w-7xl mx-auto pb-16 text-slate-700 font-sans antialiased">
@@ -403,7 +529,7 @@ CREATE TABLE IF NOT EXISTS inventory_orders (
         <AdminStatCard
           label="Total Asset Valuation"
           value={`₹${netAssetValue.toLocaleString('en-IN')}`}
-          subtext="Net institutional valuation"
+          subtext={`${assets.length} tagged assets - stock on hand Rs.${Math.round(stockOnHandValue).toLocaleString('en-IN')}`}
           icon={Package}
           variant="emerald"
         />
@@ -417,14 +543,14 @@ CREATE TABLE IF NOT EXISTS inventory_orders (
         <AdminStatCard
           label="Active Vendors"
           value={vendors.filter(v => v.status === 'Active').length}
-          subtext="Approved Partners"
+          subtext={`${vendors.length} in supplier directory`}
           icon={Truck}
           variant="primary"
         />
         <AdminStatCard
           label="Pending Orders"
           value={orders.filter(o => o.status === 'Sent' || o.status === 'Draft').length}
-          subtext="In-Pipeline POs"
+          subtext={`Rs.${Math.round(openOrdersValue).toLocaleString('en-IN')} committed`}
           icon={ShoppingCart}
           variant="violet"
         />
@@ -443,7 +569,7 @@ CREATE TABLE IF NOT EXISTS inventory_orders (
             return (
               <button
                 key={tab.id}
-                onClick={() => { setActiveTab(tab.id as TabType); setSelectedItems([]); }}
+                onClick={() => { setActiveTab(tab.id as TabType); setSelectedItems([]); setCategoryFilter('all'); }}
                 className={cn(
                   "inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer",
                   active 
@@ -814,7 +940,7 @@ CREATE TABLE IF NOT EXISTS inventory_orders (
             >
               <div className="p-5 bg-slate-900 border-b border-slate-800 flex items-center justify-between text-white">
                 <h3 className="font-display font-black uppercase text-xs">
-                  {editingItem ? 'Edit Inventory Record' : `Add New ${activeTab.replace('s', '').toUpperCase()}`}
+                  {editingItem ? `Edit ${RECORD_LABEL[activeTab]}` : `Add New ${RECORD_LABEL[activeTab]}`}
                 </h3>
                 <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-white cursor-pointer"><X className="w-5 h-5" /></button>
               </div>

@@ -398,20 +398,30 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
 
   // Filter categories and their items by current user permissions
   const categoriesToRender = isStudentOrParent ? studentSidebarCategories : sidebarCategories;
+  const isAdminOrSuperAdmin = role === 'admin' || role === 'super_admin';
 
-  const filteredCategories = categoriesToRender.map(cat => {
-    const items = cat.items.filter(item => {
-      if (!item.permission) return true;
-      return can(item.permission);
+  const filteredCategories = categoriesToRender
+    .filter(cat => {
+      // Hide teacher individual workspace "My Teaching" from Admin/Super Admin
+      if (isAdminOrSuperAdmin && cat.title === 'My Teaching') {
+        return false;
+      }
+      return true;
+    })
+    .map(cat => {
+      const items = cat.items.filter(item => {
+        if (!item.permission) return true;
+        return can(item.permission);
+      });
+      return {
+        ...cat,
+        items
+      };
+    })
+    .filter(cat => {
+      if (!cat.permission) return cat.items.length > 0;
+      return can(cat.permission) && cat.items.length > 0;
     });
-    return {
-      ...cat,
-      items
-    };
-  }).filter(cat => {
-    if (!cat.permission) return cat.items.length > 0;
-    return can(cat.permission) && cat.items.length > 0;
-  });
 
   // Global Search logic
   const [searchQuery, setSearchQuery] = useState('');
