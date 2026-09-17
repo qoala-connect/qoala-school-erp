@@ -16,6 +16,18 @@ export interface ChatResponsePayload {
 }
 
 /**
+ * Gemini model candidates to try, in order. Defaults to a real, currently
+ * supported flash lineup; override with a comma-separated GEMINI_MODEL env var.
+ */
+export function getGeminiCandidateModels(): string[] {
+  const override = process.env.GEMINI_MODEL?.trim();
+  if (override) {
+    return override.split(',').map(m => m.trim()).filter(Boolean);
+  }
+  return ['gemini-flash-latest', 'gemini-3.6-flash', 'gemini-2.5-flash'];
+}
+
+/**
  * Helper to extract class name from text (e.g. "Class 10", "10th", "Class 8-A", "Nursery", "LKG")
  */
 function extractClassName(text: string): string | undefined {
@@ -120,65 +132,78 @@ CRITICAL ROLE & SECURITY RULES:
    - ALWAYS call the appropriate tool when asked about specific students, attendance numbers, fee dues, timetable periods, or exam marks.
    - NEVER invent or guess database figures. If no records match, state that clearly.
 5. CONTROLLED ACTIONS:
-   - If the user asks to mark attendance, submit marks, or publish a notice, call "propose_erp_action". DO NOT claim it is executed until the user confirms the action card.`;
+   - If the user asks to mark attendance, submit marks, or publish a notice, call "propose_erp_action". DO NOT claim it is executed until the user confirms the action card.
+6. RESPONSE FORMATTING:
+   - When presenting multiple records (a student roster, attendance register, fee ledger, marks breakdown, timetable, etc.), format them as a proper GitHub-flavored Markdown table (a header row, a "|---|---|" separator row, then data rows) instead of a wall of text or an ad-hoc list — the UI renders real Markdown tables with full column alignment.
+   - Use short bullet points for simple lists and **bold** for key figures. Keep prose between tables brief.
+   - You may call more than one tool in sequence within the same turn if answering the question fully requires it (e.g. look up a student, then their fee status).`;
 
   // -----------------------------------------------------------------
   // Option A: Try Gemini Generative AI with Function Calling
   // -----------------------------------------------------------------
   if (genAI) {
     try {
-      const candidateModels = [
-        'gemini-3.6-flash',
-        'gemini-3.7-flash',
-        'gemini-2.5-flash',
-        'gemini-2.0-flash'
-      ];
-      
-      const contents: any[] = [];
+      const candidateModels = getGeminiCandidateModels();
+
+      const baseContents: any[] = [];
       if (Array.isArray(history) && history.length > 0) {
-        history.slice(-6).forEach(h => {
-          contents.push({
+        history.slice(-12).forEach(h => {
+          baseContents.push({
             role: h.role === 'user' ? 'user' : 'model',
             parts: [{ text: h.text }]
           });
         });
       }
-      contents.push({
+      baseContents.push({
         role: 'user',
         parts: [{ text: message }]
       });
 
       let replyText: string | null = null;
+      const MAX_TOOL_ROUNDS = 4;
 
       for (const modelName of candidateModels) {
         try {
-          const chatResponse = await genAI.models.generateContent({
-            model: modelName,
-            contents,
-            config: {
-              systemInstruction,
-              temperature: 0.3,
-              maxOutputTokens: 1500,
-              tools: [{ functionDeclarations: geminiToolDeclarations as any }]
+          let workingContents = [...baseContents];
+          let modelReplyText: string | null = null;
+          const roundToolsUsed: string[] = [];
+          const roundStructuredData: any[] = [];
+
+          for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+            const isFinalRound = round === MAX_TOOL_ROUNDS - 1;
+
+            const response = await genAI.models.generateContent({
+              model: modelName,
+              contents: workingContents,
+              config: {
+                systemInstruction,
+                temperature: 0.3,
+                maxOutputTokens: 2048,
+                ...(isFinalRound ? {} : { tools: [{ functionDeclarations: geminiToolDeclarations as any }] })
+              }
+            });
+
+            const candidates = response?.candidates || [];
+            const firstCandidate = candidates[0];
+            const functionCalls = firstCandidate?.content?.parts?.filter((p: any) => p.functionCall) || [];
+
+            if (functionCalls.length === 0 || isFinalRound) {
+              if (response && response.text) {
+                modelReplyText = response.text;
+              }
+              break;
             }
-          });
 
-          const candidates = chatResponse?.candidates || [];
-          const firstCandidate = candidates[0];
-          const functionCalls = firstCandidate?.content?.parts?.filter((p: any) => p.functionCall) || [];
-
-          if (functionCalls.length > 0) {
             const functionResponseParts: any[] = [];
-
             for (const fcPart of functionCalls) {
               const call = fcPart.functionCall;
               const name = call.name;
               const args = call.args || {};
-              toolsUsed.push(name);
+              roundToolsUsed.push(name);
 
               const toolRes: ToolResult = await executeTool(name, args, context, supabase);
               if (toolRes.structuredPayload) {
-                structuredData.push(toolRes.structuredPayload);
+                roundStructuredData.push(toolRes.structuredPayload);
               }
 
               functionResponseParts.push({
@@ -189,28 +214,17 @@ CRITICAL ROLE & SECURITY RULES:
               });
             }
 
-            const turn2Contents = [
-              ...contents,
+            workingContents = [
+              ...workingContents,
               { role: 'model', parts: firstCandidate.content.parts },
               { role: 'user', parts: functionResponseParts }
             ];
+          }
 
-            const secondResponse = await genAI.models.generateContent({
-              model: modelName,
-              contents: turn2Contents,
-              config: {
-                systemInstruction,
-                temperature: 0.3,
-                maxOutputTokens: 1500
-              }
-            });
-
-            if (secondResponse && secondResponse.text) {
-              replyText = secondResponse.text;
-              break;
-            }
-          } else if (chatResponse && chatResponse.text) {
-            replyText = chatResponse.text;
+          if (modelReplyText) {
+            replyText = modelReplyText;
+            toolsUsed.push(...roundToolsUsed);
+            structuredData.push(...roundStructuredData);
             break;
           }
         } catch (err: any) {

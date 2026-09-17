@@ -72,7 +72,7 @@ export interface PhotoUploadResult {
  */
 export async function uploadEntityPhoto(
   file: File,
-  folder: 'students' | 'teachers' | 'staff' = 'students',
+  folder: 'students' | 'teachers' | 'staff' | 'assignments' = 'students',
   entityId?: string
 ): Promise<PhotoUploadResult> {
   const { blob, dataUrl } = await processImageFile(file);

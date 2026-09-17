@@ -141,6 +141,7 @@ export const feeService = {
         created_at: row.created_at,
         updated_at: row.updated_at,
         category_name: categoryName,
+        frequency: row.fee_categories?.frequency || undefined,
         academic_year: row.academic_years?.name || '2026-27',
         month: monthStr,
         payment_mode: lastPayment?.payment_mode || 'cash',
@@ -445,6 +446,7 @@ export const feeService = {
           payment_date: new Date().toISOString().split('T')[0],
           transaction_id: input.transactionId || null,
           remarks: input.remarks || null,
+          receipt_number: input.receiptNumber || null,
         })
       });
 
@@ -492,6 +494,7 @@ export const feeService = {
       _payment_date: new Date().toISOString().split('T')[0],
       _transaction_id: input.transactionId || null,
       _remarks: input.remarks || null,
+      _receipt_number: input.receiptNumber || null,
     });
 
     if (error) {
@@ -611,7 +614,7 @@ export const feeService = {
           status,
           academic_year_id,
           academic_years ( id, name ),
-          fee_categories ( category_name ),
+          fee_categories ( category_name, frequency ),
           students (
             id,
             name,
@@ -665,8 +668,15 @@ export const feeService = {
   /**
    * Fetch complete payment receipt details by receipt number or payment ID
    */
-  async fetchPaymentReceipt(paymentIdOrReceiptNo: string): Promise<any | null> {
+  /**
+   * Looking up by `id` returns that one payment row. Looking up by receipt
+   * number returns EVERY row sharing it -- a receipt number now spans a
+   * whole cashier batch (several ledger lines settled in one payment), not
+   * a single fee_payments row, so a caller must not assume one result.
+   */
+  async fetchPaymentReceipt(paymentIdOrReceiptNo: string): Promise<any[] | null> {
     if (!paymentIdOrReceiptNo) return null;
+    const isId = paymentIdOrReceiptNo.includes('-') && paymentIdOrReceiptNo.length === 36;
     try {
       let query = supabase
         .from('fee_payments')
@@ -703,24 +713,23 @@ export const feeService = {
               section,
               father_name,
               mother_name,
-              guardian_name,
               phone
             )
           )
         `);
 
-      if (paymentIdOrReceiptNo.includes('-') && paymentIdOrReceiptNo.length === 36) {
-        query = query.eq('id', paymentIdOrReceiptNo);
-      } else {
-        query = query.eq('receipt_number', paymentIdOrReceiptNo);
-      }
+      query = isId ? query.eq('id', paymentIdOrReceiptNo) : query.eq('receipt_number', paymentIdOrReceiptNo);
 
-      const { data, error } = await query.maybeSingle();
-      if (error || !data) return null;
+      const { data, error } = await query;
+      if (error) {
+        console.error('[feeService.fetchPaymentReceipt] Query error:', error);
+        throw new Error(error.message || 'Failed to fetch receipt.');
+      }
+      if (!data || data.length === 0) return null;
       return data;
-    } catch (e) {
+    } catch (e: any) {
       console.warn('[feeService.fetchPaymentReceipt] Error fetching receipt:', e);
-      return null;
+      throw e;
     }
   },
 
@@ -836,6 +845,7 @@ export const feeService = {
         created_at: row.created_at,
         updated_at: row.updated_at,
         category_name: categoryName,
+        frequency: row.fee_categories?.frequency || undefined,
         academic_year: row.academic_years?.name || '2026-27',
         payment_mode: lastPayment?.payment_mode || 'cash',
         payment_date: lastPayment?.payment_date || row.created_at?.split('T')[0],

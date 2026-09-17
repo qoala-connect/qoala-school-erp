@@ -1,7 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
-import { 
+import remarkGfm from 'remark-gfm';
+import { aiMarkdownComponents } from '@/components/ai/aiMarkdownComponents';
+import {
   Sparkles, Brain, Bot, Send, Search, User, Layers, Calendar, HelpCircle,
   AlertCircle, ArrowRight, TrendingUp, Wallet, Award, CheckCircle, RefreshCw, MessageSquare
 } from 'lucide-react';
@@ -445,7 +447,7 @@ export default function AIAssistant() {
                       )}
 
                       <div className={cn("prose prose-xs max-w-none break-words", msg.sender === 'user' ? 'text-white' : 'text-slate-800')}>
-                        <Markdown>{msg.text}</Markdown>
+                        <Markdown remarkPlugins={[remarkGfm]} components={aiMarkdownComponents}>{msg.text}</Markdown>
                       </div>
 
                       {/* Structured ERP Payloads */}

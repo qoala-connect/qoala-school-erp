@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus, PencilRuler, Search, Trash2, Eye } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Plus, PencilRuler, Search, Trash2, Eye, ImagePlus, X, Copy, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { uploadEntityPhoto } from '@/lib/photoUpload';
 import {
   fetchAssignments, saveAssignment, setAssignmentStatus, deleteAssignment,
   type Assignment, type AssignmentKind, type AssignmentStatus, type TeacherScopeRow,
@@ -39,6 +40,9 @@ export default function AssignmentsView({
   const [reviewing, setReviewing] = useState<Assignment | null>(null);
   const [confirmDel, setConfirmDel] = useState<Assignment | null>(null);
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [preview, setPreview] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -75,14 +79,42 @@ export default function AssignmentsView({
     });
   }, [rows, classFilter, query]);
 
+  const openForm = (next: Partial<Assignment> & { _open?: boolean } | null) => {
+    setPreview(next?.attachment_url ?? null);
+    setForm(next);
+  };
+
   const openCreate = () =>
-    setForm({
+    openForm({
       _open: true,
       kind: 'homework',
       status: 'published',
       assigned_date: new Date().toISOString().slice(0, 10),
       max_marks: 20,
     });
+
+  // Compress on the client, push to Storage (data-URL fallback if the bucket is
+  // unreachable), and hang the resulting URL on the form.
+  const pickImage = async (file: File | undefined) => {
+    if (!file || !form) return;
+    if (!file.type.startsWith('image/')) { toast.error('Pick an image file.'); return; }
+    setUploading(true);
+    try {
+      const { url } = await uploadEntityPhoto(file, 'assignments', teacherId);
+      setForm(f => (f ? { ...f, attachment_url: url } : f));
+      setPreview(url);
+    } catch (err: any) {
+      toast.error(err?.message || 'Could not attach the image.');
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
+
+  const clearImage = () => {
+    setForm(f => (f ? { ...f, attachment_url: null } : f));
+    setPreview(null);
+  };
 
   const save = async () => {
     if (!form) return;
@@ -118,10 +150,11 @@ export default function AssignmentsView({
         assigned_date: form.assigned_date ?? new Date().toISOString().slice(0, 10),
         due_date: form.due_date ?? null,
         max_marks: form.kind === 'assignment' ? (form.max_marks ?? null) : null,
+        attachment_url: blankToNull(form.attachment_url),
         status: (form.status as AssignmentStatus) ?? 'published',
       });
       toast.success(form.id ? 'Saved.' : 'Published.');
-      setForm(null);
+      openForm(null);
       await load();
     } catch (err: any) {
       toast.error(err.message);
@@ -200,7 +233,16 @@ export default function AssignmentsView({
             <tbody>
               {filtered.map(a => (
                 <tr key={a.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50">
-                  <td className="py-3 px-4 text-[13px] font-bold text-slate-800">{a.title}</td>
+                  <td className="py-3 px-4 text-[13px] font-bold text-slate-800">
+                    <div className="flex items-center gap-2.5">
+                      {a.attachment_url && (
+                        <a href={a.attachment_url} target="_blank" rel="noreferrer" className="shrink-0" title="Open attached image">
+                          <img src={a.attachment_url} alt="" className="w-9 h-9 rounded-lg object-cover border border-slate-200" />
+                        </a>
+                      )}
+                      <span>{a.title}</span>
+                    </div>
+                  </td>
                   <td className="py-3 px-4"><StatusPill tone={a.kind === 'assignment' ? 'info' : 'muted'}>{a.kind}</StatusPill></td>
                   <td className="py-3 px-4 text-[12px] text-slate-600">{a.class ?? '—'}{a.section ? `-${a.section}` : ''}</td>
                   <td className="py-3 px-4 text-[12px] text-slate-500 tabular-nums">{a.assigned_date}</td>
@@ -211,8 +253,21 @@ export default function AssignmentsView({
                   <td className="py-3 px-4">
                     <div className="flex items-center justify-end gap-1">
                       <IconButton label="Review submissions" onClick={() => setReviewing(a)}><Eye size={14} /></IconButton>
-                      <IconButton label="Edit" onClick={() => setForm({ ...a, _open: true })}>
+                      <IconButton label="Edit" onClick={() => openForm({ ...a, _open: true })}>
                         <PencilRuler size={13} />
+                      </IconButton>
+                      <IconButton
+                        label="Duplicate to another class/section"
+                        onClick={() => openForm({
+                          ...a,
+                          _open: true,
+                          id: undefined,
+                          title: `${a.title} (copy)`,
+                          status: 'draft',
+                          assigned_date: new Date().toISOString().slice(0, 10),
+                        })}
+                      >
+                        <Copy size={13} />
                       </IconButton>
                       {a.status !== 'closed'
                         ? <GhostButton onClick={() => setAssignmentStatus(a.id, 'closed').then(load)}>Close</GhostButton>
@@ -230,10 +285,10 @@ export default function AssignmentsView({
       {form?._open && (
         <Modal
           title={form.id ? 'Edit item' : 'New homework / assignment'}
-          onClose={() => setForm(null)}
+          onClose={() => openForm(null)}
           footer={
             <>
-              <GhostButton onClick={() => setForm(null)} disabled={busy}>Cancel</GhostButton>
+              <GhostButton onClick={() => openForm(null)} disabled={busy}>Cancel</GhostButton>
               <PrimaryButton onClick={save} disabled={busy}>{busy ? 'Saving…' : form.id ? 'Save' : 'Publish'}</PrimaryButton>
             </>
           }
@@ -255,6 +310,38 @@ export default function AssignmentsView({
               <textarea id="a-desc" className={inputClass + ' h-20 py-2'} value={form.description ?? ''}
                 onChange={e => setForm({ ...form, description: e.target.value })} />
             </Field>
+
+            <Field label="Reference image (optional)" htmlFor="a-img">
+              <input
+                ref={fileRef}
+                id="a-img"
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={e => pickImage(e.target.files?.[0])}
+              />
+              {preview ? (
+                <div className="flex items-start gap-3">
+                  <img src={preview} alt="Attachment preview" className="w-24 h-24 rounded-xl object-cover border border-slate-200" />
+                  <div className="flex flex-col gap-1.5">
+                    <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
+                      className="px-3 h-[30px] rounded-lg text-xs font-bold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50">
+                      Replace
+                    </button>
+                    <button type="button" onClick={clearImage} disabled={uploading}
+                      className="px-3 h-[30px] rounded-lg text-xs font-bold bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 inline-flex items-center gap-1 disabled:opacity-50">
+                      <X size={12} /> Remove
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
+                  className="w-full h-[72px] rounded-xl border-2 border-dashed border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/40 text-slate-500 text-xs font-bold inline-flex items-center justify-center gap-2 disabled:opacity-50">
+                  {uploading ? <><Loader2 size={14} className="animate-spin" /> Uploading…</> : <><ImagePlus size={15} /> Attach a photo / worksheet image</>}
+                </button>
+              )}
+            </Field>
+
             <div className="grid grid-cols-2 gap-3">
               <Field label="Class" htmlFor="a-class">
                 <select id="a-class" className={selectClass} value={form.class_id ?? ''}

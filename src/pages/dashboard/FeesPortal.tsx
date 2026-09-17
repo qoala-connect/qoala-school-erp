@@ -6,25 +6,28 @@ import {
   TrendingUp, BarChart3, PieChart as PieChartIcon, History, 
   FileText, Users, Ban, Eye, CreditCard, ChevronRight, 
   Layers, Check, X, Loader2, ArrowUpRight, Smartphone, Building,
-  ArrowUpDown, ArrowUp, ArrowDown, Activity, Sparkles, Zap, Radio
+  ArrowUpDown, ArrowUp, ArrowDown, Activity, Sparkles, Zap, Radio, ChevronDown
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, 
   ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area 
 } from 'recharts';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
+import { cn, formatFeeHeadName } from '@/lib/utils';
+import { feePeriodLabel } from '@/lib/feeLabels';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { feeService } from '@/services/feeService';
-import { 
-  StudentFeeLedger, 
-  FeeCategory, 
-  FeePaymentRecord, 
-  CollectFeeResult 
+import {
+  StudentFeeLedger,
+  FeeCategory,
+  FeePaymentRecord,
+  CollectFeeResult,
+  FeeReceiptData
 } from '@/types/fee';
 import FeeCollectionModal from '@/components/fees/FeeCollectionModal';
 import FeeReceiptModal from '@/components/fees/FeeReceiptModal';
+import FeeBreakdownStatement from '@/components/fees/FeeBreakdownStatement';
 import FeeVoidModal from '@/components/fees/FeeVoidModal';
 import FeeStructureManager from '@/components/fees/FeeStructureManager';
 import FeeReportsView from '@/components/fees/FeeReportsView';
@@ -95,6 +98,9 @@ export default function FeesPortal() {
 
   const [isVoidModalOpen, setIsVoidModalOpen] = useState(false);
   const [voidTargetPayment, setVoidTargetPayment] = useState<any>(null);
+
+  const [breakdownTarget, setBreakdownTarget] = useState<{ studentId: string; student: any } | null>(null);
+  const [expandedReceipts, setExpandedReceipts] = useState<Set<string>>(new Set());
 
   // Sync activeTab with location.state passed from sidebar or deep links
   useEffect(() => {
@@ -214,16 +220,161 @@ export default function FeesPortal() {
     };
   }, [fees]);
 
-  // Client-side multi-tier filter & sorting for Student Fee Directory
+  // One card per underlying student_fees row is what itemized billing
+  // produces (12 rows for a year of Tuition alone) -- correct for a payment
+  // checklist, but the wrong shape for a school-wide roster meant for
+  // triage (find defaulters, scan by class, sort by dues). Enterprise fee
+  // systems keep that roster at one row per student per year and push the
+  // itemized detail into a drill-down (Fee Breakdown Statement, already
+  // wired below) -- so aggregate every student's rows into a single ledger
+  // card before filtering/sorting/paginating.
+  interface StudentLedgerCard {
+    student_id: string;
+    students: StudentFeeLedger['students'];
+    academic_year: string;
+    totalDemand: number;
+    totalPaid: number;
+    totalOutstanding: number;
+    itemCount: number;
+    pendingCount: number;
+    isOverdue: boolean;
+    nextDueDate: string | null;
+    status: 'paid' | 'partial' | 'pending' | 'overdue';
+    latestReceiptNumber?: string;
+    rows: StudentFeeLedger[];
+  }
+
+  const studentLedgerCards = useMemo<StudentLedgerCard[]>(() => {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const map = new Map<string, StudentLedgerCard>();
+
+    for (const f of fees) {
+      const sid = f.student_id;
+      if (!sid) continue;
+      let card = map.get(sid);
+      if (!card) {
+        card = {
+          student_id: sid,
+          students: f.students,
+          academic_year: f.academic_year,
+          totalDemand: 0,
+          totalPaid: 0,
+          totalOutstanding: 0,
+          itemCount: 0,
+          pendingCount: 0,
+          isOverdue: false,
+          nextDueDate: null,
+          status: 'pending',
+          rows: [],
+        };
+        map.set(sid, card);
+      }
+      card.rows.push(f);
+      card.totalDemand += Number(f.net_amount ?? f.total_amount ?? 0);
+      card.totalPaid += Number(f.amount_paid || 0);
+      card.totalOutstanding += Number(f.remaining_amount || 0);
+      card.itemCount += 1;
+      if (f.remaining_amount > 0) {
+        card.pendingCount += 1;
+        if (f.due_date && f.due_date < todayStr) card.isOverdue = true;
+        if (f.due_date && (!card.nextDueDate || f.due_date < card.nextDueDate)) {
+          card.nextDueDate = f.due_date;
+        }
+      }
+    }
+
+    for (const card of map.values()) {
+      const validPayments = card.rows.flatMap(r => (r.fee_payments || []).filter((p: any) => !p.voided_at));
+      const latest = validPayments.sort((a: any, b: any) => (a.payment_date || '').localeCompare(b.payment_date || '')).pop();
+      card.latestReceiptNumber = latest?.receipt_number;
+      card.status =
+        card.totalOutstanding <= 0 && card.totalDemand > 0
+          ? 'paid'
+          : card.isOverdue
+            ? 'overdue'
+            : card.totalPaid > 0
+              ? 'partial'
+              : 'pending';
+    }
+
+    return Array.from(map.values());
+  }, [fees]);
+
+  // Same problem as the ledger roster, one level down: a single cashier
+  // payment settling several ledger lines now shares one receipt number
+  // (fixed), but the raw fee_payments rows are still one row per line --
+  // so the transaction journal must group them back into one row per
+  // receipt, or "one payment" still visually reads as several.
+  interface ReceiptGroup {
+    receiptNumber: string;
+    paymentDate: string;
+    paymentMode: string;
+    student: any;
+    totalPaid: number;
+    headsLabel: string;
+    allVoided: boolean;
+    anyVoided: boolean;
+    rows: any[];
+  }
+
+  const groupedTransactions = useMemo<ReceiptGroup[]>(() => {
+    const map = new Map<string, any[]>();
+    for (const t of transactions) {
+      const key = t.receipt_number || t.id;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(t);
+    }
+
+    return Array.from(map.entries()).map(([receiptNumber, rows]) => {
+      const first = rows[0];
+      const totalPaid = rows.reduce((sum, r) => sum + Number(r.amount_paid || 0), 0);
+      const distinctHeads = [...new Set(rows.map((r: any) => r.student_fees?.fee_categories?.category_name).filter(Boolean))];
+
+      let headsLabel: string;
+      if (distinctHeads.length <= 1 && rows.length > 1) {
+        headsLabel = `${formatFeeHeadName(distinctHeads[0] || 'Academic Fee')} — ${rows.length} periods`;
+      } else if (rows.length === 1) {
+        headsLabel = feePeriodLabel({
+          category_name: first.student_fees?.fee_categories?.category_name,
+          frequency: first.student_fees?.fee_categories?.frequency,
+          due_date: first.student_fees?.due_date,
+        });
+      } else {
+        headsLabel = `${rows.length} items across ${distinctHeads.length} heads`;
+      }
+
+      return {
+        receiptNumber,
+        paymentDate: first.payment_date,
+        paymentMode: first.payment_mode,
+        student: first.student_fees?.students,
+        totalPaid,
+        headsLabel,
+        allVoided: rows.every((r: any) => r.voided_at),
+        anyVoided: rows.some((r: any) => r.voided_at),
+        rows,
+      };
+    });
+  }, [transactions]);
+
+  const toggleReceiptExpanded = (receiptNumber: string) => {
+    setExpandedReceipts(prev => {
+      const next = new Set(prev);
+      if (next.has(receiptNumber)) next.delete(receiptNumber); else next.add(receiptNumber);
+      return next;
+    });
+  };
+
+  // Client-side multi-tier filter & sorting for the student roster
   const filteredFees = useMemo(() => {
-    let result = fees.filter(f => {
+    let result = studentLedgerCards.filter(f => {
       const s = search.toLowerCase().trim();
       const matchesSearch = !s || (
         (f.students?.name && f.students.name.toLowerCase().includes(s)) ||
         (f.students?.admission_number && f.students.admission_number.toLowerCase().includes(s)) ||
         (f.students?.roll_number && f.students.roll_number.toLowerCase().includes(s)) ||
         (f.students?.father_name && f.students.father_name.toLowerCase().includes(s)) ||
-        (f.receipt_number && f.receipt_number.toLowerCase().includes(s))
+        (f.latestReceiptNumber && f.latestReceiptNumber.toLowerCase().includes(s))
       );
 
       const matchesClass = classFilter === 'all' || f.students?.class === classFilter || `Class ${f.students?.class}` === classFilter;
@@ -231,9 +382,9 @@ export default function FeesPortal() {
       const matchesStatus = statusFilter === 'all' || f.status === statusFilter;
 
       let matchesQuick = true;
-      if (quickFilter === 'defaulters') matchesQuick = f.remaining_amount > 0;
-      else if (quickFilter === 'critical') matchesQuick = f.remaining_amount >= 5000;
-      else if (quickFilter === 'partial') matchesQuick = f.amount_paid > 0 && f.remaining_amount > 0;
+      if (quickFilter === 'defaulters') matchesQuick = f.totalOutstanding > 0;
+      else if (quickFilter === 'critical') matchesQuick = f.totalOutstanding >= 5000;
+      else if (quickFilter === 'partial') matchesQuick = f.totalPaid > 0 && f.totalOutstanding > 0;
       else if (quickFilter === 'paid') matchesQuick = f.status === 'paid';
 
       return matchesSearch && matchesClass && matchesSection && matchesStatus && matchesQuick;
@@ -249,11 +400,11 @@ export default function FeesPortal() {
         const bCls = b.students?.class?.toLowerCase().includes('lkg') ? 0 : parseInt(b.students?.class || '0') || 0;
         comparison = aCls - bCls;
       } else if (sortField === 'demand') {
-        comparison = (a.total_amount || 0) - (b.total_amount || 0);
+        comparison = a.totalDemand - b.totalDemand;
       } else if (sortField === 'paid') {
-        comparison = (a.amount_paid || 0) - (b.amount_paid || 0);
+        comparison = a.totalPaid - b.totalPaid;
       } else if (sortField === 'remaining') {
-        comparison = (a.remaining_amount || 0) - (b.remaining_amount || 0);
+        comparison = a.totalOutstanding - b.totalOutstanding;
       } else if (sortField === 'status') {
         comparison = (a.status || '').localeCompare(b.status || '');
       }
@@ -261,9 +412,9 @@ export default function FeesPortal() {
     });
 
     return result;
-  }, [fees, search, classFilter, sectionFilter, statusFilter, quickFilter, sortField, sortOrder]);
+  }, [studentLedgerCards, search, classFilter, sectionFilter, statusFilter, quickFilter, sortField, sortOrder]);
 
-  // Pagination for Student Fee Directory
+  // Pagination for the student roster
   const totalPages = Math.ceil(filteredFees.length / pageSize) || 1;
   const paginatedFees = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
@@ -382,18 +533,25 @@ export default function FeesPortal() {
     });
   }, [fees]);
 
-  // Export CSV Handler
+  // Export CSV Handler -- exports the actual itemized ledger rows (one per
+  // fee head per billing period) for every student visible under the
+  // current filters, since that per-line detail is what an accountant
+  // reconciling collections actually needs; the on-screen roster itself
+  // stays aggregated to one row per student for scanability.
   const handleExportCSV = () => {
     if (filteredFees.length === 0) return toast.error('No fee records to export.');
 
-    const headers = ['Receipt No', 'Admission No', 'Student Name', 'Class', 'Section', 'Fee Category', 'Academic Year', 'Total Demand (INR)', 'Paid (INR)', 'Outstanding (INR)', 'Status'];
-    const rows = filteredFees.map(f => [
+    const visibleStudentIds = new Set(filteredFees.map(f => f.student_id));
+    const exportRows = fees.filter(f => visibleStudentIds.has(f.student_id));
+
+    const headers = ['Receipt No', 'Admission No', 'Student Name', 'Class', 'Section', 'Fee Head', 'Academic Year', 'Total Demand (INR)', 'Paid (INR)', 'Outstanding (INR)', 'Status'];
+    const rows = exportRows.map(f => [
       f.receipt_number || '',
       f.students?.admission_number || '',
       f.students?.name || '',
       f.students?.class || '',
       f.students?.section || '',
-      f.category_name,
+      feePeriodLabel(f),
       f.academic_year,
       f.total_amount,
       f.amount_paid,
@@ -409,38 +567,73 @@ export default function FeesPortal() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    toast.success(`Exported ${filteredFees.length} fee ledgers to CSV.`);
+    toast.success(`Exported ${exportRows.length} fee ledger line items for ${filteredFees.length} students.`);
   };
 
-  const handlePaymentSuccess = (
-    result: CollectFeeResult, 
-    student: any, 
-    ledger?: StudentFeeLedger | null,
-    paymentMeta?: { paymentMode: string; transactionId?: string; remarks?: string; fineAmount?: number; discountAmount?: number }
-  ) => {
-    loadAllData();
-    // Prompt to view / print receipt with exact payment transaction details
+  // A receipt number now spans every ledger line a single cashier
+  // submission settled (several months, or several heads, in one payment).
+  // Printing or re-viewing a receipt from any single fee_payments row must
+  // pull every sibling row sharing that receipt number, or the slip shows a
+  // receipt number that doesn't match the amount/items printed under it.
+  const openReceiptByNumber = async (receiptNumber: string, fallbackStudent?: any) => {
+    if (!receiptNumber) return toast.error('No receipt number to look up.');
+    let rows;
+    try {
+      rows = await feeService.fetchPaymentReceipt(receiptNumber);
+    } catch (e: any) {
+      console.error('[openReceiptByNumber] Failed:', e);
+      return toast.error(e?.message || `Could not load receipt ${receiptNumber}.`);
+    }
+    if (!rows || rows.length === 0) {
+      return toast.error(`No payment records found for receipt ${receiptNumber}.`);
+    }
+
+    const first = rows[0];
+    const student = first.student_fees?.students || fallbackStudent;
+    const totalPaid = rows.reduce((sum: number, r: any) => sum + Number(r.amount_paid || 0), 0);
+    const lineItems = rows.map((r: any) => ({
+      description: feePeriodLabel({
+        category_name: r.student_fees?.fee_categories?.category_name,
+        frequency: r.student_fees?.fee_categories?.frequency,
+        due_date: r.student_fees?.due_date,
+      }),
+      amount: Number(r.amount_paid || 0),
+    }));
+    const distinctHeads = [...new Set(rows.map((r: any) => r.student_fees?.fee_categories?.category_name).filter(Boolean))];
+    const combinedLabel =
+      distinctHeads.length <= 1 ? (lineItems[0]?.description || 'Academic Fee')
+        : distinctHeads.length === 2 ? distinctHeads.join(' + ')
+          : `${distinctHeads[0]} + ${distinctHeads.length - 1} more heads`;
+
     setReceiptTargetFee({
-      id: result.studentFeeId,
-      payment_id: result.paymentId,
-      receipt_number: result.receiptNumber,
-      paid_amount: result.amountPaid,
-      amount_paid: result.amountPaid,
-      total_amount: result.netAmount || result.amountPaid,
-      net_amount: result.netAmount || result.amountPaid,
-      fine_amount: paymentMeta?.fineAmount ?? ledger?.fine_amount ?? 0,
-      discount_amount: paymentMeta?.discountAmount ?? ledger?.discount_amount ?? 0,
-      total_paid: result.totalPaid,
-      remaining_amount: result.balance,
-      payment_mode: paymentMeta?.paymentMode || 'Cash',
-      transaction_id: paymentMeta?.transactionId || null,
-      remarks: paymentMeta?.remarks || null,
-      payment_date: new Date().toISOString().split('T')[0],
-      category_name: ledger?.category_name || 'Academic Fee',
-      academic_year: currentYear?.name || '2026-27',
+      id: first.student_fee_id,
+      payment_id: first.id,
+      receipt_number: receiptNumber,
+      paid_amount: totalPaid,
+      amount_paid: totalPaid,
+      total_amount: totalPaid,
+      net_amount: totalPaid,
+      payment_mode: first.payment_mode || 'Cash',
+      payment_date: first.payment_date,
+      transaction_id: first.transaction_id || null,
+      remarks: first.remarks || null,
+      category_name: combinedLabel,
+      academic_year: first.student_fees?.academic_years?.name || currentYear?.name || '2026-27',
       students: student,
-      student_id: student?.id
+      student_id: student?.id || first.student_fees?.student_id,
+      created_by: first.created_by,
+      line_items: lineItems,
     });
+    setIsReceiptModalOpen(true);
+  };
+
+  const handlePaymentSuccess = (result: CollectFeeResult, student: any, receiptData: FeeReceiptData) => {
+    loadAllData();
+    // Reuse the exact receipt data FeeCollectionModal already built (it
+    // includes the full line_items breakdown of every head/period this
+    // payment covered) instead of reconstructing a thinner copy here, which
+    // previously collapsed multi-item payments into one generic line.
+    setReceiptTargetFee(receiptData);
     setIsReceiptModalOpen(true);
   };
 
@@ -599,7 +792,7 @@ export default function FeesPortal() {
               "px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold",
               activeTab === 'recent_payments' ? "bg-violet-50 text-violet-700" : "bg-slate-200/80 text-slate-600"
             )}>
-              {transactions.length}
+              {groupedTransactions.length}
             </span>
           </button>
 
@@ -870,30 +1063,33 @@ export default function FeesPortal() {
               </button>
             </div>
 
-            {transactions.length === 0 ? (
+            {groupedTransactions.length === 0 ? (
               <div className="text-center py-8 text-xs text-slate-400">No payment transactions recorded yet.</div>
             ) : (
               <div className="divide-y divide-slate-100 text-xs font-medium">
-                {transactions.slice(0, 5).map(t => (
-                  <div key={t.id} className="py-3 flex items-center justify-between">
+                {groupedTransactions.slice(0, 5).map(g => (
+                  <div key={g.receiptNumber} className="py-3 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
                         <Receipt className="w-4 h-4" />
                       </div>
                       <div>
                         <div className="font-bold text-slate-900">
-                          {t.student_fees?.students?.name || 'Student'}
+                          {g.student?.name || 'Student'}
                         </div>
                         <div className="text-[10px] text-slate-400 font-mono">
-                          {t.receipt_number} • {t.payment_date} • Mode: <span className="uppercase">{t.payment_mode}</span>
+                          {g.receiptNumber} • {g.paymentDate} • Mode: <span className="uppercase">{g.paymentMode}</span>
+                          {g.rows.length > 1 && <span> • {g.rows.length} items</span>}
                         </div>
                       </div>
                     </div>
 
                     <div className="text-right">
-                      <div className="font-mono font-extrabold text-emerald-700">₹{Number(t.amount_paid).toFixed(2)}</div>
-                      {t.voided_at ? (
+                      <div className="font-mono font-extrabold text-emerald-700">₹{g.totalPaid.toFixed(2)}</div>
+                      {g.allVoided ? (
                         <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded">VOIDED</span>
+                      ) : g.anyVoided ? (
+                        <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded">PARTIALLY VOIDED</span>
                       ) : (
                         <span className="text-[10px] text-slate-400 font-mono">CLEARED</span>
                       )}
@@ -1024,7 +1220,7 @@ export default function FeesPortal() {
               <h3 className="text-xs font-bold font-sans text-slate-800 uppercase tracking-wider">
                 Student Fee Ledgers Roster
               </h3>
-              <span className="text-xs font-bold text-slate-400">{filteredFees.length} ledgers found</span>
+              <span className="text-xs font-bold text-slate-400">{filteredFees.length} students found</span>
             </div>
 
             {isLoading ? (
@@ -1035,7 +1231,7 @@ export default function FeesPortal() {
             ) : filteredFees.length === 0 ? (
               <div className="text-center py-12 text-xs text-slate-400 space-y-2">
                 <AlertCircle className="w-8 h-8 mx-auto text-slate-300" />
-                <div className="font-bold text-slate-700">No student fee ledgers match current filters</div>
+                <div className="font-bold text-slate-700">No students match current filters</div>
                 <p>Try resetting filters or record a new fee payment.</p>
               </div>
             ) : (
@@ -1066,7 +1262,7 @@ export default function FeesPortal() {
                           Class & Section {sortField === 'class' && (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-slate-800" /> : <ArrowDown className="w-3 h-3 text-slate-800" />)}
                         </div>
                       </th>
-                      <th className="py-2.5 px-3">Fee Head</th>
+                      <th className="py-2.5 px-3">Fee Items</th>
                       <th 
                         onClick={() => {
                           setSortField('demand');
@@ -1115,56 +1311,60 @@ export default function FeesPortal() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-medium">
-                    {paginatedFees.map(fee => (
-                      <tr key={fee.id} className="hover:bg-slate-50/70 transition-colors">
+                    {paginatedFees.map((card) => (
+                      <tr key={card.student_id} className="hover:bg-slate-50/70 transition-colors">
                         <td className="py-3 px-3">
-                          <div className="font-bold text-slate-900">{fee.students?.name || 'N/A'}</div>
-                          <div className="text-[10px] text-slate-400">Father: {fee.students?.father_name || 'N/A'}</div>
+                          <div className="font-bold text-slate-900">{card.students?.name || 'N/A'}</div>
+                          <div className="text-[10px] text-slate-400">Father: {card.students?.father_name || 'N/A'}</div>
                         </td>
 
                         <td className="py-3 px-3">
                           <span className="font-mono font-bold text-violet-700 bg-violet-50 px-2 py-0.5 rounded border border-violet-100 text-[11px]">
-                            {fee.students?.admission_number || 'N/A'}
+                            {card.students?.admission_number || 'N/A'}
                           </span>
                         </td>
 
                         <td className="py-3 px-3">
-                          <span className="font-bold text-slate-800">Class {fee.students?.class} - {fee.students?.section}</span>
+                          <span className="font-bold text-slate-800">Class {card.students?.class} - {card.students?.section}</span>
                         </td>
 
                         <td className="py-3 px-3">
-                          <span className="font-bold text-slate-700">{fee.category_name}</span>
-                          <div className="text-[10px] text-slate-400">Due: {fee.due_date || 'N/A'}</div>
+                          <span className="font-bold text-slate-700">
+                            {card.pendingCount === 0 ? `${card.itemCount} settled` : `${card.pendingCount} of ${card.itemCount} pending`}
+                          </span>
+                          <div className="text-[10px] text-slate-400">
+                            {card.nextDueDate ? `Next due: ${card.nextDueDate}` : 'No dues pending'}
+                          </div>
                         </td>
 
                         <td className="py-3 px-3 text-right font-mono font-bold text-slate-800">
-                          ₹{fee.total_amount.toFixed(2)}
+                          ₹{card.totalDemand.toFixed(2)}
                         </td>
 
                         <td className="py-3 px-3 text-right font-mono font-bold text-emerald-700">
-                          ₹{fee.amount_paid.toFixed(2)}
+                          ₹{card.totalPaid.toFixed(2)}
                         </td>
 
                         <td className="py-3 px-3 text-right font-mono font-extrabold text-rose-700 text-sm">
-                          ₹{fee.remaining_amount.toFixed(2)}
+                          ₹{card.totalOutstanding.toFixed(2)}
                         </td>
 
                         <td className="py-3 px-3">
                           <span className={cn(
                             "px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border",
-                            STATUS_STYLES[fee.status] || STATUS_STYLES.pending
+                            STATUS_STYLES[card.status] || STATUS_STYLES.pending
                           )}>
-                            {fee.status}
+                            {card.status}
                           </span>
                         </td>
 
                         <td className="py-3 px-3 text-right">
                           <div className="flex items-center justify-end gap-1.5">
-                            {fee.remaining_amount > 0 && !isStudentOrParent && (
+                            {card.totalOutstanding > 0 && !isStudentOrParent && (
                               <button
                                 onClick={() => {
-                                  setCollectTargetStudent(fee.students);
-                                  setCollectTargetFeeLedger(fee);
+                                  setCollectTargetStudent(card.students);
+                                  setCollectTargetFeeLedger(null);
                                   setIsCollectModalOpen(true);
                                 }}
                                 className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] rounded-lg transition-colors cursor-pointer shadow-2xs"
@@ -1174,40 +1374,34 @@ export default function FeesPortal() {
                             )}
 
                             <button
-                              onClick={() => {
-                                const validPayments = (fee.fee_payments || []).filter((p: any) => !p.voided_at);
-                                if (validPayments.length === 0 && fee.amount_paid <= 0) {
-                                  toast.info(`No payments recorded for ${fee.students?.name || 'this student'}. Please collect fee first.`);
+                              onClick={async () => {
+                                const validPayments = card.rows.flatMap(r => (r.fee_payments || []).filter((p: any) => !p.voided_at));
+                                if (validPayments.length === 0 && card.totalPaid <= 0) {
+                                  toast.info(`No payments recorded for ${card.students?.name || 'this student'}. Please collect fee first.`);
                                   return;
                                 }
-                                const latestPayment = validPayments.length > 0 ? validPayments[validPayments.length - 1] : null;
-                                setReceiptTargetFee({
-                                  id: fee.id,
-                                  payment_id: latestPayment?.id,
-                                  receipt_number: latestPayment?.receipt_number || fee.receipt_number,
-                                  paid_amount: Number(latestPayment?.amount_paid || fee.amount_paid),
-                                  amount_paid: Number(latestPayment?.amount_paid || fee.amount_paid),
-                                  total_amount: fee.total_amount,
-                                  net_amount: fee.net_amount,
-                                  fine_amount: fee.fine_amount,
-                                  discount_amount: fee.discount_amount,
-                                  remaining_amount: fee.remaining_amount,
-                                  payment_mode: latestPayment?.payment_mode || fee.payment_mode || 'Cash',
-                                  payment_date: latestPayment?.payment_date || fee.payment_date,
-                                  transaction_id: latestPayment?.transaction_id || null,
-                                  remarks: latestPayment?.remarks || null,
-                                  category_name: fee.category_name,
-                                  academic_year: fee.academic_year,
-                                  students: fee.students,
-                                  student_id: fee.student_id,
-                                  created_by: latestPayment?.created_by
-                                });
-                                setIsReceiptModalOpen(true);
+                                const latestPayment = validPayments.length > 0
+                                  ? validPayments.sort((a: any, b: any) => (a.payment_date || '').localeCompare(b.payment_date || '')).pop()
+                                  : null;
+                                const receiptNo = latestPayment?.receipt_number || card.latestReceiptNumber;
+                                if (receiptNo) {
+                                  await openReceiptByNumber(receiptNo, card.students);
+                                } else {
+                                  toast.error('No receipt number found for this student’s latest payment.');
+                                }
                               }}
                               className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition-colors cursor-pointer"
-                              title="Print / View Receipt"
+                              title="Print / View most recent Receipt"
                             >
                               <Receipt className="w-3.5 h-3.5" />
+                            </button>
+
+                            <button
+                              onClick={() => setBreakdownTarget({ studentId: card.student_id, student: card.students })}
+                              className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                              title="Fee breakdown statement (all heads + total, PDF)"
+                            >
+                              <FileText className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         </td>
@@ -1224,7 +1418,7 @@ export default function FeesPortal() {
                 <div className="text-slate-500 font-medium">
                   Showing <span className="font-bold text-slate-800">{(currentPage - 1) * pageSize + 1}</span> to{' '}
                   <span className="font-bold text-slate-800">{Math.min(currentPage * pageSize, filteredFees.length)}</span> of{' '}
-                  <span className="font-bold text-slate-800">{filteredFees.length}</span> ledgers
+                  <span className="font-bold text-slate-800">{filteredFees.length}</span> students
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -1266,19 +1460,21 @@ export default function FeesPortal() {
             <h3 className="text-xs font-bold font-sans text-slate-800 uppercase tracking-wider">
               Cashier Transaction Journal & Audit Trail
             </h3>
-            <span className="text-xs font-bold text-slate-400">{transactions.length} transactions posted</span>
+            <span className="text-xs font-bold text-slate-400">{groupedTransactions.length} receipts posted</span>
           </div>
 
-          {transactions.length === 0 ? (
+          {groupedTransactions.length === 0 ? (
             <div className="text-center py-12 text-xs text-slate-400">No payment transactions found in database.</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="border-b border-slate-200 text-[10px] uppercase tracking-wider text-slate-400 font-black">
+                    <th className="py-2.5 px-3 w-8" />
                     <th className="py-2.5 px-3">Receipt Number</th>
                     <th className="py-2.5 px-3">Payment Date</th>
                     <th className="py-2.5 px-3">Student Particulars</th>
+                    <th className="py-2.5 px-3">Fee Head</th>
                     <th className="py-2.5 px-3">Payment Mode</th>
                     <th className="py-2.5 px-3 text-right">Amount Paid (INR)</th>
                     <th className="py-2.5 px-3">Status</th>
@@ -1286,99 +1482,126 @@ export default function FeesPortal() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium">
-                  {transactions.map(t => (
-                    <tr key={t.id} className={cn("hover:bg-slate-50 transition-colors", t.voided_at && "opacity-60 bg-rose-50/20")}>
-                      <td className="py-3 px-3">
-                        <span className="font-mono font-bold text-violet-700 bg-violet-50 px-2 py-0.5 rounded border border-violet-100 text-[11px]">
-                          {t.receipt_number}
-                        </span>
-                      </td>
-
-                      <td className="py-3 px-3 font-mono text-slate-600">{t.payment_date}</td>
-
-                      <td className="py-3 px-3">
-                        <div className="font-bold text-slate-900">{t.student_fees?.students?.name || 'Student'}</div>
-                        <div className="text-[10px] text-slate-400">
-                          Class {t.student_fees?.students?.class}-{t.student_fees?.students?.section} • ADM: {t.student_fees?.students?.admission_number || 'N/A'}
-                        </div>
-                      </td>
-
-                      <td className="py-3 px-3">
-                        <span className="capitalize font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded text-[10px]">
-                          {t.payment_mode}
-                        </span>
-                      </td>
-
-                      <td className="py-3 px-3 text-right font-mono font-extrabold text-emerald-700 text-sm">
-                        ₹{Number(t.amount_paid).toFixed(2)}
-                      </td>
-
-                      <td className="py-3 px-3">
-                        {t.voided_at ? (
-                          <div>
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-50 text-rose-700 border border-rose-200">
-                              VOIDED
+                  {groupedTransactions.map(g => {
+                    const isExpanded = expandedReceipts.has(g.receiptNumber);
+                    return (
+                      <React.Fragment key={g.receiptNumber}>
+                        <tr className={cn("hover:bg-slate-50 transition-colors", g.allVoided && "opacity-60 bg-rose-50/20")}>
+                          <td className="py-3 px-3 text-center">
+                            {g.rows.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => toggleReceiptExpanded(g.receiptNumber)}
+                                className="text-slate-400 hover:text-slate-700 cursor-pointer"
+                                title={isExpanded ? 'Collapse line items' : 'Show individual line items'}
+                              >
+                                {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                              </button>
+                            )}
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className="font-mono font-bold text-violet-700 bg-violet-50 px-2 py-0.5 rounded border border-violet-100 text-[11px]">
+                              {g.receiptNumber}
                             </span>
-                            <div className="text-[10px] text-slate-400 mt-0.5 truncate max-w-xs" title={t.void_reason}>
-                              Reason: {t.void_reason}
+                          </td>
+
+                          <td className="py-3 px-3 font-mono text-slate-600">{g.paymentDate}</td>
+
+                          <td className="py-3 px-3">
+                            <div className="font-bold text-slate-900">{g.student?.name || 'Student'}</div>
+                            <div className="text-[10px] text-slate-400">
+                              Class {g.student?.class}-{g.student?.section} • ADM: {g.student?.admission_number || 'N/A'}
                             </div>
-                          </div>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            CLEARED
-                          </span>
-                        )}
-                      </td>
+                          </td>
 
-                      <td className="py-3 px-3 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            onClick={() => {
-                              setReceiptTargetFee({
-                                id: t.student_fee_id,
-                                payment_id: t.id,
-                                receipt_number: t.receipt_number,
-                                transaction_id: t.transaction_id,
-                                paid_amount: Number(t.amount_paid),
-                                amount_paid: Number(t.amount_paid),
-                                total_amount: Number(t.student_fees?.total_amount || t.amount_paid),
-                                net_amount: Number(t.student_fees?.net_amount || t.student_fees?.total_amount || t.amount_paid),
-                                fine_amount: Number(t.student_fees?.fine_amount || 0),
-                                discount_amount: Number(t.student_fees?.discount_amount || 0),
-                                remaining_amount: Math.max(0, (Number(t.student_fees?.net_amount || t.student_fees?.total_amount || t.amount_paid)) - Number(t.student_fees?.amount_paid || t.amount_paid)),
-                                payment_date: t.payment_date,
-                                payment_mode: t.payment_mode,
-                                remarks: t.remarks,
-                                category_name: t.student_fees?.fee_categories?.category_name || 'Academic Fee',
-                                academic_year: t.student_fees?.academic_years?.name || currentYear?.name || '2026-27',
-                                students: t.student_fees?.students,
-                                student_id: t.student_fees?.students?.id || t.student_fees?.student_id,
-                                created_by: t.created_by
-                              });
-                              setIsReceiptModalOpen(true);
-                            }}
-                            className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition-colors cursor-pointer"
-                            title="Print Receipt"
-                          >
-                            <Printer className="w-3.5 h-3.5" />
-                          </button>
+                          <td className="py-3 px-3">
+                            <span className="font-bold text-slate-700">{formatFeeHeadName(g.headsLabel)}</span>
+                          </td>
 
-                          {!t.voided_at && !isStudentOrParent && (
-                            <button
-                              onClick={() => {
-                                setVoidTargetPayment(t);
-                                setIsVoidModalOpen(true);
-                              }}
-                              className="p-1.5 bg-rose-50 hover:bg-rose-600 hover:text-white text-rose-700 rounded-lg text-xs font-bold transition-colors cursor-pointer"
-                              title="Void Payment"
-                            >
-                              <Ban className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                          <td className="py-3 px-3">
+                            <span className="capitalize font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded text-[10px]">
+                              {g.paymentMode}
+                            </span>
+                          </td>
+
+                          <td className="py-3 px-3 text-right font-mono font-extrabold text-emerald-700 text-sm">
+                            ₹{g.totalPaid.toFixed(2)}
+                          </td>
+
+                          <td className="py-3 px-3">
+                            {g.allVoided ? (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-50 text-rose-700 border border-rose-200">
+                                VOIDED
+                              </span>
+                            ) : g.anyVoided ? (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200">
+                                PARTIALLY VOIDED
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                CLEARED
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="py-3 px-3 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => openReceiptByNumber(g.receiptNumber, g.student)}
+                                className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                                title="Print / Download full receipt"
+                              >
+                                <Printer className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+
+                        {isExpanded && g.rows.map((t: any) => (
+                          <tr key={t.id} className={cn("bg-slate-50/40 transition-colors", t.voided_at && "opacity-60 bg-rose-50/20")}>
+                            <td className="py-2 px-3" />
+                            <td className="py-2 px-3 text-slate-300 text-[10px]">↳</td>
+                            <td className="py-2 px-3 font-mono text-slate-500 text-[10px]">{t.payment_date}</td>
+                            <td className="py-2 px-3" />
+                            <td className="py-2 px-3">
+                              <span className="font-semibold text-slate-600 text-[11px]">
+                                {feePeriodLabel({
+                                  category_name: t.student_fees?.fee_categories?.category_name,
+                                  frequency: t.student_fees?.fee_categories?.frequency,
+                                  due_date: t.student_fees?.due_date,
+                                })}
+                              </span>
+                            </td>
+                            <td className="py-2 px-3" />
+                            <td className="py-2 px-3 text-right font-mono font-bold text-slate-600 text-[11px]">
+                              ₹{Number(t.amount_paid).toFixed(2)}
+                            </td>
+                            <td className="py-2 px-3">
+                              {t.voided_at ? (
+                                <span className="text-[9px] font-bold text-rose-600 uppercase">Voided</span>
+                              ) : (
+                                <span className="text-[9px] text-slate-400 uppercase">Cleared</span>
+                              )}
+                            </td>
+                            <td className="py-2 px-3 text-right">
+                              {!t.voided_at && !isStudentOrParent && (
+                                <button
+                                  onClick={() => {
+                                    setVoidTargetPayment(t);
+                                    setIsVoidModalOpen(true);
+                                  }}
+                                  className="p-1 bg-rose-50 hover:bg-rose-600 hover:text-white text-rose-700 rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
+                                  title="Void this line item"
+                                >
+                                  <Ban className="w-3 h-3" />
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </React.Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -1433,6 +1656,15 @@ export default function FeesPortal() {
         payment={voidTargetPayment}
         onSuccess={loadAllData}
       />
+
+      {breakdownTarget && (
+        <FeeBreakdownStatement
+          studentId={breakdownTarget.studentId}
+          student={breakdownTarget.student}
+          academicYearId={currentYear?.id}
+          onClose={() => setBreakdownTarget(null)}
+        />
+      )}
 
     </div>
   );

@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { StudentFeeLedger } from '@/types/fee';
+import { feePeriodLabel } from '@/lib/feeLabels';
 
 interface FeeReportsViewProps {
   fees: StudentFeeLedger[];
@@ -158,7 +159,7 @@ export default function FeeReportsView({
         d.students?.section || '',
         d.students?.father_name || '',
         d.students?.phone || '',
-        d.category_name,
+        feePeriodLabel(d),
         d.total_amount,
         d.amount_paid,
         d.remaining_amount,
@@ -228,7 +229,7 @@ export default function FeeReportsView({
     }
     const studentName = d.students?.name || 'Student';
     const amountDue = d.remaining_amount.toFixed(2);
-    const feeHead = d.category_name || 'Academic Fee';
+    const feeHead = feePeriodLabel(d) || 'Academic Fee';
     const msg = encodeURIComponent(
       `Dear Parent, This is a gentle reminder from SDPS School regarding the outstanding fee of Rs. ${amountDue} for ${studentName} (Class ${d.students?.class || ''}-${d.students?.section || ''}, Fee Head: ${feeHead}). Kindly clear the pending balance at your earliest convenience. Thank you.`
     );
@@ -403,7 +404,7 @@ export default function FeeReportsView({
                         </div>
                       </td>
                       <td className="py-3 px-3">
-                        <span className="font-bold text-slate-700">{d.category_name}</span>
+                        <span className="font-bold text-slate-700">{feePeriodLabel(d)}</span>
                         <div className="text-[10px] text-slate-400">Due: {d.due_date || 'N/A'}</div>
                       </td>
                       <td className="py-3 px-3 text-right font-mono font-bold text-slate-800">₹{d.total_amount.toFixed(2)}</td>

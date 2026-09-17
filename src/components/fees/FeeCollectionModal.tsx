@@ -3,14 +3,15 @@ import {
   X, Check, Search, CreditCard, Banknote, Smartphone, 
   Building, Receipt, AlertCircle, Loader2, User,
   CheckCircle2, Printer, Download, Eye, Copy, ArrowRight,
-  RotateCcw, Calendar, FileText, ChevronRight,
+  RotateCcw, Calendar, FileText, ChevronRight, ChevronDown,
   AlertTriangle, CheckSquare, Square
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
+import { cn, formatFeeHeadName } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { feeService } from '@/services/feeService';
-import { FeeCategory, PaymentMode, CollectFeeResult, StudentFeeLedger, FeeReceiptData } from '@/types/fee';
+import { feePeriodLabel } from '@/lib/feeLabels';
+import { FeeCategory, PaymentMode, CollectFeeResult, StudentFeeLedger, FeeReceiptData, FeeStructureItem } from '@/types/fee';
 import FeeReceiptModal from '@/components/fees/FeeReceiptModal';
 
 interface FeeCollectionModalProps {
@@ -21,12 +22,13 @@ interface FeeCollectionModalProps {
   targetFeeLedger?: StudentFeeLedger | null;
   feeCategories: FeeCategory[];
   currentAcademicYear?: { id: string; name: string } | null;
-  onPaymentSuccess?: (
-    result: CollectFeeResult, 
-    student: any, 
-    ledger?: StudentFeeLedger | null, 
-    paymentMeta?: { paymentMode: string; transactionId?: string; remarks?: string; fineAmount?: number; discountAmount?: number }
-  ) => void;
+  /**
+   * Fires with the exact same receipt data this modal itself displays
+   * (including the full line_items breakdown) -- callers should hand it
+   * straight to their own FeeReceiptModal rather than reconstructing a
+   * receipt from the raw result, which loses the per-head/per-month detail.
+   */
+  onPaymentSuccess?: (result: CollectFeeResult, student: any, receiptData: FeeReceiptData) => void;
 }
 
 type CollectionStep = 'form' | 'confirm' | 'success';
@@ -60,6 +62,16 @@ export default function FeeCollectionModal({
   const [studentInvoices, setStudentInvoices] = useState<StudentFeeLedger[]>([]);
   const [isLoadingInvoices, setIsLoadingInvoices] = useState(false);
   const [selectedLedgerIds, setSelectedLedgerIds] = useState<Set<string>>(new Set());
+  // Which recurring fee-head groups (Tuition, Transport...) are expanded to
+  // show their individual per-month rows, rather than just the quick-pick
+  // summary row.
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+
+  // Fee Structure Master heads for a composite-billed student, and which of
+  // them the cashier has ticked as "what this payment is for". Tagging only
+  // — it never changes the ledger row a payment is recorded against.
+  const [structureHeads, setStructureHeads] = useState<FeeStructureItem[]>([]);
+  const [selectedHeadIds, setSelectedHeadIds] = useState<Set<string>>(new Set());
 
   // Payment inputs
   const [payingAmount, setPayingAmount] = useState<number | ''>('');
@@ -143,17 +155,33 @@ export default function FeeCollectionModal({
       setStudentInvoices([]);
       setSelectedLedgerIds(new Set());
       setPayingAmount('');
+      setStructureHeads([]);
+      setSelectedHeadIds(new Set());
       return;
     }
 
     let isCancelled = false;
     const loadLedgers = async () => {
       setIsLoadingInvoices(true);
+      setStructureHeads([]);
+      setSelectedHeadIds(new Set());
       try {
-        const fees = await feeService.fetchFees();
+        // Scoped server-side to this one student, rather than walking the
+        // entire school's fee ledger and filtering client-side — with
+        // itemized billing (up to ~20 rows/student/year) that whole-school
+        // fetch only gets heavier as enrolment grows.
+        const account = await feeService.getStudentFeeAccount(selectedStudent.id);
         if (isCancelled) return;
 
-        const rows = fees.filter(f => f.student_id === selectedStudent.id);
+        // A settled-with-zero-balance "Composite Annual Fee" row is a
+        // retrofit artifact -- kept only so historical payments still
+        // resolve to a real ledger row, never something anyone will collect
+        // against again. Showing it in the active checklist just inflates
+        // the item count with a dead line; a Composite row that still has a
+        // real balance (not yet converted to itemized billing) stays.
+        const rows = account.ledgers.filter(r =>
+          !(/composite/i.test(r.category_name) && Number(r.remaining_amount || 0) === 0 && Number(r.total_amount || 0) === Number(r.amount_paid || 0))
+        );
         setStudentInvoices(rows);
 
         if (targetFeeLedger && rows.some(r => r.id === targetFeeLedger.id)) {
@@ -170,6 +198,24 @@ export default function FeeCollectionModal({
             .reduce((sum, r) => sum + Number(r.remaining_amount || 0), 0);
 
           setPayingAmount(totalPending > 0 ? Math.round(totalPending * 100) / 100 : '');
+        }
+
+        // A lumped "Composite" row can't be checked head-by-head the way
+        // itemized rows can (there's only ever the one row) -- when the
+        // student has one, pull the class's Fee Structure Master so the
+        // cashier can still tick which heads this payment is for. Nothing
+        // here changes the ledger; it only tags the payment for the receipt.
+        if (rows.some(r => /composite/i.test(r.category_name) && Number(r.remaining_amount || 0) > 0)) {
+          const rawClassName = String(selectedStudent.class || '').replace(/^class\s*/i, '').trim();
+          const sessionName = selectedStudent.academic_year || currentAcademicYear?.name;
+          const structures = await feeService.fetchFeeStructures();
+          if (isCancelled) return;
+          setStructureHeads(
+            structures.filter(s =>
+              (s.classes?.class_name || '').trim() === rawClassName &&
+              (!sessionName || (s.academic_years?.name || '') === sessionName)
+            )
+          );
         }
       } catch (e) {
         console.warn('Error loading fees:', e);
@@ -207,35 +253,117 @@ export default function FeeCollectionModal({
   const numPaying = typeof payingAmount === 'number' ? payingAmount : 0;
   const remainingBalance = Math.max(0, totalAmountDue - numPaying);
 
+  // A recurring head (Monthly/Quarterly) with more than one period pending
+  // gets collapsed into one quick-pick row -- 12 individual Tuition
+  // checkboxes is a lot of scrolling/clicking for what's usually just "pay N
+  // months". Anything billed once (Admission, Exam, Annual heads) or a
+  // recurring head with only one row left renders as a normal single row.
+  interface InvoiceGroup {
+    key: string;
+    categoryName: string;
+    frequency?: string;
+    rows: StudentFeeLedger[];
+    isGrouped: boolean;
+  }
+
+  const groupedInvoices = useMemo<InvoiceGroup[]>(() => {
+    const map = new Map<string, StudentFeeLedger[]>();
+    for (const inv of studentInvoices) {
+      const key = inv.fee_category_id || inv.category_name;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(inv);
+    }
+    const groups = Array.from(map.entries()).map(([key, rows]) => {
+      const sorted = [...rows].sort((a, b) => (a.due_date || '').localeCompare(b.due_date || ''));
+      const freq = (sorted[0].frequency || '').toLowerCase();
+      return {
+        key,
+        categoryName: sorted[0].category_name,
+        frequency: sorted[0].frequency,
+        rows: sorted,
+        isGrouped: sorted.length > 1 && (freq === 'monthly' || freq === 'quarterly'),
+      };
+    });
+    // Chronological by each group's earliest due date, matching the flat
+    // list's original ordering.
+    return groups.sort((a, b) => (a.rows[0]?.due_date || '').localeCompare(b.rows[0]?.due_date || ''));
+  }, [studentInvoices]);
+
+  // Shared by every selection action: write the id set, then derive Amount
+  // Received from exactly what's now selected across the whole invoice list.
+  const applyLedgerSelection = (next: Set<string>) => {
+    setSelectedLedgerIds(next);
+    const sum = studentInvoices
+      .filter(r => next.has(r.id))
+      .reduce((acc, r) => acc + Number(r.remaining_amount || 0), 0);
+    setPayingAmount(sum > 0 ? Math.round(sum * 100) / 100 : '');
+  };
+
   // Toggle selection
   const handleToggleLedger = (id: string) => {
     const next = new Set(selectedLedgerIds);
-    if (next.has(id)) {
-      next.delete(id);
-    } else {
-      next.add(id);
-    }
-    setSelectedLedgerIds(next);
-
-    const newTotal = studentInvoices
-      .filter(r => next.has(r.id))
-      .reduce((sum, r) => sum + Number(r.remaining_amount || 0), 0);
-
-    setPayingAmount(newTotal > 0 ? Math.round(newTotal * 100) / 100 : '');
+    if (next.has(id)) next.delete(id); else next.add(id);
+    applyLedgerSelection(next);
   };
 
   const handleToggleAllLedgers = () => {
     const pendingRows = studentInvoices.filter(r => Number(r.remaining_amount || 0) > 0);
     if (selectedLedgerIds.size === pendingRows.length && pendingRows.length > 0) {
-      setSelectedLedgerIds(new Set());
-      setPayingAmount('');
+      applyLedgerSelection(new Set());
     } else {
-      const next = new Set(pendingRows.map(r => r.id));
-      setSelectedLedgerIds(next);
-      const sum = pendingRows.reduce((acc, r) => acc + Number(r.remaining_amount || 0), 0);
-      setPayingAmount(sum > 0 ? Math.round(sum * 100) / 100 : '');
+      applyLedgerSelection(new Set(pendingRows.map(r => r.id)));
     }
   };
+
+  // Quick-pick N earliest-due pending periods within one grouped head
+  // (or every pending period, for "Pay All"). Replaces this group's own
+  // selection only -- every other head's ticks are left exactly as they were.
+  const handleQuickSelectGroup = (groupRows: StudentFeeLedger[], count: number | 'all') => {
+    const pending = groupRows
+      .filter(r => Number(r.remaining_amount || 0) > 0)
+      .sort((a, b) => (a.due_date || '').localeCompare(b.due_date || ''));
+    const toSelect = count === 'all' ? pending : pending.slice(0, count);
+
+    const next = new Set(selectedLedgerIds);
+    groupRows.forEach(r => next.delete(r.id));
+    toSelect.forEach(r => next.add(r.id));
+    applyLedgerSelection(next);
+  };
+
+  const toggleGroupExpanded = (key: string) => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+
+  const handleToggleHead = (id: string) => {
+    const next = new Set(selectedHeadIds);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setSelectedHeadIds(next);
+
+    if (next.size > 0) {
+      // Can't collect more against the one composite row than it's still
+      // owed, however many heads got ticked.
+      const sum = structureHeads
+        .filter(s => next.has(s.id))
+        .reduce((acc, s) => acc + Number(s.amount || 0), 0);
+      const capped = totalAmountDue > 0 ? Math.min(sum, totalAmountDue) : sum;
+      setPayingAmount(capped > 0 ? Math.round(capped * 100) / 100 : '');
+    }
+    // Unticking the last box leaves Amount Received as it is, rather than
+    // clobbering a figure the cashier may have typed by hand.
+  };
+
+  const selectedHeads = useMemo(
+    () => structureHeads.filter(s => selectedHeadIds.has(s.id)),
+    [structureHeads, selectedHeadIds]
+  );
+  const selectedHeadsTotal = useMemo(
+    () => selectedHeads.reduce((sum, s) => sum + Number(s.amount || 0), 0),
+    [selectedHeads]
+  );
 
   const handleSelectStudent = (st: any) => {
     setSelectedStudent(st);
@@ -285,8 +413,26 @@ export default function FeeCollectionModal({
     toast.loading('Saving payment & issuing receipt...', { id: 'fee-pay' });
 
     try {
-      let finalResult: CollectFeeResult | null = null;
+      // Head tags are cashier-entered context, not a ledger change: fold them
+      // into the remarks that actually get written, and carry them through to
+      // the receipt separately so it can show the exact heads ticked.
+      const headTagNote = selectedHeads.length > 0
+        ? `Covers: ${selectedHeads.map(s => s.fee_categories?.category_name).filter(Boolean).join(', ')}.`
+        : '';
+      const typedRemarks = remarks.trim();
+      const effectiveRemarks = [headTagNote, typedRemarks].filter(Boolean).join(' ') || undefined;
+
+      // A single "amount received" can cover several selected lines at once
+      // (several months of one head, or several heads together). Each line
+      // is its own collect_fee() call so it settles against its own ledger
+      // row and can be independently voided later, but they must all read
+      // as ONE payment to the cashier and the parent -- so the first call
+      // mints a receipt number and every subsequent call in this batch
+      // reuses it, instead of each line minting (and displaying) its own.
+      const paidResults: CollectFeeResult[] = [];
+      const paidLineItems: { description: string; amount: number }[] = [];
       let remainingBudget = numPaying;
+      let batchReceiptNumber: string | undefined;
 
       for (const item of selectedInvoices) {
         if (remainingBudget <= 0) break;
@@ -294,7 +440,9 @@ export default function FeeCollectionModal({
         const alloc = Math.min(due, remainingBudget);
         if (alloc <= 0) continue;
 
-        finalResult = await feeService.collectFee({
+        paidLineItems.push({ description: feePeriodLabel(item), amount: alloc });
+
+        const result = await feeService.collectFee({
           studentFeeId: item.id,
           studentId: selectedStudent.id,
           feeCategoryId: item.fee_category_id,
@@ -304,36 +452,72 @@ export default function FeeCollectionModal({
           totalAmount: item.total_amount,
           dueDate: item.due_date,
           transactionId: transactionId.trim() || undefined,
-          remarks: remarks.trim() || undefined
+          remarks: effectiveRemarks,
+          receiptNumber: batchReceiptNumber
         });
 
+        batchReceiptNumber = batchReceiptNumber || result.receiptNumber;
+        paidResults.push(result);
         remainingBudget -= alloc;
       }
 
-      if (!finalResult) {
+      if (paidResults.length === 0) {
         throw new Error('Payment processing failed.');
       }
 
-      setLastPaymentResult(finalResult);
+      const primaryResult = paidResults[0];
+      const totalPaidNow = paidResults.reduce((sum, r) => sum + Number(r.amountPaid || 0), 0);
+      const combinedNet = selectedInvoices.reduce((sum, inv) => sum + Number(inv.net_amount || 0), 0);
+      const combinedBalance = Math.max(0, Math.round((totalAmountDue - totalPaidNow) * 100) / 100);
 
-      const primaryLedger = selectedInvoices[0];
+      const aggregateResult: CollectFeeResult = {
+        paymentId: primaryResult.paymentId,
+        studentFeeId: primaryResult.studentFeeId,
+        receiptNumber: primaryResult.receiptNumber,
+        amountPaid: totalPaidNow,
+        netAmount: combinedNet,
+        totalPaid: paidResults.reduce((sum, r) => sum + Number(r.totalPaid || 0), 0),
+        balance: combinedBalance,
+        status: combinedBalance === 0 ? 'paid' : 'partial',
+      };
+
+      setLastPaymentResult(aggregateResult);
+
+      // One label for the printed receipt: the head paid, or a joined list
+      // when several different heads were settled in the same payment.
+      const distinctHeads = [...new Set(selectedInvoices.map(i => i.category_name))];
+      const combinedLabel =
+        distinctHeads.length <= 1
+          ? feePeriodLabel(selectedInvoices[0])
+          : distinctHeads.length === 2
+            ? distinctHeads.join(' + ')
+            : `${distinctHeads[0]} + ${distinctHeads.length - 1} more heads`;
+
       const receiptData: FeeReceiptData = {
-        id: finalResult.studentFeeId,
-        payment_id: finalResult.paymentId,
-        receipt_number: finalResult.receiptNumber,
-        amount_paid: finalResult.amountPaid,
-        paid_amount: finalResult.amountPaid,
-        total_amount: finalResult.netAmount,
-        net_amount: finalResult.netAmount,
-        remaining_amount: finalResult.balance,
-        total_outstanding_dues: finalResult.balance,
+        id: primaryResult.studentFeeId,
+        payment_id: primaryResult.paymentId,
+        receipt_number: primaryResult.receiptNumber,
+        amount_paid: totalPaidNow,
+        paid_amount: totalPaidNow,
+        total_amount: combinedNet,
+        net_amount: combinedNet,
+        remaining_amount: combinedBalance,
+        total_outstanding_dues: combinedBalance,
         payment_mode: paymentMode,
         payment_date: paymentDate,
         transaction_id: transactionId.trim() || null,
-        remarks: remarks.trim() || null,
-        category_name: primaryLedger?.category_name || 'Academic Fee',
+        remarks: effectiveRemarks || null,
+        category_name: combinedLabel,
         academic_year: selectedStudent?.academic_year || currentAcademicYear?.name || '2026-27',
         student_id: selectedStudent.id,
+        line_items: paidLineItems,
+        composite_heads_covered: selectedHeads.length > 0
+          ? selectedHeads.map(s => ({
+              category_name: s.fee_categories?.category_name || 'Fee Head',
+              frequency: s.fee_categories?.frequency,
+              amount: Number(s.amount || 0),
+            }))
+          : undefined,
         students: {
           id: selectedStudent.id,
           name: selectedStudent.name,
@@ -347,14 +531,15 @@ export default function FeeCollectionModal({
       };
 
       setLastReceiptData(receiptData);
-      toast.success(`Payment recorded! Receipt #${finalResult.receiptNumber}`, { id: 'fee-pay' });
+      toast.success(
+        paidResults.length > 1
+          ? `Payment of ₹${totalPaidNow.toLocaleString('en-IN')} recorded across ${paidResults.length} fee items. Receipt #${primaryResult.receiptNumber} (+${paidResults.length - 1} more)`
+          : `Payment recorded! Receipt #${primaryResult.receiptNumber}`,
+        { id: 'fee-pay' }
+      );
 
       if (onPaymentSuccess) {
-        onPaymentSuccess(finalResult, selectedStudent, primaryLedger, {
-          paymentMode,
-          transactionId: transactionId.trim() || undefined,
-          remarks: remarks.trim() || undefined
-        });
+        onPaymentSuccess(aggregateResult, selectedStudent, receiptData);
       }
 
       setStep('success');
@@ -582,7 +767,7 @@ export default function FeeCollectionModal({
                         </div>
                       ) : (
                         <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs bg-white">
-                          <div className="max-h-[260px] overflow-y-auto">
+                          <div className="max-h-[340px] overflow-y-auto">
                             <table className="w-full text-left text-xs border-collapse">
                               <thead className="sticky top-0 bg-slate-100 border-b border-slate-200 text-slate-700 text-[10px] font-bold uppercase tracking-wider z-10">
                                 <tr>
@@ -594,54 +779,226 @@ export default function FeeCollectionModal({
                                       className="w-3.5 h-3.5 rounded text-slate-900 focus:ring-slate-800 border-slate-300 cursor-pointer"
                                     />
                                   </th>
-                                  <th className="py-2 px-2.5">Fee Head</th>
-                                  <th className="py-2 px-2 text-center">Due Date</th>
-                                  <th className="py-2 px-2 text-right">Total</th>
-                                  <th className="py-2 px-2.5 text-right">Due Balance</th>
+                                  <th className="py-2 px-2.5 min-w-[150px]">Fee Head</th>
+                                  <th className="py-2 px-2 text-center w-20">Due Date</th>
+                                  <th className="py-2 px-2 text-right w-24">Total</th>
+                                  <th className="py-2 px-2.5 text-right w-24">Due Balance</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-100 bg-white text-[11px]">
-                                {studentInvoices.map((inv) => {
-                                  const isSelected = selectedLedgerIds.has(inv.id);
-                                  const balance = Number(inv.remaining_amount || 0);
+                                {groupedInvoices.map((group) => {
+                                  if (!group.isGrouped) {
+                                    const inv = group.rows[0];
+                                    const isSelected = selectedLedgerIds.has(inv.id);
+                                    const balance = Number(inv.remaining_amount || 0);
+
+                                    return (
+                                      <tr
+                                        key={inv.id}
+                                        onClick={() => balance > 0 && handleToggleLedger(inv.id)}
+                                        className={cn(
+                                          "transition-colors",
+                                          balance === 0 ? "opacity-45 bg-slate-50/50" : "cursor-pointer hover:bg-slate-50",
+                                          isSelected && "bg-blue-50/60 font-medium"
+                                        )}
+                                      >
+                                        <td className="py-1.5 px-2.5 text-center" onClick={(e) => e.stopPropagation()}>
+                                          <input
+                                            type="checkbox"
+                                            disabled={balance === 0}
+                                            checked={isSelected}
+                                            onChange={() => handleToggleLedger(inv.id)}
+                                            className="w-3.5 h-3.5 rounded text-slate-900 focus:ring-slate-800 border-slate-300 cursor-pointer disabled:cursor-not-allowed"
+                                          />
+                                        </td>
+                                        <td className="py-1.5 px-2.5 font-bold text-slate-900">
+                                          {feePeriodLabel(inv)}
+                                        </td>
+                                        <td className="py-1.5 px-2 text-center text-slate-500 text-[10px]">
+                                          {inv.due_date ? new Date(inv.due_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '—'}
+                                        </td>
+                                        <td className="py-1.5 px-2 text-right font-mono text-slate-600 text-[10px]">
+                                          ₹{Number(inv.total_amount || 0).toLocaleString('en-IN')}
+                                        </td>
+                                        <td className="py-1.5 px-2.5 text-right font-mono font-bold text-rose-700">
+                                          ₹{balance.toLocaleString('en-IN')}
+                                        </td>
+                                      </tr>
+                                    );
+                                  }
+
+                                  // Grouped recurring head: one quick-pick summary row, with
+                                  // an expandable list of the individual periods underneath.
+                                  const pending = group.rows.filter(r => Number(r.remaining_amount || 0) > 0);
+                                  const groupDue = pending.reduce((sum, r) => sum + Number(r.remaining_amount || 0), 0);
+                                  const selectedInGroup = group.rows.filter(r => selectedLedgerIds.has(r.id)).length;
+                                  const isExpanded = expandedGroups.has(group.key);
+                                  const quickCounts = [1, 3, 6].filter(n => n < pending.length);
 
                                   return (
-                                    <tr
-                                      key={inv.id}
-                                      onClick={() => balance > 0 && handleToggleLedger(inv.id)}
-                                      className={cn(
-                                        "transition-colors",
-                                        balance === 0 ? "opacity-45 bg-slate-50/50" : "cursor-pointer hover:bg-slate-50",
-                                        isSelected && "bg-blue-50/60 font-medium"
-                                      )}
-                                    >
-                                      <td className="py-1.5 px-2.5 text-center" onClick={(e) => e.stopPropagation()}>
-                                        <input
-                                          type="checkbox"
-                                          disabled={balance === 0}
-                                          checked={isSelected}
-                                          onChange={() => handleToggleLedger(inv.id)}
-                                          className="w-3.5 h-3.5 rounded text-slate-900 focus:ring-slate-800 border-slate-300 cursor-pointer disabled:cursor-not-allowed"
-                                        />
-                                      </td>
-                                      <td className="py-1.5 px-2.5 font-bold text-slate-900">
-                                        {inv.category_name}
-                                      </td>
-                                      <td className="py-1.5 px-2 text-center text-slate-500 text-[10px]">
-                                        {inv.due_date ? new Date(inv.due_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '—'}
-                                      </td>
-                                      <td className="py-1.5 px-2 text-right font-mono text-slate-600 text-[10px]">
-                                        ₹{Number(inv.total_amount || 0).toLocaleString('en-IN')}
-                                      </td>
-                                      <td className="py-1.5 px-2.5 text-right font-mono font-bold text-rose-700">
-                                        ₹{balance.toLocaleString('en-IN')}
-                                      </td>
-                                    </tr>
+                                    <React.Fragment key={group.key}>
+                                      <tr className={cn("transition-colors bg-slate-50/40", selectedInGroup > 0 && "bg-blue-50/40")}>
+                                        <td className="py-1.5 px-2.5 text-center align-top pt-2.5">
+                                          <button
+                                            type="button"
+                                            onClick={() => toggleGroupExpanded(group.key)}
+                                            className="text-slate-400 hover:text-slate-700 cursor-pointer"
+                                            title={isExpanded ? 'Collapse months' : 'Show individual months'}
+                                          >
+                                            {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                                          </button>
+                                        </td>
+                                        <td className="py-1.5 px-2.5" colSpan={4}>
+                                          <div className="flex items-center justify-between flex-wrap gap-1.5">
+                                            <div>
+                                              <span className="font-bold text-slate-900">{formatFeeHeadName(group.categoryName)}</span>
+                                              <span className="text-[10px] text-slate-500 ml-1.5">
+                                                {pending.length === 0
+                                                  ? `${group.rows.length} settled`
+                                                  : `${selectedInGroup > 0 ? `${selectedInGroup} of ` : ''}${pending.length} pending · ₹${groupDue.toLocaleString('en-IN')} due`}
+                                              </span>
+                                            </div>
+                                            {pending.length > 0 && (
+                                              <div className="flex items-center gap-1">
+                                                {quickCounts.map(n => (
+                                                  <button
+                                                    key={n}
+                                                    type="button"
+                                                    onClick={() => handleQuickSelectGroup(group.rows, n)}
+                                                    className={cn(
+                                                      "px-2 py-0.5 rounded-md text-[10px] font-bold border cursor-pointer transition-colors",
+                                                      selectedInGroup === n ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-600 border-slate-200 hover:border-slate-400"
+                                                    )}
+                                                  >
+                                                    Pay {n}
+                                                  </button>
+                                                ))}
+                                                <button
+                                                  type="button"
+                                                  onClick={() => handleQuickSelectGroup(group.rows, 'all')}
+                                                  className={cn(
+                                                    "px-2 py-0.5 rounded-md text-[10px] font-bold border cursor-pointer transition-colors",
+                                                    selectedInGroup === pending.length ? "bg-emerald-700 text-white border-emerald-700" : "bg-white text-emerald-700 border-emerald-200 hover:border-emerald-400"
+                                                  )}
+                                                >
+                                                  Pay All
+                                                </button>
+                                                {selectedInGroup > 0 && (
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => handleQuickSelectGroup(group.rows, 0)}
+                                                    className="px-2 py-0.5 rounded-md text-[10px] font-bold text-slate-400 hover:text-rose-600 cursor-pointer"
+                                                  >
+                                                    Clear
+                                                  </button>
+                                                )}
+                                              </div>
+                                            )}
+                                          </div>
+                                        </td>
+                                      </tr>
+
+                                      {isExpanded && group.rows.map(inv => {
+                                        const isSelected = selectedLedgerIds.has(inv.id);
+                                        const balance = Number(inv.remaining_amount || 0);
+                                        return (
+                                          <tr
+                                            key={inv.id}
+                                            onClick={() => balance > 0 && handleToggleLedger(inv.id)}
+                                            className={cn(
+                                              "transition-colors",
+                                              balance === 0 ? "opacity-45 bg-slate-50/50" : "cursor-pointer hover:bg-slate-50",
+                                              isSelected && "bg-blue-50/60 font-medium"
+                                            )}
+                                          >
+                                            <td className="py-1.5 px-2.5 text-center" onClick={(e) => e.stopPropagation()}>
+                                              <input
+                                                type="checkbox"
+                                                disabled={balance === 0}
+                                                checked={isSelected}
+                                                onChange={() => handleToggleLedger(inv.id)}
+                                                className="w-3.5 h-3.5 rounded text-slate-900 focus:ring-slate-800 border-slate-300 cursor-pointer disabled:cursor-not-allowed"
+                                              />
+                                            </td>
+                                            <td className="py-1.5 pl-6 pr-2.5 font-semibold text-slate-700">
+                                              {feePeriodLabel(inv)}
+                                            </td>
+                                            <td className="py-1.5 px-2 text-center text-slate-500 text-[10px]">
+                                              {inv.due_date ? new Date(inv.due_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '—'}
+                                            </td>
+                                            <td className="py-1.5 px-2 text-right font-mono text-slate-600 text-[10px]">
+                                              ₹{Number(inv.total_amount || 0).toLocaleString('en-IN')}
+                                            </td>
+                                            <td className="py-1.5 px-2.5 text-right font-mono font-bold text-rose-700">
+                                              ₹{balance.toLocaleString('en-IN')}
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </React.Fragment>
                                   );
                                 })}
                               </tbody>
                             </table>
                           </div>
+                        </div>
+                      )}
+
+                      {/* Head-tagging for a lumped "Composite" ledger row: there's only
+                          the one row to check, so let the cashier tick which of the
+                          class's configured fee heads this payment is for instead.
+                          Tags the receipt/remarks only — the payment still posts
+                          against the composite row above. */}
+                      {structureHeads.length > 1 && (
+                        <div className="border border-amber-200 bg-amber-50/40 rounded-xl p-3 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10.5px] font-bold text-amber-900 uppercase tracking-wide">
+                              What is this payment for? <span className="font-normal normal-case text-amber-700">(tag the composite payment — optional)</span>
+                            </span>
+                            {selectedHeadIds.size > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => setSelectedHeadIds(new Set())}
+                                className="text-[10px] font-bold text-amber-700 hover:text-amber-900 underline cursor-pointer"
+                              >
+                                Clear
+                              </button>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                            {structureHeads.map(s => {
+                              const checked = selectedHeadIds.has(s.id);
+                              return (
+                                <label
+                                  key={s.id}
+                                  className={cn(
+                                    "flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border text-[11px] cursor-pointer transition-colors",
+                                    checked ? "bg-white border-amber-400 shadow-2xs" : "bg-white/60 border-amber-100 hover:border-amber-300"
+                                  )}
+                                >
+                                  <span className="flex items-center gap-1.5 min-w-0">
+                                    <input
+                                      type="checkbox"
+                                      checked={checked}
+                                      onChange={() => handleToggleHead(s.id)}
+                                      className="w-3.5 h-3.5 rounded text-amber-600 focus:ring-amber-500 border-amber-300 cursor-pointer shrink-0"
+                                    />
+                                    <span className="font-bold text-slate-800 truncate">
+                                      {formatFeeHeadName(s.fee_categories?.category_name)}
+                                    </span>
+                                  </span>
+                                  <span className="font-mono text-slate-500 text-[10px] shrink-0">
+                                    ₹{Number(s.amount || 0).toLocaleString('en-IN')}
+                                  </span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                          {selectedHeadIds.size > 0 && (
+                            <p className="text-[10px] text-amber-800 font-medium">
+                              Tagged total: ₹{selectedHeadsTotal.toLocaleString('en-IN')} — filled into Amount Received. Edit it there if the cashier collected a different figure.
+                            </p>
+                          )}
                         </div>
                       )}
                     </div>
@@ -817,7 +1174,7 @@ export default function FeeCollectionModal({
                     <div className="bg-slate-50 rounded-lg p-2 space-y-1">
                       {selectedInvoices.map(inv => (
                         <div key={inv.id} className="flex justify-between items-center text-[11px]">
-                          <span className="font-semibold text-slate-800">{inv.category_name}</span>
+                          <span className="font-semibold text-slate-800">{feePeriodLabel(inv)}</span>
                           <span className="font-mono font-bold text-slate-900">₹{Number(inv.remaining_amount || 0).toLocaleString('en-IN')}</span>
                         </div>
                       ))}
@@ -845,6 +1202,12 @@ export default function FeeCollectionModal({
                 </div>
 
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1.5">
+                  {lastReceiptData?.category_name && (
+                    <div className="flex justify-between items-center pb-1.5 border-b border-slate-200">
+                      <span className="text-slate-500 text-[11px]">Paid For:</span>
+                      <span className="font-bold text-slate-900 text-right">{lastReceiptData.category_name}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center pb-1.5 border-b border-slate-200">
                     <span className="text-slate-500 text-[11px]">Receipt Number:</span>
                     <span className="font-mono font-bold text-slate-900 flex items-center gap-1.5 bg-white px-2 py-0.5 rounded border border-slate-200 text-xs">

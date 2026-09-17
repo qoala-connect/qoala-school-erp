@@ -8,7 +8,7 @@ import { formatFeeHeadName } from '@/lib/utils';
 import { fetchSystemSettings, SystemSettings } from '@/services/systemService';
 import { feeService } from '@/services/feeService';
 import { useAuth } from '@/context/AuthContext';
-import { FeeReceiptData } from '@/types/fee';
+import { FeeReceiptData, FeeStructureItem } from '@/types/fee';
 
 interface FeeReceiptModalProps {
   isOpen: boolean;
@@ -87,6 +87,7 @@ export default function FeeReceiptModal({ isOpen, onClose, fee }: FeeReceiptModa
   const [isCopied, setIsCopied] = useState(false);
   const [schoolSettings, setSchoolSettings] = useState<SystemSettings | null>(null);
   const [totalStudentDues, setTotalStudentDues] = useState<number | null>(null);
+  const [compositeBreakdown, setCompositeBreakdown] = useState<FeeStructureItem[]>([]);
 
   // Fetch live school branding and system settings
   useEffect(() => {
@@ -129,6 +130,45 @@ export default function FeeReceiptModal({ isOpen, onClose, fee }: FeeReceiptModa
     return () => { isCancelled = true; };
   }, [isOpen, fee]);
 
+  // A lumped "Composite Annual Fee" ledger row (every student billed before the
+  // itemized generator landed) shows on the receipt as one line, with no way to
+  // see what it was made of. When that is the head actually paid, pull the
+  // class's Fee Structure Master for reference — this is display-only, never
+  // a reconciliation: the composite total was priced as one number at billing
+  // time and these per-head figures may not sum to exactly that number.
+  useEffect(() => {
+    if (!isOpen || !fee) { setCompositeBreakdown([]); return; }
+    const isComposite = /composite/i.test(fee.category_name || '');
+    if (!isComposite) { setCompositeBreakdown([]); return; }
+    // The cashier already tagged this exact payment with the heads it
+    // covers -- use that instead of guessing from the whole class structure.
+    if (fee.composite_heads_covered && fee.composite_heads_covered.length > 0) {
+      return;
+    }
+
+    let isCancelled = false;
+    const rawClassName = String(fee.students?.class || (fee as any).class || '')
+      .replace(/^class\s*/i, '')
+      .trim();
+    const sessionName = fee.academic_year;
+
+    feeService.fetchFeeStructures()
+      .then(rows => {
+        if (isCancelled) return;
+        const matches = rows.filter(r =>
+          (r.classes?.class_name || '').trim() === rawClassName &&
+          (!sessionName || (r.academic_years?.name || '') === sessionName)
+        );
+        setCompositeBreakdown(matches);
+      })
+      .catch(err => {
+        console.warn('[FeeReceiptModal] composite breakdown fetch failed:', err);
+        setCompositeBreakdown([]);
+      });
+
+    return () => { isCancelled = true; };
+  }, [isOpen, fee]);
+
   if (!isOpen || !fee) return null;
 
   // Extract financial data
@@ -140,10 +180,29 @@ export default function FeeReceiptModal({ isOpen, onClose, fee }: FeeReceiptModa
   // Total outstanding dues calculation
   const totalDues = totalStudentDues !== null ? totalStudentDues : installmentBalance;
 
-  // Format items breakdown — line item for the fee category actually received
-  const items: { sNo: number; description: string; amount: number }[] = [
-    { sNo: 1, description: formatFeeHeadName(fee.category_name) || 'Academic Tuition / Composite Fee', amount: paid }
-  ];
+  // Format items breakdown — one row per ledger entry actually settled (e.g.
+  // "Tuition Fee — Apr" ₹500, "Tuition Fee — May" ₹500) when the payment
+  // spanned several rows, instead of collapsing everything into one lump
+  // line that hides which periods/heads were paid.
+  const items: { sNo: number; description: string; amount: number }[] =
+    fee.line_items && fee.line_items.length > 0
+      ? fee.line_items.map((li, i) => ({ sNo: i + 1, description: formatFeeHeadName(li.description), amount: li.amount }))
+      : [{ sNo: 1, description: formatFeeHeadName(fee.category_name) || 'Academic Tuition / Composite Fee', amount: paid }];
+
+  const taggedHeads = fee.composite_heads_covered || [];
+  const breakdownRows: { id: string; category_name: string; frequency?: string; amount: number }[] =
+    taggedHeads.length > 0
+      ? taggedHeads.map((h, i) => ({ id: `tagged-${i}`, category_name: h.category_name, frequency: h.frequency, amount: h.amount }))
+      : compositeBreakdown.map(s => ({
+          id: s.id,
+          category_name: formatFeeHeadName(s.fee_categories?.category_name) || 'Fee Head',
+          frequency: s.fee_categories?.frequency,
+          amount: Number(s.amount || 0),
+        }));
+  const isComposite = /composite/i.test(fee.category_name || '') && breakdownRows.length > 1;
+  const breakdownTitle = taggedHeads.length > 0
+    ? 'This payment covers (as recorded by the cashier)'
+    : "What this composite fee covers (Fee Structure Master — reference only)";
 
   if (fine > 0) {
     items.push({ sNo: items.length + 1, description: 'Late Fine / Penalty', amount: fine });
@@ -176,9 +235,11 @@ export default function FeeReceiptModal({ isOpen, onClose, fee }: FeeReceiptModa
   const remark = fee.remarks || (payMode.toLowerCase() === 'online' ? 'Online Portal Collection' : 'Cashier Counter Collection');
   
   const academicSession = fee.academic_year || (schoolSettings as any)?.academic_year || '2026-27';
-  const installmentTitle = fee.installment_name 
+  const installmentTitle = fee.installment_name
     ? `FEE PARTICULARS FOR ${fee.installment_name.toUpperCase()} (${academicSession})`
-    : `FEE PARTICULARS FOR ${(fee.category_name || 'Academic Fee').toUpperCase()} (${academicSession})`;
+    : items.length > 1
+      ? `FEE PARTICULARS (${items.length} ITEMS) — SESSION ${academicSession}`
+      : `FEE PARTICULARS FOR ${(fee.category_name || 'Academic Fee').toUpperCase()} (${academicSession})`;
 
   // School metadata from DB with authoritative fallback
   const schoolName = (schoolSettings?.school_name || "ST. JOSEPH'S SCHOOL, BARHALGANJ").toUpperCase();
@@ -349,6 +410,37 @@ export default function FeeReceiptModal({ isOpen, onClose, fee }: FeeReceiptModa
             </tbody>
           </table>
         </div>
+
+        {/* 5b. Composite Fee Breakdown (reference only, not a reconciliation) */}
+        {isComposite && (
+          <div className="mt-1">
+            <div className="bg-[#efefef] border border-black/60 px-1.5 py-0.5 text-[7.5px] font-bold text-black uppercase tracking-tight">
+              {breakdownTitle}
+            </div>
+            <table className="w-full border-collapse text-[7.5px]">
+              <tbody>
+                {breakdownRows.map(s => (
+                  <tr key={s.id} className="border-b border-slate-300">
+                    <td className="py-0.5 px-1.5 text-black border-r border-slate-400">
+                      {s.category_name}
+                    </td>
+                    <td className="py-0.5 px-1 text-black border-r border-slate-400 text-center w-16">
+                      {s.frequency || ''}
+                    </td>
+                    <td className="py-0.5 px-1.5 text-right font-mono text-black w-16">
+                      {s.amount.toFixed(2)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="text-[6.5px] text-slate-600 italic mt-0.5 px-0.5">
+              {taggedHeads.length > 0
+                ? 'Heads selected by the cashier at the time of this payment.'
+                : "Billed and received as one composite instalment; heads shown are the class's configured rates for reference and may not sum to the composite total exactly."}
+            </p>
+          </div>
+        )}
 
         {/* 6. Payment Detail Table */}
         <div className="mt-1.5">

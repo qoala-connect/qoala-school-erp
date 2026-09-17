@@ -26,10 +26,12 @@ import TeacherAssignmentModal, { AssignmentPrefill } from '@/components/teachers
 import StudentMarksheetModal from '@/components/results/StudentMarksheetModal';
 import StudentAdmitCardModal from '@/components/results/StudentAdmitCardModal';
 import FeeReceiptModal from '@/components/fees/FeeReceiptModal';
+import FeeBreakdownStatement from '@/components/fees/FeeBreakdownStatement';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { cn, formatFeeHeadName } from '@/lib/utils';
+import { feePeriodLabel } from '@/lib/feeLabels';
 import { useAuth } from '@/context/AuthContext';
 
 interface Student360DrawerProps {
@@ -137,6 +139,7 @@ export default function Student360Drawer({
   const [isAdmitCardModalOpen, setIsAdmitCardModalOpen] = useState(false);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const [selectedReceiptFee, setSelectedReceiptFee] = useState<any | null>(null);
+  const [isBreakdownOpen, setIsBreakdownOpen] = useState(false);
 
   // Fetch contextual data when student or active tab changes
   useEffect(() => {
@@ -183,7 +186,7 @@ export default function Student360Drawer({
             id, student_id, fee_category_id, academic_year_id,
             total_amount, discount_amount, scholarship_amount, fine_amount,
             net_amount, amount_paid, due_date, status,
-            fee_categories:fee_category_id (id, category_name),
+            fee_categories:fee_category_id (id, category_name, frequency),
             fee_payments (id, receipt_number, amount_paid, payment_date, payment_mode, voided_at)
           `)
           .eq('student_id', student.id)
@@ -210,6 +213,7 @@ export default function Student360Drawer({
             academic_year_id: l.academic_year_id,
             category_name: formatFeeHeadName(l.fee_categories?.category_name) || 'Composite School Fee',
             fee_category_name: formatFeeHeadName(l.fee_categories?.category_name) || 'Composite School Fee',
+            frequency: l.fee_categories?.frequency || undefined,
             total_amount: total,
             discount_amount: discount,
             scholarship_amount: schol,
@@ -1087,12 +1091,21 @@ export default function Student360Drawer({
                           <h4 className="text-xs font-black uppercase text-slate-800 tracking-wider">Fee Account & Ledgers</h4>
                           <p className="text-[11px] text-slate-500">Official fee ledger statements from Financials module.</p>
                         </div>
-                        <button
-                          onClick={() => navigate('/dashboard/fees', { state: { activeTab: 'student_fees', selectedStudent: student } })}
-                          className="px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1 shadow-xs cursor-pointer"
-                        >
-                          <ExternalLink size={12} /> Collect Fees in Portal
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setIsBreakdownOpen(true)}
+                            className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1 shadow-xs cursor-pointer"
+                            title="Full fee breakdown by head, with total — printable PDF"
+                          >
+                            <FileText size={12} /> Breakdown / PDF
+                          </button>
+                          <button
+                            onClick={() => navigate('/dashboard/fees', { state: { activeTab: 'student_fees', selectedStudent: student } })}
+                            className="px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1 shadow-xs cursor-pointer"
+                          >
+                            <ExternalLink size={12} /> Collect Fees in Portal
+                          </button>
+                        </div>
                       </div>
 
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
@@ -1133,7 +1146,7 @@ export default function Student360Drawer({
                               <tbody className="divide-y divide-slate-100">
                                 {feeData.ledgers.map(l => (
                                   <tr key={l.id}>
-                                    <td className="py-2.5 font-bold text-slate-800">{l.fee_category_name}</td>
+                                    <td className="py-2.5 font-bold text-slate-800">{feePeriodLabel(l)}</td>
                                     <td className="py-2.5 text-slate-500">{l.due_date}</td>
                                     <td className="py-2.5 font-mono">₹{l.net_amount.toLocaleString()}</td>
                                     <td className="py-2.5 font-mono text-emerald-700 font-bold">₹{l.amount_paid.toLocaleString()}</td>
@@ -1652,6 +1665,21 @@ export default function Student360Drawer({
         }}
         fee={selectedReceiptFee}
       />
+
+      {isBreakdownOpen && (
+        <FeeBreakdownStatement
+          studentId={student.id}
+          student={{
+            name: student.name,
+            class: student.class,
+            section: student.section,
+            admission_number: student.admission_number,
+            roll_number: student.roll_number,
+            father_name: student.father_name,
+          }}
+          onClose={() => setIsBreakdownOpen(false)}
+        />
+      )}
     </AnimatePresence>
   );
 }

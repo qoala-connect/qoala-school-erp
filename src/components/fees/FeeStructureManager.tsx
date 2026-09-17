@@ -17,13 +17,27 @@ interface FeeStructureManagerProps {
 }
 
 const DEFAULT_CBSE_HEADS = [
-  { category_name: 'Tuition Fee', frequency: 'Monthly', amount: 3500, description: 'Academic instruction and classroom tuition' },
-  { category_name: 'Admission Fee', frequency: 'One-time', amount: 5000, description: 'One-time registration & admission processing' },
-  { category_name: 'Examination Fee', frequency: 'Term', amount: 1200, description: 'CBSE terminal & summative assessments' },
-  { category_name: 'Computer & Lab Fee', frequency: 'Annual', amount: 2000, description: 'Science lab, computer lab & smart classroom tech' },
-  { category_name: 'Annual Activity & Sports', frequency: 'Annual', amount: 1800, description: 'Sports, co-curricular and annual events' },
-  { category_name: 'Transport Fee', frequency: 'Monthly', amount: 1500, description: 'School bus commute & fleet service' },
+  { category_name: 'Admission Fee', frequency: 'One-time', amount: 1500, description: 'One-time registration & admission processing' },
+  { category_name: 'Tuition Fee', frequency: 'Monthly', amount: 600, description: 'Academic instruction and classroom tuition' },
+  { category_name: 'Development Fee', frequency: 'Annual', amount: 500, description: 'Infrastructure upkeep, campus development & annual maintenance' },
+  { category_name: 'Caution Money (Refundable)', frequency: 'One-time', amount: 500, description: 'Refundable security deposit, adjusted or returned on withdrawal / course completion' },
+  { category_name: 'Examination Fee', frequency: 'Term', amount: 200, description: 'CBSE terminal & summative assessments' },
+  { category_name: 'Computer & Lab Fee', frequency: 'Annual', amount: 500, description: 'Science lab & computer lab equipment, consumables and upkeep' },
+  { category_name: 'Library Fee', frequency: 'Annual', amount: 200, description: 'Library books, periodicals & digital reading resources' },
+  { category_name: 'Smart Class & Technology Fee', frequency: 'Annual', amount: 300, description: 'Digital smart-classroom infrastructure & ed-tech subscriptions' },
+  { category_name: 'Annual Activity & Sports', frequency: 'Annual', amount: 400, description: 'Sports, co-curricular and annual events' },
+  { category_name: 'Transport Fee', frequency: 'Monthly', amount: 800, description: 'School bus commute & fleet service' },
 ];
+
+// Matches the actual billing generator: Monthly bills 12x/year, Quarterly
+// 4x/year, everything else (Annual/Term/One-time) bills once. Used to turn a
+// per-period rate into a real annual figure instead of just summing raw
+// numbers of mismatched periods together.
+const periodsPerYear = (frequency?: string): number => {
+  if (frequency === 'Monthly') return 12;
+  if (frequency === 'Quarterly') return 4;
+  return 1;
+};
 
 export default function FeeStructureManager({
   classes,
@@ -335,12 +349,12 @@ export default function FeeStructureManager({
             ))}
           </select>
 
-          {categories.length <= 2 && (
+          {isAdmin && (
             <button
               onClick={handleSeedDefaultHeads}
               disabled={isSeeding}
               className="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-xl border border-emerald-200 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-              title="Add standard CBSE heads: Tuition, Admission, Exam, Lab, Sports, Transport"
+              title="Add any missing standard CBSE heads: Admission, Tuition, Development, Caution Money, Examination, Computer & Lab, Library, Smart Class & Technology, Activity & Sports, Transport"
             >
               <Sparkles className="w-3.5 h-3.5" /> Seed CBSE Heads
             </button>
@@ -424,6 +438,12 @@ export default function FeeStructureManager({
                   </span>
                 </div>
 
+                {(cat.frequency === 'Monthly' || cat.frequency === 'Quarterly') && (
+                  <div className="text-[10px] text-slate-400 font-normal mt-1">
+                    ≈ ₹{(Number(cat.amount || 0) * periodsPerYear(cat.frequency)).toLocaleString('en-IN')} / year
+                  </div>
+                )}
+
                 {cat.description && (
                   <p className="text-[11px] text-slate-400 font-normal mt-1.5 line-clamp-1" title={cat.description}>
                     {cat.description}
@@ -495,7 +515,7 @@ export default function FeeStructureManager({
                     </th>
                   ))}
                   <th className="py-3 px-4 text-right w-44 font-bold text-slate-900 bg-slate-100/50 font-sans">
-                    Total Demand / Term
+                    Total Annual Demand
                   </th>
                   {isAdmin && (
                     <th className="py-3 px-3 text-center w-28 font-bold text-slate-500 font-sans">
@@ -516,11 +536,17 @@ export default function FeeStructureManager({
                       {categories.map(cat => {
                         const key = `${cls.id}_${cat.id}`;
                         const currentVal = matrixValues[key] ?? cat.amount;
-                        rowTotal += currentVal;
+                        // Composite Annual Fee is a legacy, whole-school-year
+                        // head being phased out by itemized billing -- it
+                        // shouldn't double-count alongside the itemized heads
+                        // in the annual total.
+                        if (cat.category_name !== 'Composite Annual Fee') {
+                          rowTotal += currentVal * periodsPerYear(cat.frequency);
+                        }
 
                         return (
                           <td key={cat.id} className="py-2.5 px-4 text-right border-r border-slate-100">
-                            <div className="flex justify-end">
+                            <div className="flex justify-end flex-col items-end gap-0.5">
                               <input
                                 type="number"
                                 min="0"
@@ -530,6 +556,11 @@ export default function FeeStructureManager({
                                 onChange={(e) => handleMatrixCellChange(cls.id, cat.id, e.target.value === '' ? 0 : Number(e.target.value))}
                                 className="w-28 text-right bg-white border border-slate-200 rounded-xl py-1.5 px-2.5 text-xs font-sans font-bold tabular-nums text-slate-900 outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-500 shadow-2xs transition-all"
                               />
+                              {(cat.frequency === 'Monthly' || cat.frequency === 'Quarterly') && currentVal > 0 && (
+                                <span className="text-[9px] text-slate-400 font-normal pr-0.5">
+                                  ×{periodsPerYear(cat.frequency)} = ₹{(currentVal * periodsPerYear(cat.frequency)).toLocaleString('en-IN')}/yr
+                                </span>
+                              )}
                             </div>
                           </td>
                         );

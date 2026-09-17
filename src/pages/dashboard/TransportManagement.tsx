@@ -75,6 +75,7 @@ interface EnrolledStudent {
   name: string;
   class: string;
   section: string;
+  admission_number: string;
 }
 
 type TabType = 'routes' | 'vehicles' | 'drivers' | 'allotments';
@@ -114,6 +115,14 @@ export default function TransportManagement() {
   // Form Field States
   const [formData, setFormData] = useState<any>({});
 
+  // Narrows the "Enrolled Student" picker in the Allotment form -- a flat
+  // dropdown of ~300 unallotted students is unusable, so a cashier can
+  // narrow by class/section (fastest when they already know the child's
+  // class) and/or search by name or admission number.
+  const [studentPickerClass, setStudentPickerClass] = useState('all');
+  const [studentPickerSection, setStudentPickerSection] = useState('all');
+  const [studentPickerSearch, setStudentPickerSearch] = useState('');
+
   // Fetch from PostgreSQL
   const loadData = async () => {
     setIsSyncing(true);
@@ -124,7 +133,7 @@ export default function TransportManagement() {
         supabase.from('vehicles').select('*'),
         supabase.from('drivers').select('*'),
         supabase.from('student_transport').select('*, students(id, name, class, section)'),
-        supabase.from('students').select('id, name, class, section').eq('status', 'active').order('name').limit(2000)
+        supabase.from('students').select('id, name, class, section, admission_number').eq('status', 'active').order('name').limit(2000)
       ]);
 
       // supabase-js resolves rather than throws, so a failed request arrives as
@@ -137,7 +146,7 @@ export default function TransportManagement() {
       }
 
       setStudents((stdRes.data || []).map((s: any) => ({
-        id: s.id, name: s.name || 'Student', class: s.class || '', section: s.section || ''
+        id: s.id, name: s.name || 'Student', class: s.class || '', section: s.section || '', admission_number: s.admission_number || ''
       })));
 
       setRoutes((routesRes.data || []).map((r: any) => ({
@@ -212,12 +221,18 @@ export default function TransportManagement() {
       activeTab === 'routes' ? { stops_count: 1, fare_amount: 0 } :
       { pickup_time: '07:30 AM', drop_time: '03:30 PM' }
     );
+    setStudentPickerClass('all');
+    setStudentPickerSection('all');
+    setStudentPickerSearch('');
     setShowAddModal(true);
   };
 
   const handleOpenEdit = (item: any) => {
     setEditingItem(item);
     setFormData({ ...item });
+    setStudentPickerClass('all');
+    setStudentPickerSection('all');
+    setStudentPickerSearch('');
     setShowAddModal(true);
   };
 
@@ -469,11 +484,36 @@ export default function TransportManagement() {
 
   // A student can hold only one allotment (student_transport_student_unique),
   // so the picker offers the unallotted — plus whoever is being edited.
-  const selectableStudents = useMemo(() => {
+  const unallottedStudents = useMemo(() => {
     const taken = new Set(allotments.map(a => a.student_id));
     if (editingItem?.student_id) taken.delete(editingItem.student_id);
     return students.filter(s => !taken.has(s.id));
   }, [students, allotments, editingItem]);
+
+  // Classes/sections narrowed to whoever is actually still pickable, so the
+  // filter never offers a combination with zero results.
+  const pickerClasses = useMemo(() => {
+    const set = new Set(unallottedStudents.map(s => s.class).filter(Boolean));
+    return Array.from(set).sort((a, b) => {
+      const aVal = a.toLowerCase().includes('lkg') ? -2 : a.toLowerCase().includes('ukg') ? -1 : parseInt(a) || 99;
+      const bVal = b.toLowerCase().includes('lkg') ? -2 : b.toLowerCase().includes('ukg') ? -1 : parseInt(b) || 99;
+      return aVal - bVal;
+    });
+  }, [unallottedStudents]);
+
+  const pickerSections = useMemo(() => {
+    const pool = studentPickerClass === 'all' ? unallottedStudents : unallottedStudents.filter(s => s.class === studentPickerClass);
+    return Array.from(new Set(pool.map(s => s.section).filter(Boolean))).sort();
+  }, [unallottedStudents, studentPickerClass]);
+
+  const selectableStudents = useMemo(() => {
+    const q = studentPickerSearch.trim().toLowerCase();
+    return unallottedStudents.filter(s =>
+      (studentPickerClass === 'all' || s.class === studentPickerClass) &&
+      (studentPickerSection === 'all' || s.section === studentPickerSection) &&
+      (!q || s.name.toLowerCase().includes(q) || s.admission_number.toLowerCase().includes(q))
+    );
+  }, [unallottedStudents, studentPickerClass, studentPickerSection, studentPickerSearch]);
 
   // Filtered lists for rendering
   const filteredRoutes = useMemo(() => {
@@ -1460,21 +1500,58 @@ export default function TransportManagement() {
                   <div className="space-y-4">
                     <div className="space-y-1">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider pl-1">Enrolled Student</label>
+
+                      {/* Narrow the picker before scrolling a 300-name dropdown --
+                          by class/section when the cashier already knows it, or by
+                          name/admission number when they don't. */}
+                      <div className="grid grid-cols-2 gap-2 mb-1.5">
+                        <select
+                          value={studentPickerClass}
+                          onChange={(e) => { setStudentPickerClass(e.target.value); setStudentPickerSection('all'); }}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs text-slate-800 focus:ring-2 focus:ring-violet-500/20 h-[34px] outline-none cursor-pointer"
+                        >
+                          <option value="all">All Classes</option>
+                          {pickerClasses.map(c => (
+                            <option key={c} value={c}>Class {c}</option>
+                          ))}
+                        </select>
+                        <select
+                          value={studentPickerSection}
+                          onChange={(e) => setStudentPickerSection(e.target.value)}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs text-slate-800 focus:ring-2 focus:ring-violet-500/20 h-[34px] outline-none cursor-pointer"
+                        >
+                          <option value="all">All Sections</option>
+                          {pickerSections.map(sec => (
+                            <option key={sec} value={sec}>Section {sec}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="relative mb-1.5">
+                        <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          value={studentPickerSearch}
+                          onChange={(e) => setStudentPickerSearch(e.target.value)}
+                          placeholder="Search by name or admission number..."
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 pl-8 pr-3 text-xs text-slate-800 focus:ring-2 focus:ring-violet-500/20 h-[34px] outline-none"
+                        />
+                      </div>
+
                       <select
                         required
                         value={formData.student_id || ''}
                         onChange={(e) => setFormData({ ...formData, student_id: e.target.value })}
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl py-1.5 px-3 text-xs text-slate-800 focus:ring-2 focus:ring-violet-500/20 h-[36px] outline-none"
                       >
-                        <option value="">Select Student...</option>
+                        <option value="">Select Student... ({selectableStudents.length} match{selectableStudents.length === 1 ? '' : 'es'})</option>
                         {selectableStudents.map(s => (
-                          <option key={s.id} value={s.id}>{s.name} — Class {s.class}{s.section ? `-${s.section}` : ''}</option>
+                          <option key={s.id} value={s.id}>{s.name} — Class {s.class}{s.section ? `-${s.section}` : ''} · Adm: {s.admission_number || 'N/A'}</option>
                         ))}
                       </select>
                       {/* One allotment per student, so those already on a bus are
                           not offered again — editing reaches them instead. */}
                       <p className="text-[10px] text-slate-400 font-medium pl-1">
-                        {selectableStudents.length} of {students.length} students are not yet allotted transport.
+                        {unallottedStudents.length} of {students.length} students are not yet allotted transport.
                       </p>
                     </div>
                     <div className="grid grid-cols-2 gap-4">

@@ -5,13 +5,41 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import { resolveUserContext } from "./aiAuth.js";
-import { processAIChat } from "./aiService.js";
+import { processAIChat, getGeminiCandidateModels } from "./aiService.js";
 import { executeTool } from "./aiTools.js";
 
 export function createExpressApp() {
   const app = express();
 
-  app.use(express.json());
+  // Tolerant JSON body parsing.
+  //
+  // On Vercel the @vercel/node runtime consumes the request stream and pre-fills
+  // req.body before this Express app ever runs. express.json() then blocks
+  // waiting on 'data'/'end' events that will never fire, and ~10s later the
+  // invocation dies with FUNCTION_INVOCATION_FAILED — which is why every POST to
+  // /api/* fails in production while GET (no body) works. So: if a body is
+  // already present, use it (parsing a raw string if that is what we were
+  // handed); otherwise run the normal parser for `tsx server.ts` locally.
+  app.use((req, res, next) => {
+    const existing = (req as any).body;
+    if (existing !== undefined && existing !== null && existing !== '') {
+      if (typeof existing === 'string') {
+        try {
+          (req as any).body = JSON.parse(existing);
+        } catch {
+          (req as any).body = {};
+        }
+      }
+      return next();
+    }
+    express.json({ limit: '10mb' })(req, res, (err?: any) => {
+      if (err) {
+        return res.status(400).json({ error: 'Invalid JSON request body.' });
+      }
+      if ((req as any).body == null) (req as any).body = {};
+      next();
+    });
+  });
 
   // Supabase Clients - supporting both standard and VITE_ prefixed environment variables
   const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || 'https://cqylpqrharentkjmrymr.supabase.co';
@@ -298,31 +326,42 @@ export function createExpressApp() {
           const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, '');
           const cleanMime = mimeType || 'image/jpeg';
 
-          const response = await genAI.models.generateContent({
-            model: 'gemini-3.6-flash',
-            contents: [
-              {
-                role: 'user',
-                parts: [
-                  {
-                    inlineData: {
-                      mimeType: cleanMime,
-                      data: cleanBase64
-                    }
-                  },
-                  {
-                    text: prompt || `You are an expert OCR and Document Analyzer for St. Joseph's School, Barhalganj.
+          const visionContents = [
+            {
+              role: 'user',
+              parts: [
+                {
+                  inlineData: {
+                    mimeType: cleanMime,
+                    data: cleanBase64
+                  }
+                },
+                {
+                  text: prompt || `You are an expert OCR and Document Analyzer for St. Joseph's School, Barhalganj.
 Analyze this uploaded document (${documentType || 'document'}).
 Extract all relevant fields (Student Name, Roll Number, Class, Date, Marks/Subjects, Medical Reason, or Fee Amount).
 Provide a clear, structured summary and return JSON formatted key-value pairs.`
-                  }
-                ]
-              }
-            ]
-          });
+                }
+              ]
+            }
+          ];
 
-          analysisSummary = response.text || "Document processed successfully.";
-          extractedData = { rawText: response.text, status: 'verified_with_gemini_vision' };
+          for (const modelName of getGeminiCandidateModels()) {
+            try {
+              const response = await genAI.models.generateContent({
+                model: modelName,
+                contents: visionContents
+              });
+
+              if (response && response.text) {
+                analysisSummary = response.text;
+                extractedData = { rawText: response.text, status: 'verified_with_gemini_vision' };
+                break;
+              }
+            } catch (modelErr: any) {
+              console.warn(`[Gemini Vision Model ${modelName}] attempt failed:`, modelErr?.message || modelErr);
+            }
+          }
         } catch (visionErr: any) {
           console.warn("[Gemini Vision Error] Using fallback extractor:", visionErr?.message);
         }
@@ -729,7 +768,8 @@ Provide a clear, structured summary and return JSON formatted key-value pairs.`
       due_date,
       payment_date,
       transaction_id,
-      remarks
+      remarks,
+      receipt_number: incomingReceiptNumber
     } = req.body || {};
 
     if (!student_id || !amount || Number(amount) <= 0) {
@@ -845,13 +885,18 @@ Provide a clear, structured summary and return JSON formatted key-value pairs.`
         });
       }
 
-      // Generate receipt number
-      let receiptNo = `REC-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
-      try {
-        const { data: rpcReceipt } = await adminClient!.rpc('next_receipt_number', { _academic_year_id: yearId });
-        if (rpcReceipt) receiptNo = rpcReceipt;
-      } catch (e) {
-        // Ignore fallback to formatted receipt
+      // A batch of several ledger lines settled in one cashier submission
+      // shares one receipt number: the caller mints it on the first call and
+      // passes it back in on every subsequent call in the same batch.
+      let receiptNo = incomingReceiptNumber || null;
+      if (!receiptNo) {
+        receiptNo = `REC-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
+        try {
+          const { data: rpcReceipt } = await adminClient!.rpc('next_receipt_number', { _academic_year_id: yearId });
+          if (rpcReceipt) receiptNo = rpcReceipt;
+        } catch (e) {
+          // Ignore fallback to formatted receipt
+        }
       }
 
       // Insert fee_payment. This is what moves the ledger: the trigger

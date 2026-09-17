@@ -59,6 +59,7 @@ export interface StudentFeeLedger {
   created_at?: string;
   updated_at?: string;
   category_name: string;
+  frequency?: string;
   academic_year: string;
   month?: string;
   payment_mode?: string;
@@ -116,6 +117,13 @@ export interface CollectFeeInput {
   dueDate?: string;
   transactionId?: string;
   remarks?: string;
+  /**
+   * Reuse an already-minted receipt number instead of minting a new one --
+   * pass the first call's returned receiptNumber into every subsequent call
+   * of the same cashier submission so a multi-item payment shares one
+   * receipt instead of getting one per settled line.
+   */
+  receiptNumber?: string;
 }
 
 export interface CollectFeeResult {
@@ -154,6 +162,21 @@ export interface FeeReceiptData {
   created_by?: string | null;
   cashier_name?: string | null;
   student_id?: string;
+  /**
+   * Fee heads this specific payment was tagged as covering, when it was paid
+   * against a lumped "Composite" ledger row and the cashier ticked which
+   * heads it's for. The receipt shows exactly these instead of pulling the
+   * whole class's fee structure.
+   */
+  composite_heads_covered?: { category_name: string; frequency?: string; amount: number }[];
+  /**
+   * Every individual ledger row this payment actually settled, in the exact
+   * amount allocated to it -- e.g. "Tuition Fee — Apr" ₹500, "Tuition Fee —
+   * May" ₹500, "Admission Fee" ₹1500. When a single payment spans several
+   * rows (several months, or several heads at once), the receipt shows this
+   * full breakdown instead of collapsing everything into one lump line.
+   */
+  line_items?: { description: string; amount: number }[];
   students?: {
     id?: string;
     name?: string;

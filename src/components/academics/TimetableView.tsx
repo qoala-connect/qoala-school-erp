@@ -26,6 +26,49 @@ import {
 /**
  * Enterprise weekly teaching schedule matrix for school classes & sections.
  */
+
+/** Bell schedule: derive every period's clock time from P1 + a fixed length. */
+interface BellSchedule {
+  firstStart: string;   // "HH:MM"
+  periodMins: number;    // length of one period
+  breakAfter: number;    // 0 = no break; otherwise a gap falls after this period
+  breakMins: number;     // length of that gap
+}
+
+const DEFAULT_BELL: BellSchedule = { firstStart: '08:30', periodMins: 60, breakAfter: 4, breakMins: 30 };
+const BELL_STORAGE_KEY = 'tt:bellSchedule:v1';
+
+const clampTime = (hhmm: string) => (/^\d{2}:\d{2}$/.test(hhmm) ? hhmm : DEFAULT_BELL.firstStart);
+
+const addMinutes = (hhmm: string, mins: number): string => {
+  const [h, m] = clampTime(hhmm).split(':').map(Number);
+  const total = ((h * 60 + m + mins) % 1440 + 1440) % 1440;
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+};
+
+/** Walk the bell schedule and return start/end for periods 1..count. */
+function buildBellTimes(bell: BellSchedule, count: number): Map<number, { start: string; end: string }> {
+  const out = new Map<number, { start: string; end: string }>();
+  const len = bell.periodMins > 0 ? bell.periodMins : DEFAULT_BELL.periodMins;
+  let cursor = clampTime(bell.firstStart);
+  for (let p = 1; p <= count; p++) {
+    const end = addMinutes(cursor, len);
+    out.set(p, { start: cursor, end });
+    cursor = end;
+    if (bell.breakAfter > 0 && bell.breakMins > 0 && p === bell.breakAfter) {
+      cursor = addMinutes(cursor, bell.breakMins);
+    }
+  }
+  return out;
+}
+
+function loadBell(): BellSchedule {
+  try {
+    const raw = localStorage.getItem(BELL_STORAGE_KEY);
+    if (raw) return { ...DEFAULT_BELL, ...JSON.parse(raw) };
+  } catch { /* private mode / bad JSON — fall back to default */ }
+  return DEFAULT_BELL;
+}
 export default function TimetableView({ onNavigateView }: { onNavigateView: (view: string) => void }) {
   const { user, role, can } = useAuth();
   const navigate = useNavigate();
@@ -252,6 +295,31 @@ export default function TimetableView({ onNavigateView }: { onNavigateView: (vie
     }
     return out;
   }, [slots]);
+
+  // Bell schedule: set P1's start and one period length, and every later period
+  // chains off it automatically (P2 begins when P1 ends, and so on), so the
+  // admin never types a time per period. Real slot times still win once a
+  // period has been scheduled — this only fills the blanks.
+  const [bell, setBell] = useState<BellSchedule>(loadBell);
+  const patchBell = (patch: Partial<BellSchedule>) => {
+    setBell(prev => {
+      const next = { ...prev, ...patch };
+      try { localStorage.setItem(BELL_STORAGE_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  };
+
+  const computedPeriodTimes = useMemo(
+    () => buildBellTimes(bell, Math.max(12, periods.length)),
+    [bell, periods.length]
+  );
+
+  /** Bell-schedule times, overridden by whatever a scheduled slot actually uses. */
+  const effectivePeriodTimes = useMemo(() => {
+    const m = new Map(computedPeriodTimes);
+    for (const [p, t] of periodTimes) m.set(p, t);
+    return m;
+  }, [computedPeriodTimes, periodTimes]);
 
   const handleDelete = async () => {
     if (!confirmDelete) return;
@@ -678,6 +746,59 @@ export default function TimetableView({ onNavigateView }: { onNavigateView: (vie
           </div>
         </div>
 
+        {mayManage && (
+          <div className="rounded-xl border border-blue-100 bg-blue-50/40 px-4 py-3 flex flex-wrap items-end gap-x-5 gap-y-3">
+            <div className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-blue-800 shrink-0">
+              <Clock size={13} /> Bell Schedule
+            </div>
+            <Field label="P1 starts at" htmlFor="bell-start">
+              <input
+                id="bell-start"
+                type="time"
+                className={inputClass + ' w-32'}
+                value={bell.firstStart}
+                onChange={e => patchBell({ firstStart: e.target.value || DEFAULT_BELL.firstStart })}
+              />
+            </Field>
+            <Field label="Each period" htmlFor="bell-len">
+              <select
+                id="bell-len"
+                className={selectClass + ' w-32'}
+                value={bell.periodMins}
+                onChange={e => patchBell({ periodMins: Number(e.target.value) })}
+              >
+                {[35, 40, 45, 50, 55, 60].map(m => <option key={m} value={m}>{m} min</option>)}
+              </select>
+            </Field>
+            <Field label="Break after" htmlFor="bell-brk">
+              <select
+                id="bell-brk"
+                className={selectClass + ' w-28'}
+                value={bell.breakAfter}
+                onChange={e => patchBell({ breakAfter: Number(e.target.value) })}
+              >
+                <option value={0}>No break</option>
+                {periods.slice(0, -1).map(p => <option key={p} value={p}>P{p}</option>)}
+              </select>
+            </Field>
+            {bell.breakAfter > 0 && (
+              <Field label="Break length" htmlFor="bell-brkm">
+                <select
+                  id="bell-brkm"
+                  className={selectClass + ' w-28'}
+                  value={bell.breakMins}
+                  onChange={e => patchBell({ breakMins: Number(e.target.value) })}
+                >
+                  {[10, 15, 20, 25, 30, 35, 40].map(m => <option key={m} value={m}>{m} min</option>)}
+                </select>
+              </Field>
+            )}
+            <p className="text-[10.5px] text-blue-700/80 font-medium basis-full sm:basis-auto">
+              Periods chain automatically — P1 {bell.firstStart}–{computedPeriodTimes.get(1)?.end}, P2 {computedPeriodTimes.get(2)?.start}–{computedPeriodTimes.get(2)?.end}, … A period already scheduled keeps its own saved time.
+            </p>
+          </div>
+        )}
+
         <AsyncBlock
           isLoading={isLoading}
           error={error}
@@ -715,15 +836,15 @@ export default function TimetableView({ onNavigateView }: { onNavigateView: (vie
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {periods.map(period => {
-                    const knownTime = periodTimes.get(period);
+                    const knownTime = effectivePeriodTimes.get(period);
                     return (
                       <tr key={period} className="align-top hover:bg-slate-50/30 transition-colors">
                         <th scope="row" className="px-3 py-2.5 bg-slate-50/40 text-center border-r border-slate-100">
                           <div className="flex flex-col items-center">
                             <span className="text-xs font-black text-slate-900 tabular-nums">P{period}</span>
                             {knownTime && (
-                              <span className="text-[9px] font-semibold text-slate-400 font-mono mt-0.5">
-                                {knownTime.start}
+                              <span className="text-[9px] font-semibold text-slate-400 font-mono mt-0.5 whitespace-nowrap">
+                                {knownTime.start}–{knownTime.end}
                               </span>
                             )}
                           </div>
@@ -853,7 +974,7 @@ export default function TimetableView({ onNavigateView }: { onNavigateView: (vie
           initialSectionId={sectionId || currentSection?.section_id || (sections[0]?.section_id ?? null)}
           initialDay={addAt?.day ?? null}
           initialPeriod={addAt?.period ?? null}
-          periodTimes={periodTimes}
+          periodTimes={effectivePeriodTimes}
           sections={sections}
           subjects={subjects}
           subjectMaster={subjectMaster}
