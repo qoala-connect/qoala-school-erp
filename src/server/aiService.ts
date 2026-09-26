@@ -24,7 +24,7 @@ export function getGeminiCandidateModels(): string[] {
   if (override) {
     return override.split(',').map(m => m.trim()).filter(Boolean);
   }
-  return ['gemini-flash-latest', 'gemini-3.6-flash', 'gemini-2.5-flash'];
+  return ['gemini-flash-latest', 'gemini-3.6-flash', 'gemini-3.5-flash'];
 }
 
 /**
@@ -129,8 +129,9 @@ CRITICAL ROLE & SECURITY RULES:
 3. ADMINISTRATOR:
    - You have full access to institutional KPIs, admissions, fee collections, datesheets, teacher workloads, and student statistics.
 4. DATA GROUNDING:
-   - ALWAYS call the appropriate tool when asked about specific students, attendance numbers, fee dues, timetable periods, or exam marks.
+   - ALWAYS call the appropriate tool when asked about specific students, attendance numbers, fee dues, timetable periods, exam marks, library records ("get_library_status"), transport/bus details ("get_transport_info"), homework/assignments ("get_homework_assignments"), or syllabus coverage ("get_syllabus_progress").
    - NEVER invent or guess database figures. If no records match, state that clearly.
+   - When answering policy/SOP questions from "query_school_knowledge_base", stay close to the retrieved content's wording rather than paraphrasing loosely — it is the authoritative institutional source.
 5. CONTROLLED ACTIONS:
    - If the user asks to mark attendance, submit marks, or publish a notice, call "propose_erp_action". DO NOT claim it is executed until the user confirms the action card.
 6. RESPONSE FORMATTING:
@@ -744,7 +745,99 @@ How may I assist you today?`
     };
   }
 
-  // 16. Default Role-Aware Smart Guide
+  // 16. Library Records (Issued Books, Fines, Catalog)
+  if (
+    lowerMsg.includes('library') ||
+    lowerMsg.includes('issued book') ||
+    lowerMsg.includes('overdue book') ||
+    lowerMsg.includes('borrow') ||
+    (lowerMsg.includes('book') && !lowerMsg.includes('booking'))
+  ) {
+    const toolRes = await executeTool('get_library_status', { student_id: context.studentId }, context, supabase);
+    toolsUsed.push('get_library_status');
+    if (toolRes.structuredPayload) structuredData.push(toolRes.structuredPayload);
+
+    return {
+      reply: `### 📚 Library Records\n\n${toolRes.summaryForModel}\n\n• Fines accrue at the standard per-day rate until the book is returned or the fine is settled at the library desk.`,
+      structuredData,
+      toolsUsed,
+      suggestedFollowUps: [
+        'Show library fine policy',
+        'What is the borrowing limit?',
+        'Show my fee status'
+      ]
+    };
+  }
+
+  // 17. School Transport (Routes, Pickup/Drop, Fleet)
+  if (
+    lowerMsg.includes('transport') ||
+    lowerMsg.includes('bus') ||
+    lowerMsg.includes('route') ||
+    lowerMsg.includes('pickup') ||
+    lowerMsg.includes('pick up') ||
+    lowerMsg.includes('driver')
+  ) {
+    const toolRes = await executeTool('get_transport_info', { student_id: context.studentId }, context, supabase);
+    toolsUsed.push('get_transport_info');
+    if (toolRes.structuredPayload) structuredData.push(toolRes.structuredPayload);
+
+    return {
+      reply: `### 🚌 School Transport\n\n${toolRes.summaryForModel}\n\n• Route allocations and fare structures are reviewed at the start of every academic session.`,
+      structuredData,
+      toolsUsed,
+      suggestedFollowUps: [
+        'Show transport fare structure',
+        'Show my fee status',
+        'Contact transport office'
+      ]
+    };
+  }
+
+  // 18. Homework & Assignments
+  if (
+    lowerMsg.includes('homework') ||
+    lowerMsg.includes('assignment') ||
+    lowerMsg.includes('submission') ||
+    lowerMsg.includes('submit my') ||
+    lowerMsg.includes('pending work')
+  ) {
+    const toolRes = await executeTool('get_homework_assignments', { class_name: detectedClass }, context, supabase);
+    toolsUsed.push('get_homework_assignments');
+    if (toolRes.structuredPayload) structuredData.push(toolRes.structuredPayload);
+
+    return {
+      reply: `### 📝 Homework & Assignments\n\n${toolRes.summaryForModel}`,
+      structuredData,
+      toolsUsed,
+      suggestedFollowUps: [
+        'Show my pending submissions',
+        'Show today timetable',
+        'Show my attendance'
+      ]
+    };
+  }
+
+  // 19. Syllabus Coverage & Progress
+  if (
+    lowerMsg.includes('syllabus') ||
+    lowerMsg.includes('chapter cover') ||
+    lowerMsg.includes('portion complete') ||
+    lowerMsg.includes('course coverage') ||
+    lowerMsg.includes('syllabus progress')
+  ) {
+    const toolRes = await executeTool('get_syllabus_progress', { class_name: detectedClass, subject_name: detectedSubject }, context, supabase);
+    toolsUsed.push('get_syllabus_progress');
+    if (toolRes.structuredPayload) structuredData.push(toolRes.structuredPayload);
+
+    return {
+      reply: `### 📖 Syllabus Coverage\n\n${toolRes.summaryForModel}`,
+      structuredData,
+      toolsUsed
+    };
+  }
+
+  // 20. Default Role-Aware Smart Guide
   return {
     reply: `Hello **${context.name}**! I am your **Google Gemini AI Copilot** for **St. Joseph's School, Barhalganj** (CBSE Affiliation No. 2131498).
 

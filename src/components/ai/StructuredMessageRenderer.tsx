@@ -565,7 +565,7 @@ export default function StructuredMessageRenderer({ payload, accessToken, onActi
 
   // 6. ACTION CONFIRMATION CARD (Safe 2-Step Protocol)
   if (type === 'action_card') {
-    const { actionType, title: actTitle, description } = data;
+    const { actionType, title: actTitle, description, previewFields } = data;
 
     return (
       <div className="p-4 bg-amber-50/90 border border-amber-200 rounded-2xl my-2 space-y-3 shadow-sm">
@@ -584,6 +584,17 @@ export default function StructuredMessageRenderer({ payload, accessToken, onActi
         <p className="text-xs text-slate-700 bg-white/80 p-2.5 rounded-xl border border-amber-100 leading-relaxed font-normal">
           {description}
         </p>
+
+        {Array.isArray(previewFields) && previewFields.length > 0 && (
+          <div className="bg-white/80 rounded-xl border border-amber-100 divide-y divide-amber-50 overflow-hidden">
+            {previewFields.map((f: any, idx: number) => (
+              <div key={idx} className="flex items-baseline justify-between gap-3 px-2.5 py-1.5 text-[11px]">
+                <span className="font-bold text-amber-900 shrink-0">{f.label}</span>
+                <span className="text-slate-700 text-right break-words">{f.value}</span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {actionDone ? (
           <div className="p-2.5 bg-emerald-100 border border-emerald-200 rounded-xl flex items-center gap-2 text-emerald-800 text-xs font-bold">
@@ -618,9 +629,9 @@ export default function StructuredMessageRenderer({ payload, accessToken, onActi
     );
   }
 
-  // 7. TIMETABLE GRID
+  // 7. TIMETABLE GRID — grouped by day: { days: [{ day, slots: [...] }] }
   if (type === 'timetable_grid') {
-    const slots = Array.isArray(data.slots) ? data.slots : [];
+    const days = Array.isArray(data?.days) ? data.days : [];
 
     return (
       <div className="p-3.5 bg-white border border-sky-100 rounded-2xl my-2 space-y-3 shadow-3xs">
@@ -629,17 +640,24 @@ export default function StructuredMessageRenderer({ payload, accessToken, onActi
           <span>{title || 'Academic Schedule'}</span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {slots.slice(0, 6).map((slot: any, idx: number) => (
-            <div key={idx} className="p-2.5 bg-slate-50 border border-slate-200/70 rounded-xl space-y-0.5 text-xs">
-              <div className="flex items-center justify-between text-[10px] font-mono text-sky-600 font-bold">
-                <span>Period {slot.period_number || idx + 1}</span>
-                <span className="text-slate-400">{slot.start_time?.slice(0, 5)} - {slot.end_time?.slice(0, 5)}</span>
+        <div className="space-y-3">
+          {days.map((d: any, dIdx: number) => (
+            <div key={dIdx} className="space-y-1.5">
+              <p className="text-[10px] font-black uppercase tracking-wider text-sky-700">{d.day}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {(d.slots || []).map((slot: any, idx: number) => (
+                  <div key={idx} className="p-2.5 bg-slate-50 border border-slate-200/70 rounded-xl space-y-0.5 text-xs">
+                    <div className="flex items-center justify-between text-[10px] font-mono text-sky-600 font-bold">
+                      <span>Period {slot.period_number ?? idx + 1}</span>
+                      <span className="text-slate-400">{slot.start_time?.slice(0, 5)} - {slot.end_time?.slice(0, 5)}</span>
+                    </div>
+                    <h5 className="font-bold text-slate-800 truncate">{slot.subject || slot.class || 'Subject'}</h5>
+                    {slot.teacher && (
+                      <p className="text-[10px] text-slate-500 truncate">{slot.teacher}{slot.class ? ` · Class ${slot.class}` : ''}</p>
+                    )}
+                  </div>
+                ))}
               </div>
-              <h5 className="font-bold text-slate-800 truncate">{slot.subjects?.subject_name || slot.class || 'Subject'}</h5>
-              {slot.teachers?.name && (
-                <p className="text-[10px] text-slate-500 truncate">{slot.teachers.name}</p>
-              )}
             </div>
           ))}
         </div>
@@ -699,7 +717,15 @@ export default function StructuredMessageRenderer({ payload, accessToken, onActi
 
   // 10. GENERIC / SUBSTITUTION LIST
   if (type === 'generic_list') {
-    const { summary, slots } = data || {};
+    // Shape 1 (Faculty Substitution Planner): { summary, slots: [{period, class, subject, time, substitute}] }
+    const hasSlots = data && !Array.isArray(data) && Array.isArray(data.slots);
+    // Shape 2 (everything else — knowledge base, library, transport, homework, syllabus, etc.):
+    // a plain array of flat objects, rendered generically from their own keys.
+    const items = Array.isArray(data) ? data : (hasSlots ? null : []);
+    const summary = !Array.isArray(data) ? data?.summary : null;
+
+    const formatLabel = (key: string) =>
+      key.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^\w/, c => c.toUpperCase());
 
     return (
       <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl my-2 space-y-2.5 shadow-3xs text-xs">
@@ -709,9 +735,9 @@ export default function StructuredMessageRenderer({ payload, accessToken, onActi
         </div>
         {summary && <p className="text-slate-600 text-[11px]">{summary}</p>}
 
-        {Array.isArray(slots) && slots.length > 0 && (
+        {hasSlots && Array.isArray(data.slots) && data.slots.length > 0 && (
           <div className="space-y-1.5">
-            {slots.map((s: any, idx: number) => (
+            {data.slots.map((s: any, idx: number) => (
               <div key={idx} className="p-2 bg-white rounded-xl border border-slate-200 flex justify-between items-center text-xs">
                 <div>
                   <span className="font-bold text-slate-800">Period {s.period}: {s.class} ({s.subject})</span>
@@ -723,6 +749,35 @@ export default function StructuredMessageRenderer({ payload, accessToken, onActi
               </div>
             ))}
           </div>
+        )}
+
+        {items && items.length > 0 && (
+          <div className="space-y-1.5">
+            {items.map((item: any, idx: number) => {
+              if (item === null || typeof item !== 'object') {
+                return (
+                  <div key={idx} className="p-2 bg-white rounded-xl border border-slate-200 text-slate-700">
+                    {String(item)}
+                  </div>
+                );
+              }
+              const entries = Object.entries(item).filter(([, v]) => v !== null && v !== undefined && v !== '');
+              return (
+                <div key={idx} className="p-2.5 bg-white rounded-xl border border-slate-200 space-y-0.5">
+                  {entries.map(([k, v]) => (
+                    <div key={k} className="flex items-baseline gap-1.5 text-[11px]">
+                      <span className="font-bold text-slate-800 shrink-0">{formatLabel(k)}:</span>
+                      <span className="text-slate-600 break-words">{String(v)}</span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {items && items.length === 0 && !hasSlots && (
+          <p className="text-slate-400 text-[11px] italic">No records found.</p>
         )}
       </div>
     );

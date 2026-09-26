@@ -8,6 +8,74 @@ import { resolveUserContext } from "./aiAuth.js";
 import { processAIChat, getGeminiCandidateModels } from "./aiService.js";
 import { executeTool } from "./aiTools.js";
 
+/* ------------------------------------------------------------------ *
+ * Lightweight abuse protection for the public, unauthenticated
+ * /api/ai/chat endpoint. Anonymous visitors are an intentional use
+ * case (public admissions/FAQ questions), so this can't be an auth
+ * wall — it caps input size and throttles request bursts per IP
+ * instead, without pulling in a new dependency.
+ *
+ * In-memory + per-process: on Vercel this app can run as multiple
+ * concurrent serverless instances, each with its own memory, so this
+ * throttles sustained abuse against a single warm instance rather
+ * than guaranteeing a hard cross-instance cap. That's an accepted
+ * trade-off for this effort level; a hard guarantee would need a
+ * shared store (e.g. a Supabase table or Redis).
+ * ------------------------------------------------------------------ */
+const MAX_CHAT_MESSAGE_LENGTH = 2000;
+const CHAT_RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+const CHAT_RATE_LIMIT_MAX_REQUESTS = 20;
+const chatRateLimitHits = new Map<string, number[]>();
+
+function isChatRateLimited(clientKey: string): boolean {
+  const now = Date.now();
+  const windowStart = now - CHAT_RATE_LIMIT_WINDOW_MS;
+  const recentHits = (chatRateLimitHits.get(clientKey) || []).filter(t => t > windowStart);
+  recentHits.push(now);
+  chatRateLimitHits.set(clientKey, recentHits);
+
+  // Opportunistic cleanup so the map doesn't grow unbounded under sustained traffic.
+  if (chatRateLimitHits.size > 5000) {
+    for (const [key, hits] of chatRateLimitHits) {
+      if (hits.every(t => t <= windowStart)) chatRateLimitHits.delete(key);
+    }
+  }
+
+  return recentHits.length > CHAT_RATE_LIMIT_MAX_REQUESTS;
+}
+
+/* ------------------------------------------------------------------ *
+ * Audit logging for AI-confirmed write actions.
+ *
+ * Mirrors src/lib/audit.ts's row shape (that file is browser-only, so it
+ * can't be imported here) — every AI-executed action lands in the same
+ * audit_logs table the rest of the app already uses, clearly attributed
+ * to whichever user confirmed it. Never throws: a logging failure must
+ * not fail the user's action.
+ * ------------------------------------------------------------------ */
+async function logAiAction(
+  db: any,
+  context: { userId: string; email: string },
+  actionType: string,
+  tableName: string,
+  recordId?: string | null,
+  newValues?: unknown
+): Promise<void> {
+  try {
+    await db.from('audit_logs').insert({
+      user_id: context.userId,
+      user_email: context.email,
+      action_type: actionType,
+      table_name: tableName,
+      record_id: recordId ?? null,
+      new_values: newValues == null ? null : (typeof newValues === 'object' ? newValues : { val: newValues }),
+      created_at: new Date().toISOString()
+    });
+  } catch (err) {
+    console.warn('[AI audit] could not write audit log:', err);
+  }
+}
+
 export function createExpressApp() {
   const app = express();
 
@@ -63,14 +131,105 @@ export function createExpressApp() {
   });
 
   /* ------------------------------------------------------------------ *
+   * Scheduled AI Daily Digest (Vercel Cron — see vercel.json)
+   *
+   * Runs the school's existing, already-verified AI tools once a day and
+   * stores the result in ai_daily_digests, replacing the hardcoded mock
+   * "insights" the admin dashboard used to show. No new analysis logic —
+   * pure orchestration of get_ai_daily_brief / get_at_risk_students_prediction
+   * / get_cashflow_forecast.
+   * ------------------------------------------------------------------ */
+  // Vercel Cron always triggers via GET.
+  app.get('/api/cron/daily-digest', async (req, res) => {
+    try {
+      const db = adminClient || supabase;
+      if (!db) {
+        return res.status(503).json({ error: 'Database connection unavailable' });
+      }
+
+      // Accept either the Vercel Cron shared secret, or a normal admin session
+      // (so an admin can manually re-trigger "regenerate today's digest" too).
+      const cronSecret = process.env.CRON_SECRET?.trim();
+      const authHeader = req.headers.authorization;
+      const providedToken = authHeader?.replace(/^Bearer\s+/i, '').trim();
+
+      let isAuthorized = Boolean(cronSecret && providedToken === cronSecret);
+      if (!isAuthorized) {
+        const { context } = await resolveUserContext(authHeader, adminClient);
+        isAuthorized = Boolean(context?.isAdmin);
+      }
+      if (!isAuthorized) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      const systemContext: any = {
+        user: null,
+        userId: 'system-cron',
+        email: 'system@stjosephs.edu.in',
+        name: 'AI Daily Digest',
+        role: 'admin',
+        roleCategory: 'admin',
+        isAdmin: true,
+        isTeacher: false,
+        isStudent: false,
+        studentId: null,
+        studentName: null,
+        studentClass: null,
+        studentSection: null,
+        studentRollNumber: null,
+        teacherId: null,
+        teacherName: null,
+        assignedClasses: [],
+        assignedSections: [],
+        assignedSubjectIds: []
+      };
+
+      const [dailyBrief, atRiskStudents, cashflowForecast] = await Promise.all([
+        executeTool('get_ai_daily_brief', {}, systemContext, db),
+        executeTool('get_at_risk_students_prediction', { risk_level: 'all' }, systemContext, db),
+        executeTool('get_cashflow_forecast', { days_ahead: 30 }, systemContext, db)
+      ]);
+
+      const digestDate = new Date().toISOString().split('T')[0];
+      const summaryText = [dailyBrief.summaryForModel, atRiskStudents.summaryForModel, cashflowForecast.summaryForModel]
+        .filter(Boolean)
+        .join(' ');
+
+      const { error: upsertErr } = await db.from('ai_daily_digests').upsert([{
+        digest_date: digestDate,
+        daily_brief: dailyBrief.structuredPayload || dailyBrief.data || null,
+        at_risk_students: atRiskStudents.structuredPayload || atRiskStudents.data || null,
+        cashflow_forecast: cashflowForecast.structuredPayload || cashflowForecast.data || null,
+        summary_text: summaryText,
+        generated_at: new Date().toISOString()
+      }], { onConflict: 'digest_date' });
+
+      if (upsertErr) throw upsertErr;
+
+      return res.json({ ok: true, digest_date: digestDate, generated_at: new Date().toISOString() });
+    } catch (err: any) {
+      console.error('[AI Daily Digest Cron Error]:', err);
+      return res.status(500).json({ error: 'Failed to generate daily digest', details: err?.message });
+    }
+  });
+
+  /* ------------------------------------------------------------------ *
    * Enterprise AI Chat Route (Role-Aware & Tool-Augmented)
    * ------------------------------------------------------------------ */
   app.post("/api/ai/chat", async (req, res) => {
     try {
+      const clientKey = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown';
+      if (isChatRateLimited(clientKey)) {
+        return res.status(429).json({ error: "You're sending messages too quickly. Please wait a moment and try again." });
+      }
+
       const { message, history } = req.body;
 
       if (!message || typeof message !== 'string') {
         return res.status(400).json({ error: "Message string is required" });
+      }
+      if (message.length > MAX_CHAT_MESSAGE_LENGTH) {
+        return res.status(413).json({ error: `Message is too long (max ${MAX_CHAT_MESSAGE_LENGTH} characters).` });
       }
 
       // 1. Authenticate user from Bearer token (or resolve visitor context)
@@ -159,9 +318,11 @@ export function createExpressApp() {
             if (insErr) throw insErr;
           }
 
-          return res.json({ 
-            ok: true, 
-            message: `Attendance marked as "${status}" on ${targetDate}.` 
+          await logAiAction(db, context, 'AI_MARK_ATTENDANCE', 'attendance', existing?.id || null, payload);
+
+          return res.json({
+            ok: true,
+            message: `Attendance marked as "${status}" on ${targetDate}.`
           });
         }
 
@@ -187,10 +348,12 @@ export function createExpressApp() {
 
           if (noticeErr) throw noticeErr;
 
-          return res.json({ 
-            ok: true, 
+          await logAiAction(db, context, 'AI_CREATE_NOTICE', 'notices', notice?.id || null, { title, description });
+
+          return res.json({
+            ok: true,
             message: `Official circular "${title}" published successfully.`,
-            notice 
+            notice
           });
         }
 
@@ -203,6 +366,17 @@ export function createExpressApp() {
 
           if (!context.isAdmin && !(context.isTeacher && context.assignedClasses.includes(class_name))) {
             return res.status(403).json({ error: "Permission Denied: You cannot submit marks for this class" });
+          }
+
+          // Defense-in-depth: re-check exam/subject state at write time, since it can have
+          // changed between the AI proposing this action and the user confirming it.
+          const { data: examRow } = await db.from('exams').select('status').eq('id', exam_id).maybeSingle();
+          if (examRow?.status === 'published' || examRow?.status === 'result_processed') {
+            return res.status(409).json({ error: "This exam's results are already finalized and can no longer be edited this way." });
+          }
+          const { data: examSubjectRow } = await db.from('exam_subjects').select('locked').eq('exam_id', exam_id).eq('subject_id', subject_id).maybeSingle();
+          if (examSubjectRow?.locked) {
+            return res.status(409).json({ error: "Marks entry for this subject is locked." });
           }
 
           // Check for existing marks record
@@ -225,16 +399,22 @@ export function createExpressApp() {
           };
 
           if (existingMark?.id) {
+            // Leave `status` untouched on update — don't silently resubmit or revert a
+            // status a human already set (e.g. 'returned' for correction).
             const { error: updMarkErr } = await db.from('marks').update(markPayload).eq('id', existingMark.id);
             if (updMarkErr) throw updMarkErr;
           } else {
-            const { error: insMarkErr } = await db.from('marks').insert([{ ...markPayload, created_at: new Date().toISOString() }]);
+            // New AI-entered marks land as a draft — the teacher still has to submit it
+            // for review through the normal Marks Entry screen.
+            const { error: insMarkErr } = await db.from('marks').insert([{ ...markPayload, status: 'draft', created_at: new Date().toISOString() }]);
             if (insMarkErr) throw insMarkErr;
           }
 
-          return res.json({ 
-            ok: true, 
-            message: `Marks (${obtained_marks}/${max_marks || 100}) recorded successfully.` 
+          await logAiAction(db, context, 'AI_SUBMIT_MARKS', 'marks', existingMark?.id || null, markPayload);
+
+          return res.json({
+            ok: true,
+            message: `Marks (${obtained_marks}/${max_marks || 100}) recorded successfully.`
           });
         }
 
@@ -291,6 +471,166 @@ export function createExpressApp() {
           });
         }
 
+        case 'fill_timetable_slot': {
+          if (!context.isAdmin) {
+            return res.status(403).json({ error: "Permission Denied: Only administrators can modify the master timetable" });
+          }
+
+          const { class_name, class_id, academic_year_id, day, period_number, subject_id, teacher_id, start_time, end_time } = parameters;
+          if (!class_name || !day || period_number === undefined || !subject_id || !teacher_id || !start_time || !end_time) {
+            return res.status(400).json({ error: "class_name, day, period_number, subject_id, teacher_id, start_time and end_time are required" });
+          }
+
+          // Defense-in-depth: re-check the slot is still empty and the teacher is still
+          // clash-free, since state can change between the AI proposing this and confirming it.
+          let stillEmptyQuery = db.from('timetable').select('id').eq('day', day).eq('period_number', period_number);
+          const { data: emptyCheck } = class_id
+            ? await stillEmptyQuery.eq('class_id', class_id).maybeSingle()
+            : await stillEmptyQuery.eq('class', class_name).maybeSingle();
+          if (emptyCheck) {
+            return res.status(409).json({ error: "This slot has already been scheduled since this was proposed." });
+          }
+
+          const { data: teacherClash } = await db.from('timetable').select('id').eq('day', day).eq('period_number', period_number).eq('teacher_id', teacher_id).maybeSingle();
+          if (teacherClash) {
+            return res.status(409).json({ error: "This teacher has since been scheduled elsewhere at this day/period." });
+          }
+
+          const newSlot = {
+            class: class_name,
+            class_id: class_id || null,
+            academic_year_id: academic_year_id || null,
+            day,
+            period_number,
+            subject_id,
+            teacher_id,
+            start_time,
+            end_time
+          };
+          const { data: insertedSlot, error: insertErr } = await db.from('timetable').insert([newSlot]).select('id').single();
+          if (insertErr) throw insertErr;
+
+          await logAiAction(db, context, 'AI_FILL_TIMETABLE_SLOT', 'timetable', insertedSlot?.id || null, newSlot);
+
+          return res.json({
+            ok: true,
+            message: `Timetable slot scheduled: Class ${class_name}, ${day} period ${period_number}.`
+          });
+        }
+
+        case 'collect_fee_payment': {
+          if (!context.isAdmin) {
+            return res.status(403).json({ error: "Permission Denied: Only administrators and accountants can record fee payments" });
+          }
+
+          const { student_id, fee_category_id, amount, payment_mode, remarks } = parameters;
+          if (!student_id || !fee_category_id || !amount) {
+            return res.status(400).json({ error: "student_id, fee_category_id and amount are required" });
+          }
+
+          // collect_fee checks auth_has_permission('fees.collect') against auth.uid(), so it
+          // must run through a client carrying the confirming user's own JWT — the service-role
+          // adminClient used everywhere else in this route would make auth.uid() resolve to
+          // nothing and either fail the permission check or misattribute the payment.
+          const userScopedClient = createClient(supabaseUrl, supabaseKey, {
+            global: { headers: { Authorization: authHeader! } },
+            auth: { autoRefreshToken: false, persistSession: false }
+          });
+
+          const { data: rpcResult, error: rpcErr } = await userScopedClient.rpc('collect_fee', {
+            _student_id: student_id,
+            _fee_category_id: fee_category_id,
+            _amount: Number(amount),
+            _payment_mode: payment_mode || 'cash',
+            _remarks: remarks || null
+          });
+
+          if (rpcErr) {
+            return res.status(400).json({ error: rpcErr.message || 'Fee collection failed.' });
+          }
+
+          const result = Array.isArray(rpcResult) ? rpcResult[0] : rpcResult;
+          // collect_fee already writes its own audit_logs row (action_type 'FEE_COLLECTED') —
+          // no separate logAiAction call needed here.
+
+          return res.json({
+            ok: true,
+            message: `Payment of ₹${Number(amount).toLocaleString('en-IN')} recorded — Receipt ${result?.receipt_number || 'N/A'}. Balance remaining: ₹${Number(result?.balance || 0).toLocaleString('en-IN')}.`
+          });
+        }
+
+        case 'issue_library_book': {
+          if (!context.isAdmin && !context.isTeacher) {
+            return res.status(403).json({ error: "Permission Denied: Only teachers and administrators can issue library books" });
+          }
+
+          const { book_id, student_id, borrower_name, issue_date, due_date } = parameters;
+          if (!book_id || !student_id || !due_date) {
+            return res.status(400).json({ error: "book_id, student_id and due_date are required" });
+          }
+
+          // Defense-in-depth: re-check a copy is still available.
+          const { data: bookRow } = await db.from('library_books').select('copies_total, copies_available').eq('id', book_id).maybeSingle();
+          if (!bookRow || Number(bookRow.copies_available) <= 0) {
+            return res.status(409).json({ error: "No copies of this book are available anymore." });
+          }
+
+          const issuePayload = {
+            book_id,
+            student_id,
+            borrower_name: borrower_name || null,
+            borrower_role: 'Student',
+            issue_date: issue_date || new Date().toISOString().slice(0, 10),
+            due_date,
+            status: 'issued'
+          };
+          const { data: insertedIssue, error: issueErr } = await db.from('book_issues').insert([issuePayload]).select('id').single();
+          if (issueErr) throw issueErr;
+
+          const nextAvailable = Math.min(Math.max(Number(bookRow.copies_available) - 1, 0), Number(bookRow.copies_total));
+          await db.from('library_books').update({ copies_available: nextAvailable }).eq('id', book_id);
+
+          await logAiAction(db, context, 'AI_ISSUE_LIBRARY_BOOK', 'book_issues', insertedIssue?.id || null, issuePayload);
+
+          return res.json({ ok: true, message: `Book issued, due back ${due_date}.` });
+        }
+
+        case 'return_library_book': {
+          if (!context.isAdmin && !context.isTeacher) {
+            return res.status(403).json({ error: "Permission Denied: Only teachers and administrators can process library returns" });
+          }
+
+          const { issue_id, book_id, return_date, fine_amount } = parameters;
+          if (!issue_id || !book_id || !return_date) {
+            return res.status(400).json({ error: "issue_id, book_id and return_date are required" });
+          }
+
+          const { data: issueRow } = await db.from('book_issues').select('id, return_date').eq('id', issue_id).maybeSingle();
+          if (!issueRow) {
+            return res.status(404).json({ error: "This loan record was not found." });
+          }
+          if (issueRow.return_date) {
+            return res.status(409).json({ error: "This book has already been returned." });
+          }
+
+          const returnPayload = { status: 'returned', return_date, fine_amount: Number(fine_amount) || 0 };
+          const { error: returnErr } = await db.from('book_issues').update(returnPayload).eq('id', issue_id);
+          if (returnErr) throw returnErr;
+
+          const { data: bookRow } = await db.from('library_books').select('copies_total, copies_available').eq('id', book_id).maybeSingle();
+          if (bookRow) {
+            const nextAvailable = Math.min(Math.max(Number(bookRow.copies_available) + 1, 0), Number(bookRow.copies_total));
+            await db.from('library_books').update({ copies_available: nextAvailable }).eq('id', book_id);
+          }
+
+          await logAiAction(db, context, 'AI_RETURN_LIBRARY_BOOK', 'book_issues', issue_id, returnPayload);
+
+          return res.json({
+            ok: true,
+            message: `Book returned.${Number(fine_amount) > 0 ? ` ₹${fine_amount} fine recorded.` : ''}`
+          });
+        }
+
         default:
           return res.status(400).json({ error: `Unsupported action type: ${actionType}` });
       }
@@ -308,6 +648,13 @@ export function createExpressApp() {
    * ------------------------------------------------------------------ */
   app.post("/api/ai/vision/analyze", async (req, res) => {
     try {
+      const authHeader = req.headers.authorization;
+      const { context } = await resolveUserContext(authHeader, adminClient);
+
+      if (!context || (!context.isTeacher && !context.isAdmin)) {
+        return res.status(403).json({ error: "Permission Denied: Document OCR analysis is restricted to teachers and administrators." });
+      }
+
       const { imageBase64, mimeType, documentType, prompt } = req.body || {};
 
       if (!imageBase64) {
@@ -368,40 +715,15 @@ Provide a clear, structured summary and return JSON formatted key-value pairs.`
       }
 
       if (!extractedData) {
-        // Fallback simulated OCR processor
-        if (documentType === 'medical_leave') {
-          extractedData = {
-            documentCategory: 'Medical Leave Certificate',
-            patientName: 'Aarav Sharma',
-            class: 'Class 10-A',
-            diagnosedCondition: 'Viral Pyrexia / Medical Rest',
-            recommendedLeaveDays: '3 Days (07-Sep to 09-Sep)',
-            issuingDoctor: 'Dr. S. K. Rai (MBBS, Reg #54219)',
-            actionRecommended: 'Mark Approved Medical Leave on Attendance Register'
-          };
-          analysisSummary = `### 🩺 Medical Leave Certificate Verified\n\n• **Student Name**: Aarav Sharma (Class 10-A)\n• **Medical Diagnosis**: Viral Pyrexia & Fatigue\n• **Recommended Rest Period**: 3 Days (07-Sep to 09-Sep)\n• **Authorized Practitioner**: Dr. S. K. Rai (Reg #54219)\n\n**System Recommendation**: Regularize attendance records with approved medical exemption.`;
-        } else if (documentType === 'handwritten_marks') {
-          extractedData = {
-            documentCategory: 'Handwritten Marks Assessment Sheet',
-            class: 'Class 8-B',
-            subject: 'Mathematics (Unit Test 1)',
-            maxMarks: 50,
-            extractedEntries: [
-              { roll: '101', name: 'Aarav Patel', score: 48, status: 'Passed' },
-              { roll: '102', name: 'Bhavna Verma', score: 44, status: 'Passed' },
-              { roll: '103', name: 'Chirag Rao', score: 29, status: 'Passed' },
-              { roll: '104', name: 'Divya Pandey', score: 19, status: 'Needs Attention' }
-            ]
-          };
-          analysisSummary = `### 📝 Handwritten Marks Sheet OCR Scanned\n\n• **Class**: Class 8-B | **Subject**: Mathematics (Max: 50)\n• **Total Records Identified**: 4 Students\n• **Class Average**: 70%\n• **Top Performer**: Aarav Patel (48/50)\n\n**Action**: Ready to sync directly into the Examination Module.`;
-        } else {
-          extractedData = {
-            documentCategory: 'Institutional Document',
-            processedAt: new Date().toISOString(),
-            confidence: '96.8%'
-          };
-          analysisSummary = `### 📄 Document Analysis Complete\n\nDocument text, stamps, and signatures scanned with 96.8% optical confidence.`;
-        }
+        // Gemini Vision was unavailable or failed on every candidate model. Do NOT
+        // fabricate a plausible-looking result — a fake name/diagnosis/marks sheet
+        // presented as if read from the user's actual uploaded document could be
+        // acted on directly (e.g. approving a medical leave that was never verified).
+        return res.status(503).json({
+          ok: false,
+          error: "Document OCR analysis is temporarily unavailable. Please try again shortly, or enter the details manually.",
+          summary: "### ⚠️ OCR Analysis Unavailable\n\nAutomated document analysis could not be completed for this upload. No data was extracted — please retry, or enter the details from the document manually rather than relying on an automated read."
+        });
       }
 
       return res.json({

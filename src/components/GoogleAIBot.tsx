@@ -153,7 +153,8 @@ export default function GoogleAIBot() {
 
       const data = await res.json().catch(() => ({}));
 
-      const replyText = data.reply || data.details || data.error || 
+      const replyText = data.reply || data.details || data.error ||
+        (!res.ok ? `The AI service returned an error (HTTP ${res.status}). Please try again in a moment.` : null) ||
         `Hello ${userName}! I am your **Google Gemini AI Assistant** for **St. Joseph’s School, Barhalganj**.\n\nRegarding your query: **"${messageText}"**\n\nHow else may I assist you with St. Joseph’s School, Barhalganj operations?`;
 
       const botMsg: ChatMessage = {
@@ -346,18 +347,19 @@ export default function GoogleAIBot() {
       });
 
       const data = await res.json().catch(() => ({}));
-      const replyText = data.summary || "Document processed successfully.";
+      const analysisSucceeded = res.ok && data.ok !== false;
+      const replyText = data.summary || data.error || "Document processed successfully.";
 
       const botMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         sender: 'bot',
         text: replyText,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        suggestedFollowUps: [
+        suggestedFollowUps: analysisSucceeded ? [
           "Record extracted marks into Examination register",
           "Regularize medical leave on attendance roster",
           "Send confirmation notification to parents"
-        ]
+        ] : undefined
       };
 
       setMessages(prev => [...prev, botMsg]);

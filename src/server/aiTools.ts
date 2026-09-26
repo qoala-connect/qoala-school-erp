@@ -1,6 +1,28 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { UserContext } from './aiAuth.js';
 
+// The `timetable` table stores days as 3-letter lowercase codes (see
+// academicsService.ts's TIMETABLE_DAYS/DAY_LABELS — the source of truth this
+// mirrors), not full day names. Natural-language input ("Monday") must be
+// normalized before it's used in any `timetable` query/write, or it will
+// silently match nothing against real rows.
+const DAY_NAME_TO_CODE: Record<string, string> = {
+  monday: 'mon', mon: 'mon',
+  tuesday: 'tue', tue: 'tue', tues: 'tue',
+  wednesday: 'wed', wed: 'wed',
+  thursday: 'thu', thu: 'thu', thurs: 'thu',
+  friday: 'fri', fri: 'fri',
+  saturday: 'sat', sat: 'sat',
+  sunday: 'sun', sun: 'sun'
+};
+const DAY_CODE_TO_LABEL: Record<string, string> = {
+  mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday'
+};
+function normalizeTimetableDay(input: string): string | null {
+  const key = String(input || '').trim().toLowerCase();
+  return DAY_NAME_TO_CODE[key] || null;
+}
+
 export interface ToolResult {
   data: any;
   summaryForModel: string;
@@ -129,12 +151,13 @@ export const geminiToolDeclarations = [
   },
   {
     name: 'get_timetable_schedule',
-    description: 'Fetch academic weekly timetable and period schedules. For students, returns own class schedule. For teachers, returns their personal teaching periods.',
+    description: 'Fetch academic weekly timetable and period schedules, grouped by day. For students, always returns their own class/section schedule. For teachers, returns their own teaching periods if no class is given, or a specific class\'s schedule (restricted to their assigned classes) if one is given. Admins must specify a class.',
     parameters: {
       type: 'OBJECT',
       properties: {
-        day: { type: 'STRING', description: 'Day of the week (e.g., "Monday", "mon")' },
-        class_name: { type: 'STRING', description: 'Class name (optional for admin)' }
+        day: { type: 'STRING', description: 'Optional: restrict to one day of the week (e.g., "Monday", "mon")' },
+        class_name: { type: 'STRING', description: 'Class name only, e.g. "8", "10" — do NOT include the section letter here. Required for admins; optional for teachers (omit for their own schedule).' },
+        section_name: { type: 'STRING', description: 'Section letter, e.g. "A", "B". IMPORTANT: whenever the user names both a class and a letter together — "10 A", "10-A", "Class 10th A", "10A" — split it: class_name="10", section_name="A". Never fold the letter into class_name.' }
       }
     }
   },
@@ -231,6 +254,116 @@ export const geminiToolDeclarations = [
     }
   },
   {
+    name: 'get_library_status',
+    description: 'Fetch library records. For students/parents, returns own issued books, due dates, and fines. For teachers/admins, returns catalog overview: total books, available copies, currently issued count, and overdue count.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        student_id: { type: 'STRING', description: 'UUID of the student (optional if student is logged in)' },
+        category: { type: 'STRING', description: 'Filter catalog overview by book category (admin/teacher only)' }
+      }
+    }
+  },
+  {
+    name: 'get_transport_info',
+    description: 'Fetch school transport records. For students/parents, returns own bus route, pickup/drop time, and driver details. For teachers/admins, returns the fleet overview: active routes, fares, vehicle status, and driver roster.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        student_id: { type: 'STRING', description: 'UUID of the student (optional if student is logged in)' }
+      }
+    }
+  },
+  {
+    name: 'get_homework_assignments',
+    description: 'Fetch homework/assignment records. For students/parents, returns own assignments with submission status (submitted/late/pending) and marks/feedback if reviewed. For teachers, returns assignments they created with submission counts. For admins, returns school-wide assignment coverage.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        class_name: { type: 'STRING', description: 'Class name filter (teacher/admin only)' },
+        subject_name: { type: 'STRING', description: 'Subject name filter' }
+      }
+    }
+  },
+  {
+    name: 'get_syllabus_progress',
+    description: 'Fetch syllabus/chapter completion tracking. For teachers, returns their own sections\' chapter completion percentage per subject. For admins, returns school-wide syllabus coverage, optionally filtered by class or subject. Not available to students.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        class_name: { type: 'STRING', description: 'Class name filter' },
+        subject_name: { type: 'STRING', description: 'Subject name filter' }
+      }
+    }
+  },
+  {
+    name: 'propose_marks_entry',
+    description: 'Resolve a student/subject/exam by name and propose entering an exam mark for that student. Validates permissions and exam status server-side, then returns a confirmation card with the real resolved values for the user to confirm before writing. The mark is written as a draft — the teacher must still submit it for review through the normal Marks Entry screen.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        student_name: { type: 'STRING', description: 'Student full or partial name' },
+        subject_name: { type: 'STRING', description: 'Subject name (e.g. "Mathematics", "Science")' },
+        exam_name: { type: 'STRING', description: 'Exam name (e.g. "Term 1 Exam", "Unit Test 2")' },
+        obtained_marks: { type: 'NUMBER', description: 'Marks obtained by the student' }
+      },
+      required: ['student_name', 'subject_name', 'exam_name', 'obtained_marks']
+    }
+  },
+  {
+    name: 'suggest_timetable_slot_fill',
+    description: 'Find a qualified, clash-free teacher to fill one specific EMPTY class/day/period timetable slot with a given subject, and propose scheduling it. Only proposes filling empty slots — never suggests overwriting an existing scheduled period. Admin only.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        class_name: { type: 'STRING', description: 'Class name (e.g. "8", "10")' },
+        day: { type: 'STRING', description: 'Day of week (e.g. "Monday")' },
+        period_number: { type: 'NUMBER', description: 'Period number to fill' },
+        subject_name: { type: 'STRING', description: 'Subject that should be taught in this slot' }
+      },
+      required: ['class_name', 'day', 'period_number', 'subject_name']
+    }
+  },
+  {
+    name: 'propose_fee_payment',
+    description: 'Resolve a student and fee category by name and propose recording a fee payment against their ledger, showing the real outstanding balance before and after. Admin/accountant only. Calls the same collect_fee database function the Fees Portal itself uses, so receipt numbers and ledger totals are computed identically.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        student_name: { type: 'STRING', description: 'Student full or partial name' },
+        fee_category_name: { type: 'STRING', description: 'Fee category (e.g. "Tuition Fee", "Transport Fee")' },
+        amount: { type: 'NUMBER', description: 'Amount being paid' },
+        payment_mode: { type: 'STRING', description: 'Payment mode: "cash" | "upi" | "bank" | "online" (default "cash")' },
+        remarks: { type: 'STRING', description: 'Optional remarks for the receipt' }
+      },
+      required: ['student_name', 'fee_category_name', 'amount']
+    }
+  },
+  {
+    name: 'propose_library_issue',
+    description: 'Resolve a book and student by name and propose issuing that book to the student (14-day loan), if a copy is available. Teacher/Admin only.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        book_title: { type: 'STRING', description: 'Book title (or partial title)' },
+        student_name: { type: 'STRING', description: 'Student full or partial name' }
+      },
+      required: ['book_title', 'student_name']
+    }
+  },
+  {
+    name: 'propose_library_return',
+    description: 'Resolve a book and student\'s active loan and propose marking it returned, computing any overdue fine (₹2/day). Teacher/Admin only.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        book_title: { type: 'STRING', description: 'Book title (or partial title)' },
+        student_name: { type: 'STRING', description: 'Student full or partial name' }
+      },
+      required: ['book_title', 'student_name']
+    }
+  },
+  {
     name: 'propose_erp_action',
     description: 'Propose a controlled ERP write action (e.g. mark attendance, send parent absence SMS, dispatch fee reminders, assign substitute teacher, generate admit cards). Returns a confirmation card for the user to confirm before executing.',
     parameters: {
@@ -238,7 +371,7 @@ export const geminiToolDeclarations = [
       properties: {
         action_type: {
           type: 'STRING',
-          description: 'Action type: "mark_attendance" | "create_notice" | "submit_marks" | "send_parent_absence_sms" | "dispatch_fee_reminders" | "substitute_teacher" | "generate_admit_cards"'
+          description: 'Action type: "mark_attendance" | "create_notice" | "send_parent_absence_sms" | "dispatch_fee_reminders" | "substitute_teacher" | "generate_admit_cards". For marks entry, use the dedicated "propose_marks_entry" tool instead. For a timetable slot, use "suggest_timetable_slot_fill" instead.'
         },
         title: { type: 'STRING', description: 'Action title for confirmation dialog' },
         description: { type: 'STRING', description: 'Clear description of what will be changed' },
@@ -877,17 +1010,112 @@ export async function executeTool(
       }
 
       // =============================================================
-      // 11. GET TIMETABLE
+      // 11. GET TIMETABLE (grouped by day; scoped by role)
       // =============================================================
       case 'get_timetable_schedule': {
-        const studentClass = context.studentClass || '8';
-        const { data: slots } = await supabase.from('timetable').select('period_number, start_time, end_time, day, class, subjects (subject_name), teachers (name)').eq('class', studentClass).order('period_number', { ascending: true });
+        const { day, class_name, section_name } = args;
+
+        let dayFilter: string | null = null;
+        if (day) {
+          dayFilter = normalizeTimetableDay(day);
+          if (!dayFilter) {
+            return { data: null, summaryForModel: `"${day}" is not a recognized day of the week.` };
+          }
+        }
+
+        let targetClassId: string | null = null;
+        let targetSectionId: string | null = null;
+        let targetTeacherId: string | null = null;
+        let scopeLabel = '';
+
+        if (context.isStudent) {
+          if (!context.studentClass) {
+            return { data: null, summaryForModel: 'Student profile not linked to active student record.' };
+          }
+          const { data: classRow } = await supabase.from('classes').select('id').eq('class_name', context.studentClass).maybeSingle();
+          if (!classRow) {
+            return { data: null, summaryForModel: `No timetable configured for Class ${context.studentClass}.` };
+          }
+          targetClassId = classRow.id;
+          if (context.studentSection) {
+            const { data: sectionRow } = await supabase.from('sections').select('id').ilike('section_name', context.studentSection).maybeSingle();
+            targetSectionId = sectionRow?.id || null;
+          }
+          scopeLabel = `Class ${context.studentClass}${context.studentSection ? '-' + context.studentSection : ''}`;
+        } else if (context.isTeacher && !class_name) {
+          if (!context.teacherId) {
+            return { data: null, summaryForModel: 'Teacher profile not linked to active faculty record.' };
+          }
+          targetTeacherId = context.teacherId;
+          scopeLabel = `${context.teacherName || context.name}'s Teaching Schedule`;
+        } else {
+          // Teacher looking up a specific class, or admin.
+          if (!class_name) {
+            return { data: null, summaryForModel: 'Please specify a class (e.g. "Class 10") to look up its timetable.' };
+          }
+          if (context.isTeacher && !context.assignedClasses.includes(String(class_name))) {
+            return { data: null, summaryForModel: `Permission Denied: Class ${class_name} is not one of your assigned classes.` };
+          }
+          const { data: classRow } = await supabase.from('classes').select('id').eq('class_name', String(class_name).trim()).maybeSingle();
+          if (!classRow) {
+            return { data: null, summaryForModel: `No class matching "${class_name}" found.` };
+          }
+          targetClassId = classRow.id;
+          scopeLabel = `Class ${class_name}`;
+          if (section_name) {
+            const { data: sectionRow } = await supabase.from('sections').select('id').ilike('section_name', String(section_name).trim()).maybeSingle();
+            if (!sectionRow) {
+              return { data: null, summaryForModel: `No section matching "${section_name}" found.` };
+            }
+            targetSectionId = sectionRow.id;
+            scopeLabel += `-${section_name}`;
+          }
+        }
+
+        let ttQuery = supabase.from('timetable').select('period_number, start_time, end_time, day, class, subjects (subject_name), teachers (name)');
+        if (targetTeacherId) {
+          ttQuery = ttQuery.eq('teacher_id', targetTeacherId);
+        } else if (targetClassId) {
+          ttQuery = ttQuery.eq('class_id', targetClassId);
+          if (targetSectionId) ttQuery = ttQuery.eq('section_id', targetSectionId);
+        }
+        if (dayFilter) ttQuery = ttQuery.eq('day', dayFilter);
+
+        const { data: slots } = await ttQuery;
         const list = slots || [];
 
+        // Group into real weekday order (mon -> sat) — the table's `day` column
+        // sorts alphabetically otherwise (fri, mon, sat, thu, tue, wed), which is wrong.
+        const DAY_ORDER = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+        const byDay: Record<string, any[]> = {};
+        list.forEach((s: any) => {
+          if (!byDay[s.day]) byDay[s.day] = [];
+          byDay[s.day].push(s);
+        });
+        const days = DAY_ORDER.filter(d => byDay[d]).map(d => ({
+          day: DAY_CODE_TO_LABEL[d] || d,
+          slots: byDay[d]
+            .sort((a: any, b: any) => (a.period_number || 0) - (b.period_number || 0))
+            .map((s: any) => ({
+              period_number: s.period_number,
+              start_time: s.start_time,
+              end_time: s.end_time,
+              subject: s.subjects?.subject_name,
+              teacher: s.teachers?.name,
+              class: s.class
+            }))
+        }));
+
+        if (days.length === 0) {
+          return { data: null, summaryForModel: `No timetable entries found for ${scopeLabel}${dayFilter ? ` on ${DAY_CODE_TO_LABEL[dayFilter]}` : ''}.` };
+        }
+
+        const summaryText = days.map(d => `${d.day}: ${d.slots.map((s: any) => `P${s.period_number} ${s.subject || 'Subject'}${targetTeacherId ? ` (${s.class})` : ''}`).join(', ')}`).join(' | ');
+
         return {
-          data: list,
-          summaryForModel: `Timetable (Class ${studentClass}): ${list.map((s: any) => `P${s.period_number}: ${s.subjects?.subject_name || 'Subject'}`).join(', ')}`,
-          structuredPayload: { type: 'timetable_grid', title: `Class ${studentClass} Timetable`, data: { slots: list } }
+          data: { days },
+          summaryForModel: `Timetable (${scopeLabel}): ${summaryText}`,
+          structuredPayload: { type: 'timetable_grid', title: `${scopeLabel} Timetable`, data: { days } }
         };
       }
 
@@ -943,7 +1171,11 @@ export async function executeTool(
           return {
             data: { classes: context.assignedClasses, students: students || [] },
             summaryForModel: `Assigned Classes: ${context.assignedClasses.join(', ')}. Active student roster count: ${students?.length || 0}.`,
-            structuredPayload: { type: 'generic_list', title: 'My Classes & Students', data: { classes: context.assignedClasses, students: students || [] } }
+            structuredPayload: {
+              type: 'generic_list',
+              title: `My Classes & Students (${context.assignedClasses.join(', ')})`,
+              data: (students || []).map((s: any) => ({ name: s.name, class: s.class, section: s.section, rollNumber: s.roll_number }))
+            }
           };
         }
         return { data: null, summaryForModel: 'Overview: Nursery to 12th standard.' };
@@ -962,8 +1194,752 @@ export async function executeTool(
       }
 
       // =============================================================
-      // 16. PROPOSE ACTION (2-Step Safe Write Confirmation)
+      // 16. GET LIBRARY STATUS
       // =============================================================
+      case 'get_library_status': {
+        if (context.isStudent) {
+          const targetStudentId = args.student_id || context.studentId;
+          if (!targetStudentId) {
+            return { data: null, summaryForModel: 'Student profile not linked to active student record.' };
+          }
+
+          const { data: issues } = await supabase
+            .from('book_issues')
+            .select('issue_date, due_date, return_date, status, fine_amount, fine_paid, library_books (title, author, category)')
+            .eq('student_id', targetStudentId)
+            .order('issue_date', { ascending: false })
+            .limit(20);
+
+          const list = issues || [];
+          const activeLoans = list.filter((b: any) => b.status !== 'returned');
+          const overdue = list.filter((b: any) => b.status === 'overdue');
+          const totalFines = list.reduce((acc: number, b: any) => acc + (b.fine_paid ? 0 : Number(b.fine_amount || 0)), 0);
+
+          return {
+            data: { issues: list, overdueCount: overdue.length, totalFines },
+            summaryForModel: `Library Record: ${activeLoans.length} book(s) currently issued, ${overdue.length} overdue. Outstanding fines: ₹${totalFines}. ${list.map((b: any) => `"${b.library_books?.title}" (due ${b.due_date}, ${b.status})`).join('; ') || 'No borrowing history.'}`,
+            structuredPayload: {
+              type: 'generic_list',
+              title: '📚 My Library Record',
+              data: list.map((b: any) => ({
+                title: b.library_books?.title,
+                author: b.library_books?.author,
+                dueDate: b.due_date,
+                status: b.status,
+                fine: b.fine_paid ? 'Paid' : `₹${b.fine_amount || 0}`
+              }))
+            }
+          };
+        }
+
+        // Teacher/Admin: catalog overview
+        let catalogQuery = supabase.from('library_books').select('id, copies_total, copies_available, category', { count: 'exact' }).eq('is_active', true);
+        if (args.category) catalogQuery = catalogQuery.ilike('category', `%${args.category}%`);
+        const { data: catalog, count: titleCount } = await catalogQuery;
+
+        const [{ count: issuedCount }, { count: overdueCount }] = await Promise.all([
+          supabase.from('book_issues').select('id', { count: 'exact', head: true }).eq('status', 'issued'),
+          supabase.from('book_issues').select('id', { count: 'exact', head: true }).eq('status', 'overdue')
+        ]);
+
+        const books = catalog || [];
+        const totalCopies = books.reduce((acc, b) => acc + Number(b.copies_total || 0), 0);
+        const availableCopies = books.reduce((acc, b) => acc + Number(b.copies_available || 0), 0);
+
+        return {
+          data: { titleCount: titleCount || books.length, totalCopies, availableCopies, issuedCount, overdueCount },
+          summaryForModel: `Library Catalog: ${titleCount || books.length} titles, ${totalCopies} total copies (${availableCopies} available). Currently issued: ${issuedCount || 0}. Overdue: ${overdueCount || 0}.`,
+          structuredPayload: {
+            type: 'kpi_cards',
+            title: '📚 Library Overview',
+            data: [
+              { label: 'Titles', value: String(titleCount || books.length), trend: '' },
+              { label: 'Copies Available', value: `${availableCopies}/${totalCopies}`, trend: '' },
+              { label: 'Issued', value: String(issuedCount || 0), trend: '' },
+              { label: 'Overdue', value: String(overdueCount || 0), trend: overdueCount ? 'Needs Follow-up' : 'Clear' }
+            ]
+          }
+        };
+      }
+
+      // =============================================================
+      // 17. GET TRANSPORT INFO
+      // =============================================================
+      case 'get_transport_info': {
+        if (context.isStudent) {
+          const targetStudentId = args.student_id || context.studentId;
+          if (!targetStudentId) {
+            return { data: null, summaryForModel: 'Student profile not linked to active student record.' };
+          }
+
+          const { data: allotment } = await supabase
+            .from('student_transport')
+            .select('pickup_point, boarding_point, pickup_time, drop_time, driver_name, driver_phone, transport_routes (route_name, start_point, end_point, fare_amount), vehicles (vehicle_number, status)')
+            .eq('student_id', targetStudentId)
+            .maybeSingle();
+
+          if (!allotment) {
+            return { data: null, summaryForModel: 'No transport allotment found — this student is not registered for school transport.' };
+          }
+
+          const route: any = allotment.transport_routes;
+          const vehicle: any = allotment.vehicles;
+
+          return {
+            data: allotment,
+            summaryForModel: `Transport: Route "${route?.route_name || 'N/A'}", Pickup: ${allotment.pickup_point || allotment.boarding_point || 'N/A'} at ${allotment.pickup_time || 'N/A'}, Drop: ${allotment.drop_time || 'N/A'}. Vehicle: ${vehicle?.vehicle_number || 'N/A'} (${vehicle?.status || 'N/A'}). Driver: ${allotment.driver_name || 'N/A'} (${allotment.driver_phone || 'N/A'}). Fare: ₹${route?.fare_amount || 'N/A'}.`,
+            structuredPayload: {
+              type: 'generic_list',
+              title: '🚌 My Transport Details',
+              data: [{
+                route: route?.route_name,
+                pickup: allotment.pickup_point || allotment.boarding_point,
+                pickupTime: allotment.pickup_time,
+                dropTime: allotment.drop_time,
+                driver: allotment.driver_name,
+                vehicle: vehicle?.vehicle_number,
+                fare: route?.fare_amount
+              }]
+            }
+          };
+        }
+
+        // Teacher/Admin: fleet overview
+        const [{ data: routes }, { data: drivers }] = await Promise.all([
+          supabase.from('transport_routes').select('route_name, start_point, end_point, fare_amount, is_active, vehicles (vehicle_number, status)').eq('is_active', true),
+          supabase.from('drivers').select('name, license_number, phone, license_expiry, status').eq('is_active', true)
+        ]);
+
+        const routeList = routes || [];
+        const driverList = drivers || [];
+
+        return {
+          data: { routes: routeList, drivers: driverList },
+          summaryForModel: `Transport Fleet: ${routeList.length} active routes, ${driverList.length} active drivers. Routes: ${routeList.map((r: any) => `${r.route_name} (₹${r.fare_amount})`).join(', ') || 'None configured.'}`,
+          structuredPayload: {
+            type: 'generic_list',
+            title: '🚌 Transport Fleet Overview',
+            data: routeList.map((r: any) => ({
+              route: r.route_name,
+              from: r.start_point,
+              to: r.end_point,
+              fare: r.fare_amount,
+              vehicle: r.vehicles?.vehicle_number,
+              vehicleStatus: r.vehicles?.status
+            }))
+          }
+        };
+      }
+
+      // =============================================================
+      // 18. GET HOMEWORK & ASSIGNMENTS
+      // =============================================================
+      case 'get_homework_assignments': {
+        if (context.isStudent) {
+          if (!context.studentClass) {
+            return { data: null, summaryForModel: 'Student profile not linked to active student record.' };
+          }
+
+          let q = supabase.from('assignments').select('id, title, due_date, kind, subjects (subject_name)').eq('class', context.studentClass);
+          if (context.studentSection) q = q.eq('section', context.studentSection);
+          const { data: assignments } = await q.order('due_date', { ascending: false }).limit(20);
+
+          const list = assignments || [];
+          const ids = list.map((a: any) => a.id);
+          const { data: submissions } = ids.length > 0
+            ? await supabase.from('student_assignment_submissions').select('assignment_id, status, marks_obtained, feedback').eq('student_id', context.studentId).in('assignment_id', ids)
+            : { data: [] as any[] };
+
+          const subMap = new Map((submissions || []).map((s: any) => [s.assignment_id, s]));
+          const merged = list.map((a: any) => {
+            const sub: any = subMap.get(a.id);
+            const overdue = !sub && a.due_date && new Date(a.due_date) < new Date();
+            return {
+              title: a.title,
+              subject: a.subjects?.subject_name,
+              dueDate: a.due_date,
+              status: sub ? sub.status : (overdue ? 'missed' : 'pending'),
+              marks: sub?.marks_obtained ?? null,
+              feedback: sub?.feedback ?? null
+            };
+          });
+          const pendingCount = merged.filter(m => m.status === 'pending' || m.status === 'missed').length;
+
+          return {
+            data: merged,
+            summaryForModel: `Homework/Assignments: ${merged.length} total, ${pendingCount} pending or not yet submitted. ${merged.slice(0, 8).map(m => `"${m.title}" (${m.subject || 'Subject'}, due ${m.dueDate}): ${m.status}`).join('; ') || 'No assignments recorded.'}`,
+            structuredPayload: { type: 'generic_list', title: '📝 My Homework & Assignments', data: merged }
+          };
+        }
+
+        if (context.isTeacher) {
+          let q = supabase.from('assignments').select('id, title, class, section, due_date, subjects (subject_name)').eq('teacher_id', context.teacherId);
+          if (args.class_name) q = q.eq('class', args.class_name);
+          const { data: assignments } = await q.order('due_date', { ascending: false }).limit(15);
+
+          const list = assignments || [];
+          const ids = list.map((a: any) => a.id);
+          const { data: submissions } = ids.length > 0
+            ? await supabase.from('student_assignment_submissions').select('assignment_id, status').in('assignment_id', ids)
+            : { data: [] as any[] };
+          const subs = submissions || [];
+
+          const enriched = list.map((a: any) => {
+            const forThis = subs.filter((s: any) => s.assignment_id === a.id);
+            return {
+              title: a.title,
+              class: `${a.class}${a.section ? '-' + a.section : ''}`,
+              subject: a.subjects?.subject_name,
+              dueDate: a.due_date,
+              submitted: forThis.length,
+              late: forThis.filter((s: any) => s.status === 'late').length
+            };
+          });
+
+          return {
+            data: enriched,
+            summaryForModel: `My Assigned Homework: ${enriched.length} assignment(s). ${enriched.map(e => `"${e.title}" (${e.class}): ${e.submitted} submission(s)${e.late ? `, ${e.late} late` : ''}`).join('; ') || 'No assignments created.'}`,
+            structuredPayload: { type: 'generic_list', title: '📝 My Assigned Homework', data: enriched }
+          };
+        }
+
+        // Admin: school-wide summary
+        let adminQuery = supabase.from('assignments').select('id, title, class, due_date, subjects (subject_name)');
+        if (args.class_name) adminQuery = adminQuery.eq('class', args.class_name);
+        const [{ data: recentAssignments }, { count: totalAssignments }, { count: totalSubmissions }] = await Promise.all([
+          adminQuery.order('due_date', { ascending: false }).limit(15),
+          supabase.from('assignments').select('id', { count: 'exact', head: true }),
+          supabase.from('student_assignment_submissions').select('id', { count: 'exact', head: true })
+        ]);
+
+        return {
+          data: { totalAssignments, totalSubmissions, recentAssignments },
+          summaryForModel: `School-Wide Homework: ${totalAssignments || 0} assignments issued, ${totalSubmissions || 0} total submissions received across all classes.`,
+          structuredPayload: {
+            type: 'generic_list',
+            title: '📝 School-Wide Homework Overview',
+            data: (recentAssignments || []).map((a: any) => ({ title: a.title, class: a.class, subject: a.subjects?.subject_name, dueDate: a.due_date }))
+          }
+        };
+      }
+
+      // =============================================================
+      // 19. GET SYLLABUS PROGRESS
+      // =============================================================
+      case 'get_syllabus_progress': {
+        if (context.isStudent) {
+          return { data: null, summaryForModel: 'Syllabus planning data is intended for faculty and administration, not individual student queries.' };
+        }
+
+        if (context.isTeacher) {
+          const { data: progress } = await supabase
+            .from('syllabus_progress')
+            .select('status, syllabus_chapters (title, syllabus_units (title, subjects (subject_name)))')
+            .eq('teacher_id', context.teacherId)
+            .limit(200);
+
+          const list = progress || [];
+          const total = list.length;
+          const completed = list.filter((p: any) => p.status === 'completed').length;
+          const inProgress = list.filter((p: any) => p.status === 'in_progress').length;
+          const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+          return {
+            data: { total, completed, inProgress, pct },
+            summaryForModel: `Syllabus Coverage (My Sections): ${completed}/${total} chapters completed (${pct}%), ${inProgress} in progress, ${total - completed - inProgress} not started.`,
+            structuredPayload: {
+              type: 'kpi_cards',
+              title: '📖 My Syllabus Coverage',
+              data: [
+                { label: 'Completed', value: `${completed}/${total}`, trend: `${pct}%` },
+                { label: 'In Progress', value: String(inProgress), trend: '' },
+                { label: 'Not Started', value: String(total - completed - inProgress), trend: '' }
+              ]
+            }
+          };
+        }
+
+        // Admin: school-wide coverage, optionally filtered
+        const { data: progress } = await supabase
+          .from('syllabus_progress')
+          .select('status, syllabus_chapters (title, syllabus_units (title, classes (class_name), subjects (subject_name)))')
+          .limit(500);
+
+        let list = progress || [];
+        if (args.class_name) list = list.filter((p: any) => p.syllabus_chapters?.syllabus_units?.classes?.class_name === args.class_name);
+        if (args.subject_name) list = list.filter((p: any) => (p.syllabus_chapters?.syllabus_units?.subjects?.subject_name || '').toLowerCase().includes(String(args.subject_name).toLowerCase()));
+
+        const total = list.length;
+        const completed = list.filter((p: any) => p.status === 'completed').length;
+        const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+        const bySubject: Record<string, { total: number; completed: number }> = {};
+        list.forEach((p: any) => {
+          const subj = p.syllabus_chapters?.syllabus_units?.subjects?.subject_name || 'Unknown';
+          if (!bySubject[subj]) bySubject[subj] = { total: 0, completed: 0 };
+          bySubject[subj].total++;
+          if (p.status === 'completed') bySubject[subj].completed++;
+        });
+        const subjectBreakdown = Object.entries(bySubject)
+          .map(([subject, v]) => ({ subject, completed: v.completed, total: v.total, pct: v.total > 0 ? Math.round((v.completed / v.total) * 100) : 0 }))
+          .sort((a, b) => a.pct - b.pct);
+
+        const laggingSubject = subjectBreakdown[0];
+
+        return {
+          data: { total, completed, pct, subjectBreakdown },
+          summaryForModel: `School-Wide Syllabus Coverage: ${completed}/${total} chapters completed (${pct}%). ${laggingSubject ? `Lowest coverage: ${laggingSubject.subject} (${laggingSubject.pct}%).` : ''}`,
+          structuredPayload: {
+            type: 'generic_list',
+            title: '📖 Syllabus Coverage by Subject',
+            data: subjectBreakdown
+          }
+        };
+      }
+
+      // =============================================================
+      // 20. PROPOSE MARKS ENTRY (Resolves names -> real IDs, validates, builds action card)
+      // =============================================================
+      case 'propose_marks_entry': {
+        const { student_name, subject_name, exam_name, obtained_marks } = args;
+        if (!student_name || !subject_name || !exam_name || obtained_marks === undefined) {
+          return { data: null, summaryForModel: 'student_name, subject_name, exam_name, and obtained_marks are all required.' };
+        }
+
+        // 1. Resolve student (teachers scoped to their assigned classes)
+        let studentQuery = supabase.from('students').select('id, name, class, section').eq('status', 'active').ilike('name', `%${String(student_name).trim()}%`);
+        if (context.isTeacher && context.assignedClasses.length > 0) {
+          studentQuery = studentQuery.in('class', context.assignedClasses);
+        }
+        const { data: students } = await studentQuery.limit(5);
+        if (!students || students.length === 0) {
+          return { data: null, summaryForModel: `No student matching "${student_name}" found${context.isTeacher ? ' in your assigned classes' : ''}.` };
+        }
+        if (students.length > 1) {
+          return { data: null, summaryForModel: `Multiple students match "${student_name}": ${students.map((s: any) => `${s.name} (Class ${s.class}${s.section ? '-' + s.section : ''})`).join(', ')}. Please specify more precisely.` };
+        }
+        const student: any = students[0];
+
+        // Permission check using the student's REAL resolved class, not anything the model supplies.
+        if (!context.isAdmin && !(context.isTeacher && context.assignedClasses.includes(student.class))) {
+          return { data: null, summaryForModel: `Permission Denied: You cannot enter marks for ${student.name} (Class ${student.class}).` };
+        }
+
+        // 2. Resolve subject
+        const { data: subjects } = await supabase.from('subjects').select('id, subject_name').ilike('subject_name', `%${String(subject_name).trim()}%`).limit(5);
+        if (!subjects || subjects.length === 0) {
+          return { data: null, summaryForModel: `No subject matching "${subject_name}" found.` };
+        }
+        if (subjects.length > 1) {
+          return { data: null, summaryForModel: `Multiple subjects match "${subject_name}": ${subjects.map((s: any) => s.subject_name).join(', ')}. Please specify more precisely.` };
+        }
+        const subject: any = subjects[0];
+
+        // 3. Resolve exam, preferring one scoped to the student's class
+        const { data: examsScoped } = await supabase.from('exams').select('id, exam_name, class, status').ilike('exam_name', `%${String(exam_name).trim()}%`).eq('class', student.class).limit(5);
+        let exams = examsScoped;
+        if (!exams || exams.length === 0) {
+          const { data: examsAny } = await supabase.from('exams').select('id, exam_name, class, status').ilike('exam_name', `%${String(exam_name).trim()}%`).limit(5);
+          exams = examsAny;
+        }
+        if (!exams || exams.length === 0) {
+          return { data: null, summaryForModel: `No exam matching "${exam_name}" found.` };
+        }
+        if (exams.length > 1) {
+          return { data: null, summaryForModel: `Multiple exams match "${exam_name}": ${exams.map((e: any) => `${e.exam_name} (Class ${e.class})`).join(', ')}. Please specify more precisely.` };
+        }
+        const exam: any = exams[0];
+
+        // Exam status guard — never touch finalized results via chat.
+        if (exam.status === 'published' || exam.status === 'result_processed') {
+          return { data: null, summaryForModel: `Cannot enter marks: "${exam.exam_name}" is already ${exam.status === 'published' ? 'published' : 'processed'}. Results are finalized and can no longer be edited via chat — use the Examination module's correction workflow if a change is genuinely needed.` };
+        }
+
+        // 4. Resolve exam_subjects row (authoritative max_marks/pass_marks, and lock state)
+        const { data: examSubject } = await supabase.from('exam_subjects').select('max_marks, pass_marks, locked').eq('exam_id', exam.id).eq('subject_id', subject.id).maybeSingle();
+        if (!examSubject) {
+          return { data: null, summaryForModel: `"${subject.subject_name}" is not configured as part of "${exam.exam_name}". Please check the exam's subject list before entering marks.` };
+        }
+        if (examSubject.locked) {
+          return { data: null, summaryForModel: `Marks entry for "${subject.subject_name}" in "${exam.exam_name}" is locked and cannot be edited via chat.` };
+        }
+
+        const maxMarks = Number(examSubject.max_marks || 100);
+        const enteredMarks = Number(obtained_marks);
+        if (enteredMarks > maxMarks || enteredMarks < 0) {
+          return { data: null, summaryForModel: `Obtained marks (${enteredMarks}) must be between 0 and the maximum marks (${maxMarks}) for ${subject.subject_name}.` };
+        }
+        const passMarks = examSubject.pass_marks;
+        const passFail = passMarks !== null && passMarks !== undefined ? (enteredMarks >= Number(passMarks) ? 'Pass' : 'Fail') : null;
+
+        const previewFields = [
+          { label: 'Student', value: `${student.name} (Class ${student.class}${student.section ? '-' + student.section : ''})` },
+          { label: 'Exam', value: exam.exam_name },
+          { label: 'Subject', value: subject.subject_name },
+          { label: 'Marks', value: `${enteredMarks} / ${maxMarks}` },
+          ...(passFail ? [{ label: 'Result', value: passFail }] : [])
+        ];
+
+        const parameters = {
+          exam_id: exam.id,
+          student_id: student.id,
+          subject_id: subject.id,
+          obtained_marks: enteredMarks,
+          max_marks: maxMarks,
+          class_name: student.class
+        };
+
+        return {
+          data: { student, subject, exam, parameters },
+          summaryForModel: `Proposed marks entry: ${student.name} — ${subject.subject_name} — ${exam.exam_name}: ${enteredMarks}/${maxMarks}${passFail ? ` (${passFail})` : ''}. This will be saved as a draft — the assigned teacher still needs to submit it for review through the normal Marks Entry screen before it reaches verification.`,
+          structuredPayload: {
+            type: 'action_card',
+            title: `Confirm Marks Entry: ${student.name}`,
+            data: {
+              actionType: 'submit_marks',
+              title: `Enter Marks: ${student.name} — ${subject.subject_name}`,
+              description: `Record ${enteredMarks}/${maxMarks} for ${student.name} in ${subject.subject_name} (${exam.exam_name}). Saved as a draft pending the teacher's review submission.`,
+              parameters,
+              previewFields
+            }
+          }
+        };
+      }
+
+      // =============================================================
+      // 21. SUGGEST TIMETABLE SLOT FILL (Clash-checked, empty-slot-only)
+      // =============================================================
+      case 'suggest_timetable_slot_fill': {
+        if (!context.isAdmin) {
+          return { data: null, summaryForModel: 'Permission Denied: Only administrators can modify the master timetable.' };
+        }
+
+        const { class_name, day, period_number, subject_name } = args;
+        if (!class_name || !day || period_number === undefined || !subject_name) {
+          return { data: null, summaryForModel: 'class_name, day, period_number, and subject_name are all required.' };
+        }
+
+        const dayCode = normalizeTimetableDay(day);
+        if (!dayCode) {
+          return { data: null, summaryForModel: `"${day}" is not a recognized day of the week.` };
+        }
+        const dayLabel = DAY_CODE_TO_LABEL[dayCode];
+
+        // 1. Resolve class
+        const { data: classRow } = await supabase.from('classes').select('id, class_name').eq('class_name', String(class_name).trim()).maybeSingle();
+        if (!classRow) {
+          return { data: null, summaryForModel: `No class matching "${class_name}" found.` };
+        }
+
+        // 2. Confirm the slot is currently empty — check both class_id and the legacy `class` text column.
+        const { data: existingByClassId } = await supabase.from('timetable').select('id, subjects (subject_name), teachers (name)').eq('class_id', classRow.id).eq('day', dayCode).eq('period_number', Number(period_number)).maybeSingle();
+        let existing: any = existingByClassId;
+        if (!existing) {
+          const { data: existingByClassText } = await supabase.from('timetable').select('id, subjects (subject_name), teachers (name)').eq('class', classRow.class_name).eq('day', dayCode).eq('period_number', Number(period_number)).maybeSingle();
+          existing = existingByClassText;
+        }
+        if (existing) {
+          return { data: null, summaryForModel: `Class ${classRow.class_name}, ${dayLabel} period ${period_number} is already scheduled: ${existing.subjects?.subject_name || 'a subject'} with ${existing.teachers?.name || 'a teacher'}. I only propose filling empty slots, not replacing existing ones.` };
+        }
+
+        // 3. Resolve subject
+        const { data: subjectRow } = await supabase.from('subjects').select('id, subject_name').ilike('subject_name', `%${String(subject_name).trim()}%`).limit(1).maybeSingle();
+        if (!subjectRow) {
+          return { data: null, summaryForModel: `No subject matching "${subject_name}" found.` };
+        }
+
+        // 4. Find candidate teachers assigned to this subject for this class
+        const { data: assignments } = await supabase.from('teacher_assignments').select('teacher_id, teachers (name)').eq('class_id', classRow.id).eq('subject_id', subjectRow.id).eq('is_active', true);
+        const candidates = (assignments || []).filter((a: any) => a.teacher_id);
+        if (candidates.length === 0) {
+          return { data: null, summaryForModel: `No teacher is assigned to teach ${subjectRow.subject_name} for Class ${classRow.class_name}.` };
+        }
+
+        // 5. Exclude any candidate already scheduled elsewhere at this day/period (real clash check)
+        const teacherIds = candidates.map((c: any) => c.teacher_id);
+        const { data: clashRows } = await supabase.from('timetable').select('teacher_id').eq('day', dayCode).eq('period_number', Number(period_number)).in('teacher_id', teacherIds);
+        const busyTeacherIds = new Set((clashRows || []).map((r: any) => r.teacher_id));
+        const freeCandidates = candidates.filter((c: any) => !busyTeacherIds.has(c.teacher_id));
+
+        if (freeCandidates.length === 0) {
+          return { data: null, summaryForModel: `All teachers qualified to teach ${subjectRow.subject_name} for Class ${classRow.class_name} are already scheduled elsewhere at ${dayLabel} period ${period_number}.` };
+        }
+        const chosen: any = freeCandidates[0];
+
+        // 6. Derive start/end time from any existing row sharing this period number — never guess a time.
+        const { data: timeRef } = await supabase.from('timetable').select('start_time, end_time').eq('period_number', Number(period_number)).limit(1).maybeSingle();
+        if (!timeRef) {
+          return { data: null, summaryForModel: `Period ${period_number} isn't used anywhere else in the timetable, so I can't determine its start/end time. Please schedule it manually first.` };
+        }
+
+        // 7. Resolve current academic year (so the slot is visible in the normal Timetable Management screen)
+        const { data: currentYear } = await supabase.from('academic_years').select('id').eq('is_current', true).maybeSingle();
+
+        const previewFields = [
+          { label: 'Class', value: classRow.class_name },
+          { label: 'Day', value: dayLabel },
+          { label: 'Period', value: `${period_number} (${timeRef.start_time}–${timeRef.end_time})` },
+          { label: 'Subject', value: subjectRow.subject_name },
+          { label: 'Teacher', value: chosen.teachers?.name || 'Unassigned' }
+        ];
+
+        const parameters = {
+          class_name: classRow.class_name,
+          class_id: classRow.id,
+          academic_year_id: currentYear?.id || null,
+          day: dayCode,
+          period_number: Number(period_number),
+          subject_id: subjectRow.id,
+          teacher_id: chosen.teacher_id,
+          start_time: timeRef.start_time,
+          end_time: timeRef.end_time
+        };
+
+        return {
+          data: { classRow, subjectRow, chosen, parameters },
+          summaryForModel: `Proposed: Class ${classRow.class_name}, ${dayLabel} period ${period_number} — ${subjectRow.subject_name} with ${chosen.teachers?.name || 'a teacher'} (clash-free).${freeCandidates.length > 1 ? ` ${freeCandidates.length - 1} other available teacher(s) also qualify.` : ''} Awaiting confirmation.`,
+          structuredPayload: {
+            type: 'action_card',
+            title: `Confirm Timetable Slot: Class ${classRow.class_name}`,
+            data: {
+              actionType: 'fill_timetable_slot',
+              title: `Schedule ${subjectRow.subject_name}: Class ${classRow.class_name}`,
+              description: `Schedule ${subjectRow.subject_name} with ${chosen.teachers?.name || 'the assigned teacher'} for Class ${classRow.class_name} on ${dayLabel}, period ${period_number}.`,
+              parameters,
+              previewFields
+            }
+          }
+        };
+      }
+
+      // =============================================================
+      // 22. PROPOSE ACTION (2-Step Safe Write Confirmation)
+      // =============================================================
+      case 'propose_fee_payment': {
+        if (!context.isAdmin) {
+          return { data: null, summaryForModel: 'Permission Denied: Only administrators and accountants can record fee payments.' };
+        }
+
+        const { student_name, fee_category_name, amount, payment_mode, remarks } = args;
+        if (!student_name || !fee_category_name || amount === undefined) {
+          return { data: null, summaryForModel: 'student_name, fee_category_name, and amount are all required.' };
+        }
+        const payAmount = Number(amount);
+        if (!(payAmount > 0)) {
+          return { data: null, summaryForModel: 'Payment amount must be greater than zero.' };
+        }
+
+        const { data: students } = await supabase.from('students').select('id, name, class, section').eq('status', 'active').ilike('name', `%${String(student_name).trim()}%`).limit(5);
+        if (!students || students.length === 0) {
+          return { data: null, summaryForModel: `No student matching "${student_name}" found.` };
+        }
+        if (students.length > 1) {
+          return { data: null, summaryForModel: `Multiple students match "${student_name}": ${students.map((s: any) => `${s.name} (Class ${s.class}${s.section ? '-' + s.section : ''})`).join(', ')}. Please specify more precisely.` };
+        }
+        const student: any = students[0];
+
+        const { data: categories } = await supabase.from('fee_categories').select('id, category_name').ilike('category_name', `%${String(fee_category_name).trim()}%`).limit(5);
+        if (!categories || categories.length === 0) {
+          return { data: null, summaryForModel: `No fee category matching "${fee_category_name}" found.` };
+        }
+        if (categories.length > 1) {
+          return { data: null, summaryForModel: `Multiple fee categories match "${fee_category_name}": ${categories.map((c: any) => c.category_name).join(', ')}. Please specify more precisely.` };
+        }
+        const category: any = categories[0];
+
+        // Balance lookup is for the preview only — the collect_fee RPC (called at execute
+        // time) is the source of truth for the real ledger and will reject an over-payment itself.
+        const { data: existingLedger } = await supabase.from('student_fees').select('total_amount, net_amount, amount_paid').eq('student_id', student.id).eq('fee_category_id', category.id).order('due_date', { ascending: true }).limit(1).maybeSingle();
+
+        const netPayable = existingLedger ? Number(existingLedger.net_amount ?? existingLedger.total_amount ?? 0) : payAmount;
+        const alreadyPaid = existingLedger ? Number(existingLedger.amount_paid || 0) : 0;
+        const balanceBefore = Math.max(0, netPayable - alreadyPaid);
+
+        if (existingLedger && payAmount > balanceBefore) {
+          return { data: null, summaryForModel: `Payment of ₹${payAmount.toLocaleString('en-IN')} exceeds the outstanding balance of ₹${balanceBefore.toLocaleString('en-IN')} for ${student.name}'s ${category.category_name}.` };
+        }
+        const balanceAfter = Math.max(0, balanceBefore - payAmount);
+
+        const previewFields = [
+          { label: 'Student', value: `${student.name} (Class ${student.class}${student.section ? '-' + student.section : ''})` },
+          { label: 'Fee Category', value: category.category_name },
+          { label: 'Amount', value: `₹${payAmount.toLocaleString('en-IN')}` },
+          { label: 'Payment Mode', value: String(payment_mode || 'cash').toUpperCase() },
+          { label: 'Balance', value: existingLedger ? `₹${balanceBefore.toLocaleString('en-IN')} → ₹${balanceAfter.toLocaleString('en-IN')}` : 'New fee ledger will be created' }
+        ];
+
+        const parameters = {
+          student_id: student.id,
+          fee_category_id: category.id,
+          amount: payAmount,
+          payment_mode: payment_mode || 'cash',
+          remarks: remarks || null
+        };
+
+        return {
+          data: { student, category, parameters },
+          summaryForModel: `Proposed fee payment: ₹${payAmount.toLocaleString('en-IN')} from ${student.name} for ${category.category_name} (${payment_mode || 'cash'}). Awaiting confirmation.`,
+          structuredPayload: {
+            type: 'action_card',
+            title: `Confirm Fee Payment: ${student.name}`,
+            data: {
+              actionType: 'collect_fee_payment',
+              title: `Collect ₹${payAmount.toLocaleString('en-IN')}: ${student.name}`,
+              description: `Record a ₹${payAmount.toLocaleString('en-IN')} ${payment_mode || 'cash'} payment from ${student.name} against ${category.category_name}.`,
+              parameters,
+              previewFields
+            }
+          }
+        };
+      }
+
+      case 'propose_library_issue': {
+        if (!context.isTeacher && !context.isAdmin) {
+          return { data: null, summaryForModel: 'Permission Denied: Only teachers and administrators can issue library books.' };
+        }
+        const { book_title, student_name } = args;
+        if (!book_title || !student_name) {
+          return { data: null, summaryForModel: 'book_title and student_name are both required.' };
+        }
+
+        const { data: books } = await supabase.from('library_books').select('id, title, author, copies_total, copies_available').eq('is_active', true).ilike('title', `%${String(book_title).trim()}%`).limit(5);
+        if (!books || books.length === 0) {
+          return { data: null, summaryForModel: `No book matching "${book_title}" found.` };
+        }
+        if (books.length > 1) {
+          return { data: null, summaryForModel: `Multiple books match "${book_title}": ${books.map((b: any) => `"${b.title}" by ${b.author}`).join(', ')}. Please specify more precisely.` };
+        }
+        const book: any = books[0];
+
+        if (Number(book.copies_available) <= 0) {
+          return { data: null, summaryForModel: `No copies of "${book.title}" are currently available (all ${book.copies_total} issued).` };
+        }
+
+        let studentQuery = supabase.from('students').select('id, name, class, section').eq('status', 'active').ilike('name', `%${String(student_name).trim()}%`);
+        if (context.isTeacher && context.assignedClasses.length > 0) {
+          studentQuery = studentQuery.in('class', context.assignedClasses);
+        }
+        const { data: students } = await studentQuery.limit(5);
+        if (!students || students.length === 0) {
+          return { data: null, summaryForModel: `No student matching "${student_name}" found${context.isTeacher ? ' in your assigned classes' : ''}.` };
+        }
+        if (students.length > 1) {
+          return { data: null, summaryForModel: `Multiple students match "${student_name}": ${students.map((s: any) => `${s.name} (Class ${s.class}${s.section ? '-' + s.section : ''})`).join(', ')}. Please specify more precisely.` };
+        }
+        const student: any = students[0];
+
+        const LOAN_DAYS = 14;
+        const issueDateStr = new Date().toISOString().slice(0, 10);
+        const dueDateStr = new Date(Date.now() + LOAN_DAYS * 86400000).toISOString().slice(0, 10);
+
+        const previewFields = [
+          { label: 'Book', value: `${book.title}${book.author ? ` (${book.author})` : ''}` },
+          { label: 'Student', value: `${student.name} (Class ${student.class}${student.section ? '-' + student.section : ''})` },
+          { label: 'Issue Date', value: issueDateStr },
+          { label: 'Due Date', value: dueDateStr },
+          { label: 'Copies Available', value: `${book.copies_available} of ${book.copies_total}` }
+        ];
+
+        const parameters = {
+          book_id: book.id,
+          student_id: student.id,
+          borrower_name: student.name,
+          issue_date: issueDateStr,
+          due_date: dueDateStr
+        };
+
+        return {
+          data: { book, student, parameters },
+          summaryForModel: `Proposed: Issue "${book.title}" to ${student.name}, due ${dueDateStr}. Awaiting confirmation.`,
+          structuredPayload: {
+            type: 'action_card',
+            title: `Confirm Book Issue: ${book.title}`,
+            data: {
+              actionType: 'issue_library_book',
+              title: `Issue "${book.title}" to ${student.name}`,
+              description: `Issue "${book.title}" to ${student.name} (Class ${student.class}${student.section ? '-' + student.section : ''}), due back ${dueDateStr}.`,
+              parameters,
+              previewFields
+            }
+          }
+        };
+      }
+
+      case 'propose_library_return': {
+        if (!context.isTeacher && !context.isAdmin) {
+          return { data: null, summaryForModel: 'Permission Denied: Only teachers and administrators can process library returns.' };
+        }
+        const { book_title, student_name } = args;
+        if (!book_title || !student_name) {
+          return { data: null, summaryForModel: 'book_title and student_name are both required.' };
+        }
+
+        const { data: books } = await supabase.from('library_books').select('id, title, author').ilike('title', `%${String(book_title).trim()}%`).limit(5);
+        if (!books || books.length === 0) {
+          return { data: null, summaryForModel: `No book matching "${book_title}" found.` };
+        }
+        if (books.length > 1) {
+          return { data: null, summaryForModel: `Multiple books match "${book_title}": ${books.map((b: any) => `"${b.title}"`).join(', ')}. Please specify more precisely.` };
+        }
+        const book: any = books[0];
+
+        let studentQuery = supabase.from('students').select('id, name, class, section').ilike('name', `%${String(student_name).trim()}%`);
+        if (context.isTeacher && context.assignedClasses.length > 0) {
+          studentQuery = studentQuery.in('class', context.assignedClasses);
+        }
+        const { data: students } = await studentQuery.limit(5);
+        if (!students || students.length === 0) {
+          return { data: null, summaryForModel: `No student matching "${student_name}" found${context.isTeacher ? ' in your assigned classes' : ''}.` };
+        }
+        if (students.length > 1) {
+          return { data: null, summaryForModel: `Multiple students match "${student_name}": ${students.map((s: any) => `${s.name} (Class ${s.class}${s.section ? '-' + s.section : ''})`).join(', ')}. Please specify more precisely.` };
+        }
+        const student: any = students[0];
+
+        const { data: issue } = await supabase.from('book_issues').select('id, issue_date, due_date, fine_amount').eq('book_id', book.id).eq('student_id', student.id).is('return_date', null).order('issue_date', { ascending: false }).limit(1).maybeSingle();
+        if (!issue) {
+          return { data: null, summaryForModel: `No active loan of "${book.title}" found for ${student.name}.` };
+        }
+
+        const FINE_PER_DAY = 2;
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const dueDateOnly = new Date(`${String(issue.due_date).slice(0, 10)}T00:00:00`);
+        const todayOnly = new Date(`${todayStr}T00:00:00`);
+        const overdueDays = Math.max(0, Math.floor((todayOnly.getTime() - dueDateOnly.getTime()) / 86400000));
+        const fine = Math.max(Number(issue.fine_amount) || 0, overdueDays * FINE_PER_DAY);
+
+        const previewFields = [
+          { label: 'Book', value: book.title },
+          { label: 'Student', value: `${student.name} (Class ${student.class}${student.section ? '-' + student.section : ''})` },
+          { label: 'Due Date', value: issue.due_date },
+          { label: 'Return Date', value: todayStr },
+          { label: 'Overdue', value: overdueDays > 0 ? `${overdueDays} day(s) — ₹${fine} fine` : 'On time' }
+        ];
+
+        const parameters = {
+          issue_id: issue.id,
+          book_id: book.id,
+          return_date: todayStr,
+          fine_amount: fine
+        };
+
+        return {
+          data: { book, student, issue, parameters },
+          summaryForModel: `Proposed: Return "${book.title}" from ${student.name}. ${overdueDays > 0 ? `${overdueDays} day(s) overdue, ₹${fine} fine.` : 'Returned on time.'} Awaiting confirmation.`,
+          structuredPayload: {
+            type: 'action_card',
+            title: `Confirm Book Return: ${book.title}`,
+            data: {
+              actionType: 'return_library_book',
+              title: `Return "${book.title}" from ${student.name}`,
+              description: `Mark "${book.title}" returned by ${student.name}.${overdueDays > 0 ? ` ${overdueDays} day(s) overdue — ₹${fine} fine.` : ''}`,
+              parameters,
+              previewFields
+            }
+          }
+        };
+      }
+
       case 'propose_erp_action': {
         const { action_type, title, description, parameters } = args;
 

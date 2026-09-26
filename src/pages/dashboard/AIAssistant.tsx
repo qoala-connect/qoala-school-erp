@@ -173,30 +173,47 @@ export default function AIAssistant() {
     loadLivePredictions();
   }, [isAdmin]);
 
-  // Weak Subject Analysis Recommendations
-  const insights = [
-    {
-      id: 'ins1',
-      title: 'Class 10th Algebra Performance Deficit',
-      description: 'Predictive analysis of weekly testing scores indicates a 14% drop in quadratic equations comprehension across Section B.',
-      actionable_advice: 'Schedule a 2-hour bridge lecture focusing on quadratic factorization before the upcoming half-yearly examinations.',
-      severity: 'Medium'
-    },
-    {
-      id: 'ins2',
-      title: 'Fee Collection Delay Probability Alarm',
-      description: 'AI model suggests a 22% risk of tuition collection defaults in third quarter due to holiday delays.',
-      actionable_advice: 'Dispatch automated smart Fee Reminders with integrated online payment links using SMS & Email broadcasters.',
-      severity: 'High'
-    },
-    {
-      id: 'ins3',
-      title: 'Timetable Optimization Overload warning',
-      description: 'Dr. Anand Kumar is scheduled for back-to-back Practical lab periods spanning Grades 11 and 12, creating fatigue probability.',
-      actionable_advice: 'Introduce a 1-period buffer gap or reallocate laboratory assistant roles to optimize schedules.',
-      severity: 'Low'
+  // Scheduled AI Daily Digest — generated once a day by the /api/cron/daily-digest
+  // route (see ai_daily_digests table), not computed live in the browser.
+  const [digest, setDigest] = useState<{
+    generatedAt: string;
+    summaryText: string | null;
+    dailyBrief: StructuredPayload | null;
+    atRiskStudents: StructuredPayload | null;
+    cashflowForecast: StructuredPayload | null;
+  } | null>(null);
+  const [digestLoading, setDigestLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+
+    async function loadDigest() {
+      setDigestLoading(true);
+      try {
+        const { data } = await supabase
+          .from('ai_daily_digests')
+          .select('*')
+          .order('digest_date', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (data) {
+          setDigest({
+            generatedAt: data.generated_at,
+            summaryText: data.summary_text,
+            dailyBrief: data.daily_brief || null,
+            atRiskStudents: data.at_risk_students || null,
+            cashflowForecast: data.cashflow_forecast || null
+          });
+        }
+      } catch (err) {
+        console.warn('Failed to load AI daily digest:', err);
+      } finally {
+        setDigestLoading(false);
+      }
     }
-  ];
+    loadDigest();
+  }, [isAdmin]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -690,43 +707,36 @@ export default function AIAssistant() {
         )}
 
         {activeTab === 'insights' && isAdmin && (
-          <motion.div 
+          <motion.div
             key="insights"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             className="space-y-4"
           >
-            {insights.map(item => (
-              <div key={item.id} className="bg-white border border-slate-200/60 rounded-2xl p-5 shadow-2xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                <div className="space-y-1.5 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className={cn(
-                      "status-pill text-[9px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider border",
-                      item.severity === 'High' ? 'bg-rose-50 text-rose-600 border-rose-100' :
-                      item.severity === 'Medium' ? 'bg-amber-50 text-amber-600 border-amber-100' :
-                      'bg-slate-50 text-slate-500 border-slate-100'
-                    )}>
-                      {item.severity} Priority Alert
-                    </span>
-                    <span className="text-[10px] text-slate-400 font-bold font-mono">ID: {item.id}</span>
-                  </div>
-                  <h3 className="text-xs font-black text-slate-800 uppercase tracking-tight">{item.title}</h3>
-                  <p className="text-xs text-slate-500 font-semibold leading-relaxed">{item.description}</p>
-                  <p className="text-[11px] text-violet-600 font-bold bg-violet-50/50 p-2.5 rounded-xl border border-violet-100/35">
-                    <strong>Actionable Advice: </strong>{item.actionable_advice}
-                  </p>
-                </div>
-                <div className="shrink-0">
-                  <button 
-                    onClick={() => toast.success('Insight dispatch initiated to department heads')}
-                    className="flex items-center gap-1.5 px-3.5 h-[34px] bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer active:scale-95 shadow-md shadow-violet-500/10"
-                  >
-                    Resolve Alert
-                  </button>
-                </div>
+            {digestLoading && (
+              <div className="bg-white border border-slate-200/60 rounded-2xl p-5 text-xs text-slate-400 font-semibold">
+                Loading today's AI digest...
               </div>
-            ))}
+            )}
+
+            {!digestLoading && !digest && (
+              <div className="bg-white border border-slate-200/60 rounded-2xl p-5 text-xs text-slate-500 font-semibold">
+                No AI digest has been generated yet. The school executive brief, at-risk student list, and fee
+                cashflow forecast are compiled automatically every morning — check back after the next scheduled run.
+              </div>
+            )}
+
+            {!digestLoading && digest && (
+              <>
+                <p className="text-[10px] text-slate-400 font-bold font-mono uppercase tracking-wider">
+                  Last updated: {new Date(digest.generatedAt).toLocaleString('en-IN')}
+                </p>
+                {digest.dailyBrief && <StructuredMessageRenderer payload={digest.dailyBrief} />}
+                {digest.atRiskStudents && <StructuredMessageRenderer payload={digest.atRiskStudents} />}
+                {digest.cashflowForecast && <StructuredMessageRenderer payload={digest.cashflowForecast} />}
+              </>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
