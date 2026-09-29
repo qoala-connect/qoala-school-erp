@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { 
-  ArrowLeft, 
-  ArrowRight, 
-  Lock, 
-  Mail, 
-  Eye, 
-  EyeOff, 
-  ShieldCheck 
+import {
+  ArrowLeft,
+  ArrowRight,
+  Lock,
+  Mail,
+  Eye,
+  EyeOff,
+  ShieldCheck,
+  Smartphone
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -65,7 +66,7 @@ export default function Login() {
       </header>
 
       {/* Main Centered Compact Login Card */}
-      <main className="relative z-10 flex-1 flex items-center justify-center my-auto py-4">
+      <main className="relative z-10 flex-1 flex flex-col items-center justify-center my-auto py-4">
         <div className="w-full max-w-[390px] bg-white rounded-2xl shadow-2xl shadow-black/50 border border-slate-100 p-5 sm:p-6">
           
           {/* Authentic Real School Logo & Compact Header */}
@@ -180,6 +181,16 @@ export default function Login() {
           </form>
 
         </div>
+
+        {/* Android App Download */}
+        <a
+          href="https://expo.dev/artifacts/eas/yydTZOgQXrnbA51hwSI1xyH_yYKdUvhRYWNCfwSTdBM.apk"
+          download
+          className="mt-4 inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-300 hover:text-white transition-colors"
+        >
+          <Smartphone className="w-3.5 h-3.5 text-amber-400" />
+          <span>Download Android App (APK)</span>
+        </a>
       </main>
 
       {/* Clean Bottom Footer */}
